@@ -5,7 +5,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 import { readCachedText } from "../agents/launch";
-import { isRecord, recordField, stringField } from "../lib/guards";
+import { errorMessage, isRecord, recordField, stringField } from "../lib/guards";
 import { SerialQueue } from "../lib/serial";
 import { cacheDir } from "../settings/actions";
 import { currentSettings, pathSetting, type Settings } from "../settings/store";
@@ -16,6 +16,28 @@ import type { CodeType } from "./codeTypes";
 
 /** Ghidra's first analysis of a real app takes minutes; progress notifications keep the call alive. */
 const CALL_OPTIONS = { timeout: 15 * 60_000, resetTimeoutOnProgress: true } as const;
+
+/** How long REA lets Ghidra import and analyze a file. REA's own 5.5 minutes is too short for big apps. */
+export const GHIDRA_STARTUP_MS = 30 * 60_000;
+
+const TIMEOUT_CODES: ReadonlySet<string> = new Set(["timeout", "provider_timeout"]);
+
+/** A failed REA tool call, with REA's error code so callers can tell a timeout from a broken engine. */
+export class ReaError extends Error {
+  constructor(message: string, readonly code: string) {
+    super(message);
+  }
+}
+
+export type OpenProblem = { readonly raw: string; readonly advice: string };
+
+/** What to tell someone whose file didn't open, from the error that stopped it. */
+export function openProblem(err: unknown): OpenProblem {
+  const raw = errorMessage(err);
+  if (!(err instanceof ReaError)) return { raw, advice: "Check that REA and Ghidra are installed in Setup, then open it again." };
+  if (TIMEOUT_CODES.has(err.code)) return { raw, advice: "Ghidra ran out of time analyzing it. For a big Swift app, turn off Demangle Swift names in Settings, then open it again." };
+  return { raw, advice: "Ghidra couldn't finish reading it. The details below say what stopped it." };
+}
 
 export type CodeView = "pseudocode" | "assembly";
 
@@ -63,8 +85,9 @@ const MAXMEM: Readonly<Record<Settings["ghidraMemory"], string | null>> = { Auto
 export function reaEnv(s: Settings = currentSettings()): Record<string, string> {
   const memory = MAXMEM[s.ghidraMemory];
   const inherited = (process.env.REA_GHIDRA_DISABLED_ANALYZERS ?? "").split(",").map((name) => name.trim()).filter(Boolean);
-  const disabled = [...new Set([...inherited, ...(s.rebuildSwitches ? [] : ["Decompiler Switch Analysis"])])];
+  const disabled = [...new Set([...inherited, ...(s.rebuildSwitches ? [] : ["Decompiler Switch Analysis"]), ...(s.swiftNames ? [] : ["Demangler Swift"])])];
   return {
+    REA_GHIDRA_STARTUP_TIMEOUT_MS: process.env.REA_GHIDRA_STARTUP_TIMEOUT_MS ?? String(GHIDRA_STARTUP_MS),
     ...(memory ? { GHIDRA_MAXMEM: memory } : {}),
     ...(disabled.length > 0 ? { REA_GHIDRA_DISABLED_ANALYZERS: disabled.join(",") } : {}),
   };
@@ -75,13 +98,24 @@ export function reaTransport(): StdioClientTransport {
   return new StdioClientTransport({ command, args: [...args], env: plainEnv(), stderr: "ignore" });
 }
 
+/** REA's code, the step that failed and the engine's own diagnostics, so a failure says more than its summary. */
+function errorFacts(code: string, details: Record<string, unknown> | undefined): string {
+  const operation = stringField(details, "operation");
+  const diagnostics = details?.diagnostics;
+  return [code && `code ${code}`, operation && `during ${operation}`, diagnostics !== undefined && JSON.stringify(diagnostics)].filter(Boolean).join(", ");
+}
+
 function toolError(content: unknown): Error {
   const text = Array.isArray(content) ? content.map((block) => stringField(block, "text") ?? "").join("") : "";
   try {
     const parsed: unknown = JSON.parse(text);
-    const issues = recordField(parsed, "error")?.details;
-    const issue = isRecord(issues) && Array.isArray(issues.issues) ? stringField(issues.issues[0], "message") : undefined;
-    return new Error(issue ?? stringField(recordField(parsed, "error"), "message") ?? text);
+    const error = recordField(parsed, "error");
+    const details = error?.details;
+    const issue = isRecord(details) && Array.isArray(details.issues) ? stringField(details.issues[0], "message") : undefined;
+    const code = stringField(error, "code") ?? "";
+    const message = issue ?? stringField(error, "message") ?? text;
+    const facts = issue ? "" : errorFacts(code, isRecord(details) ? details : undefined);
+    return new ReaError(facts ? `${message}\n${facts}` : message, code);
   } catch {
     return new Error(text || "REA couldn't do that.");
   }

@@ -18,6 +18,7 @@ import { type CodeType, isCodeType, withTypes } from "../engine/codeTypes";
 import { setValue } from "../engine/edits";
 import { SerialQueue } from "../lib/serial";
 import { errorMessage } from "../lib/guards";
+import { type OpenProblem, openProblem } from "../engine/rea";
 import { Shell } from "../Shell";
 import { Toast } from "../components/Toast";
 import { prepareTarget, type Target } from "../engine/target";
@@ -46,7 +47,7 @@ import { openAsk } from "./ask/place";
 /** The window's own margins around the editor card. */
 const EDGES = 24;
 
-type Opening = { readonly program: Program; readonly problem: string | null; readonly since: number | null };
+type Opening = { readonly program: Program; readonly problem: OpenProblem | null; readonly since: number | null };
 
 const NOTHING_YET = (): Promise<never> => Promise.reject(new Error("This file is still opening."));
 
@@ -75,7 +76,7 @@ function useProgram(target: Target): Opening {
         const program = await loadProgram(target);
         if (live) setOpening({ program, problem: null, since: null });
       } catch (err) {
-        if (live) setOpening({ program: pendingProgram(target), problem: errorMessage(err), since: null });
+        if (live) setOpening({ program: pendingProgram(target), problem: openProblem(err), since: null });
       }
     };
     void open();
@@ -272,7 +273,7 @@ function PaneRow(): ReactElement {
   );
 }
 
-function Editor({ problem, since }: { readonly problem: string | null; readonly since: number | null }): ReactElement {
+function Editor({ problem, since }: { readonly problem: OpenProblem | null; readonly since: number | null }): ReactElement {
   const { wb } = useBench();
   const { s } = wb;
   const focusTab = s.panes[s.focus]?.tabs[s.panes[s.focus]?.active ?? 0];
@@ -297,7 +298,7 @@ function Editor({ problem, since }: { readonly problem: string | null; readonly 
         {s.rightOpen && s.docks.right.length > 0 && <Dock />}
       </div>
       <StatusBar />
-      {problem && problem !== dismissed && <Toast title="Couldn't read the functions in this file" detail="Check that REA and Ghidra are installed in Setup, then open it again." raw={problem} onClose={() => setDismissed(problem)} />}
+      {problem && problem.raw !== dismissed && <Toast title="Couldn't read the functions in this file" detail={problem.advice} raw={problem.raw} onClose={() => setDismissed(problem.raw)} />}
       <UndoToast />
       {s.paletteOpen && <Palette />}
       <SliceOverlay />
@@ -343,7 +344,7 @@ export function Workbench({ target, chat, onBack, onOpen }: { readonly target: T
 /** The workbench around a program that is already loaded, or still opening. */
 export function WorkbenchView({ program, problem, since, code, gpu, chat, onBack, onOpen }: {
   readonly program: Program;
-  readonly problem: string | null;
+  readonly problem: OpenProblem | null;
   readonly since: number | null;
   readonly code: boolean;
   readonly gpu: GpuSource;

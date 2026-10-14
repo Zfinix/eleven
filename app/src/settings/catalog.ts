@@ -403,6 +403,7 @@ export function buildPages(c: Ctx): Readonly<Record<Page, readonly GroupModel[]>
         tg("findParameters", "Work out function parameters", "Better pseudocode for big apps. Makes the first open slower."),
         tg("rebuildSwitches", "Rebuild switch statements", "Turns jump tables back into switch blocks."),
         tg("hiddenCode", "Look for code no one calls", "Finds more functions in stripped apps. The slowest option."),
+        tg("swiftNames", "Demangle Swift names", "Readable Swift function names. Turn off if a big Swift app takes too long to open."),
         path("javaHome", "Java", c.info.java.path ?? "Not found", true, { status: c.info.java.version ? { text: `Java ${c.info.java.version}`, tone: "good" } : { text: "Not found", tone: "warn" } }),
       ] },
       { label: "Analysis tools", rows: [
