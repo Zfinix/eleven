@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 import { reaLaunch } from "../engine/rea";
 import { enginesDir } from "../engine/toolchain";
 import { ANALYZE_HEADLESS, exe, jdkLocations, THIS_DEVICE } from "../lib/platform";
+import { hasDecompiler } from "./decompiler";
 
 const run = promisify(execFile);
 const HOME = homedir();
@@ -69,19 +70,13 @@ function ghidraVersion(home: string): string {
   }
 }
 
-function decompilerNote(home: string): string {
-  const os = join(home, "Ghidra", "Features", "Decompiler", "os");
-  if (existsSync(join(os, "mac_arm_64", "decompile"))) return "with an arm64 decompiler";
-  if (existsSync(join(os, "mac_x86_64", "decompile"))) return "with an Intel decompiler that runs under Rosetta";
-  if (existsSync(join(os, "linux_x86_64", "decompile")) || existsSync(join(os, "win_x86_64", "decompile.exe"))) return "with its decompiler";
-  return "but its decompiler is missing, so code won't show";
-}
-
 function ghidraCheck(): Check {
   const home = ghidraHome();
   if (!home) return { key: "ghidra", status: "problem", title: "Ghidra not found", detail: "Install Ghidra 12 or set GHIDRA_INSTALL_DIR, then restart Eleven." };
   const version = ghidraVersion(home);
-  return { key: "ghidra", status: "ok", title: version ? `Ghidra ${version}` : "Ghidra", detail: `${tildify(home)} ${decompilerNote(home)}` };
+  const title = version ? `Ghidra ${version}` : "Ghidra";
+  if (!hasDecompiler(home)) return { key: "ghidra", status: "problem", title, detail: `${tildify(home)} has no decompiler for ${THIS_DEVICE}, so code won't show. Install Ghidra in Setup to build it.` };
+  return { key: "ghidra", status: "ok", title, detail: `${tildify(home)} with its decompiler` };
 }
 
 export function jdkHome(): string | null {

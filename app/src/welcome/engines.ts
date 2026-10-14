@@ -10,8 +10,9 @@ import { pathSetting } from "../settings/store";
 import { errorMessage, isRecord } from "../lib/guards";
 import { engineArrived } from "../analysis/engines";
 import { adoptToolchain, enginesDir } from "../engine/toolchain";
-import { OS, unzip } from "../lib/platform";
+import { OS, THIS_DEVICE, unzip } from "../lib/platform";
 import { ghidraHome, javaCheck, jdkHome } from "./checks";
+import { buildDecompiler, hasDecompiler } from "./decompiler";
 
 const run = promisify(execFile);
 const BREW_PATHS = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"] as const;
@@ -24,7 +25,8 @@ export type EngineId = "rizin" | "ghidra" | "java";
 
 export const STOPPED = "The download stopped. Check your connection, then try again.";
 
-export type Found = { readonly found: boolean; readonly where: string };
+/** `repair` is set when the engine is here but a part of it is missing. */
+export type Found = { readonly found: boolean; readonly where: string; readonly repair?: string };
 
 export type Install =
   | { readonly phase: "idle" }
@@ -87,7 +89,8 @@ export function detectEngine(id: EngineId): Found {
     }
     case "ghidra": {
       const home = ghidraHome();
-      return home ? { found: true, where: tilde(home) } : { found: false, where: "" };
+      if (!home) return { found: false, where: "" };
+      return hasDecompiler(home) ? { found: true, where: tilde(home) } : { found: false, where: tilde(home), repair: `Found, but its decompiler for ${THIS_DEVICE} is missing. Repair builds it` };
     }
     case "java": {
       const home = jdkHome();
@@ -191,6 +194,15 @@ async function installJava(): Promise<void> {
 async function installGhidra(): Promise<void> {
   if (javaCheck().status !== "ok") await startInstall("java");
   if (javaCheck().status !== "ok") throw new Error("Ghidra needs Java 21, which didn't finish downloading. Check your connection, then try again.");
+  if (!ghidraHome()) await downloadGhidra();
+  const home = ghidraHome();
+  if (!home) throw new Error("Ghidra didn't unpack. Try again.");
+  if (hasDecompiler(home)) return;
+  setInstall("ghidra", { phase: "running", progress: null, note: `Building the decompiler for ${THIS_DEVICE}` });
+  await buildDecompiler(home);
+}
+
+async function downloadGhidra(): Promise<void> {
   setInstall("ghidra", { phase: "running", progress: null, note: "Finding the latest release" });
   const url = await ghidraAsset();
   const dir = enginesDir();

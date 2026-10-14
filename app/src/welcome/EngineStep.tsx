@@ -18,11 +18,12 @@ function rowDetail(engine: Engine, engines: Engines): string {
     case "ready":
       return install.phase === "done" ? "Installed" : `Found on ${THIS_DEVICE}, ${found?.where ?? ""}`;
     case "missing":
-      return `${engine.about}, ${engine.megabytes} MB`;
+      return found?.repair ?? `${engine.about}, ${engine.megabytes} MB`;
     case "failed":
       return install.phase === "failed" ? install.message : STOPPED;
     case "installing":
-      return install.phase === "running" && install.progress !== null ? `Downloading ${Math.round(engine.megabytes * install.progress)} of ${engine.megabytes} MB` : "Setting up";
+      if (install.phase !== "running") return "Setting up";
+      return install.progress !== null ? `Downloading ${Math.round(engine.megabytes * install.progress)} of ${engine.megabytes} MB` : install.note;
   }
 }
 
@@ -50,7 +51,7 @@ function Row({ engine, engines }: { readonly engine: Engine; readonly engines: E
       {state === "missing" && (
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
           <TextButton label="I have it" onClick={() => engines.locate(engine.id)} />
-          <OutlineButton label="Install" onClick={() => engines.install(engine.id)} />
+          <OutlineButton label={engines.found[engine.id]?.repair ? "Repair" : "Install"} onClick={() => engines.install(engine.id)} />
         </div>
       )}
       {state === "failed" && <OutlineButton label="Try again" onClick={() => engines.install(engine.id)} />}
