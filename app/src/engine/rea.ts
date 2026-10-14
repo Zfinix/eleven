@@ -222,7 +222,7 @@ class Rea {
 /** Drops the cached assembly, pseudocode and dossiers of a file, so the next read sees a type change. */
 export async function forgetCode(sha256: string): Promise<void> {
   const root = join(cacheDir(), sha256, "ghidra");
-  await Promise.all(["assembly", "pseudocode", "dossier", "procedures.json"].map((name) => rm(join(root, name), { recursive: true, force: true })));
+  await Promise.all(["assembly", "pseudocode", "dossier", "procedures.json", "strings.json", "segments.json"].map((name) => rm(join(root, name), { recursive: true, force: true })));
 }
 
 declare global {

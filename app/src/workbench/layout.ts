@@ -1,5 +1,10 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+
+import { readCachedText } from "../agents/launch";
 import { isRecord, stringField } from "../lib/guards";
 import { rea } from "../engine/rea";
+import { cacheDir } from "../settings/actions";
 import type { HexRow, TableRow } from "./model";
 
 const MAX_STRINGS = 400;
@@ -10,8 +15,33 @@ function list(value: unknown): readonly unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
+function tableRow(value: unknown): readonly TableRow[] {
+  const a = stringField(value, "a");
+  const b = stringField(value, "b");
+  return a !== undefined && b !== undefined ? [{ a, b }] : [];
+}
+
+/** A table read once per binary and kept with its function list, so reopening a project never asks REA (and Ghidra) again. */
+async function cachedRows(sha256: string, name: string, load: () => Promise<readonly TableRow[]>): Promise<readonly TableRow[]> {
+  const file = join(cacheDir(), sha256, "ghidra", `${name}.json`);
+  const cached = await readCachedText(file);
+  if (cached !== null) return list(JSON.parse(cached)).flatMap(tableRow);
+  const rows = await load();
+  await mkdir(dirname(file), { recursive: true });
+  await writeFile(file, JSON.stringify(rows));
+  return rows;
+}
+
+export function programStrings(path: string, sha256: string): Promise<readonly TableRow[]> {
+  return cachedRows(sha256, "strings", () => stringsFromRea(path));
+}
+
+export function programSegments(path: string, sha256: string): Promise<readonly TableRow[]> {
+  return cachedRows(sha256, "segments", () => segmentsFromRea(path));
+}
+
 /** Defined strings in the binary, from REA, for any format. */
-export async function programStrings(path: string): Promise<readonly TableRow[]> {
+async function stringsFromRea(path: string): Promise<readonly TableRow[]> {
   return list(await rea.tool(path, "list_strings", {}))
     .flatMap((entry) => {
       const address = stringField(entry, "address");
@@ -22,7 +52,7 @@ export async function programStrings(path: string): Promise<readonly TableRow[]>
 }
 
 /** The binary's segments and sections, from REA, for any format. */
-export async function programSegments(path: string): Promise<readonly TableRow[]> {
+async function segmentsFromRea(path: string): Promise<readonly TableRow[]> {
   return list(await rea.tool(path, "list_segments", {}))
     .flatMap((entry) => {
       const name = stringField(entry, "name");

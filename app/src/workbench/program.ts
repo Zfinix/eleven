@@ -120,8 +120,8 @@ async function loadProgramRea(target: Target): Promise<Program> {
     .filter((p) => p.kind !== "External")
     .map((p) => ({ addr: p.address, name: p.name, kind: p.kind === "Thunk" ? "thunk" : "function" }));
   const [strings, segments] = await Promise.all([
-    timed(log, "list_strings", () => programStrings(target.path)),
-    timed(log, "list_segments", () => programSegments(target.path)),
+    timed(log, "list_strings", () => programStrings(target.path, sha256)),
+    timed(log, "list_segments", () => programSegments(target.path, sha256)),
   ]);
   const code = (addr: string, view: "pseudo" | "asm"): Promise<string> => {
     const name = functions.find((fn) => fn.addr === addr)?.name ?? addr;
