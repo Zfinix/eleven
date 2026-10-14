@@ -1,7 +1,8 @@
 import type { LinearGradientBackground } from "@gpuix/react";
 import type { ReactElement } from "react";
 
-import { type Appearance, frostRadius, glassTint, MONO, useTheme } from "../theme";
+import { THIS_DEVICE } from "../lib/platform";
+import { type Appearance, frostRadius, glassTint, MONO, onGlass, useTheme } from "../theme";
 import { codeFamily, formatAddress, lineHeightFor, type Syntax, syntaxFor } from "./look";
 import { PERMISSION_PRESETS, PERMISSION_TOOLS, type PermissionTable, type Settings } from "./store";
 
@@ -65,6 +66,7 @@ const LIGHTS = ["#ff5f57", "#febc2e", "#28c840"] as const;
 
 export function WindowPreview({ transparency, frost }: { readonly transparency: number; readonly frost: number }): ReactElement {
   const { p } = useTheme();
+  const glass = onGlass(p, transparency);
   const blur = 4 + frostRadius(frost) * 2;
   const bar = (width: string, color: string): ReactElement => <div style={{ height: 5, width, borderRadius: 3, backgroundColor: color, pointerEvents: "none" }} />;
   return (
@@ -78,10 +80,10 @@ export function WindowPreview({ transparency, frost }: { readonly transparency: 
             <div style={{ display: "flex", gap: 5, marginBottom: 6, pointerEvents: "none" }}>
               {LIGHTS.map((color) => <div key={color} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color, pointerEvents: "none" }} />)}
             </div>
-            {bar("70%", p.line3)}
-            <div style={{ display: "flex", alignItems: "center", height: 15, marginLeft: -4, paddingLeft: 4, borderRadius: 5, backgroundColor: p.sel2, pointerEvents: "none" }}>{bar("55%", p.muted)}</div>
-            {bar("80%", p.line3)}
-            {bar("60%", p.line3)}
+            {bar("70%", glass.line3)}
+            <div style={{ display: "flex", alignItems: "center", height: 15, marginLeft: -4, paddingLeft: 4, borderRadius: 5, backgroundColor: glass.sel2, pointerEvents: "none" }}>{bar("55%", glass.muted)}</div>
+            {bar("80%", glass.line3)}
+            {bar("60%", glass.line3)}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 7, flexGrow: 1, padding: 12, borderWidth: 1, borderColor: p.sel, borderRadius: 8, backgroundColor: p.card, pointerEvents: "none" }}>
             {bar("34%", p.keyword)}
@@ -98,7 +100,7 @@ export function WindowPreview({ transparency, frost }: { readonly transparency: 
 const THEMES = [
   { value: "Dark", label: "Dark", win: ["#171717"], card: ["#0f0f0f"], line: "#3a3a3a" },
   { value: "Light", label: "Light", win: ["#f3f3f1"], card: ["#ffffff"], line: "#d4d4d1" },
-  { value: "System", label: "Match my Mac", win: ["#171717", "#f3f3f1"], card: ["#0f0f0f", "#ffffff"], line: "#8f8f8f" },
+  { value: "System", label: `Match ${THIS_DEVICE}`, win: ["#171717", "#f3f3f1"], card: ["#0f0f0f", "#ffffff"], line: "#8f8f8f" },
 ] as const;
 
 function Split({ colors }: { readonly colors: readonly string[] }): ReactElement {

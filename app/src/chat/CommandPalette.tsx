@@ -86,7 +86,7 @@ function ItemRow({ item, highlighted, onPick }: { readonly item: PaletteItem; re
       );
     }
     case "skill":
-      return <div onClick={onPick} style={look}>{line("bolt", p.data, item.skill.name, item.skill.description)}</div>;
+      return <div onClick={onPick} style={look}>{line("spark", p.data, item.skill.name, item.skill.description)}</div>;
     case "command":
       return <div onClick={onPick} style={look}>{line("slash", p.text3, item.command.name, item.command.description)}</div>;
     case "switch":

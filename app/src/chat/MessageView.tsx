@@ -44,10 +44,14 @@ function IconAction({ icon, label, onClick }: { readonly icon: string; readonly 
 function UserMessage({ text: sent, at }: { readonly text: string; readonly at: number }): ReactElement {
   const { p } = useTheme();
   const text = shownText(sent);
+  const { colorScheme } = useSettings().settings;
+  const look = useCodeLook();
   const [hovered, setHovered] = useState(false);
   return (
     <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <div {...menuOn(() => [{ kind: "action", label: "Copy", icon: "copy", run: () => copyText(text) }])} style={{ userSelect: "text", paddingTop: 10, paddingBottom: 10, paddingLeft: 14, paddingRight: 14, borderWidth: 1, borderColor: p.line2, borderRadius: 12, backgroundColor: p.raised, color: p.text, lineHeight: 21 }}>{text}</div>
+      <div {...menuOn(() => [{ kind: "action", label: "Copy", icon: "copy", run: () => copyText(text) }])} style={{ display: "flex", flexDirection: "column", userSelect: "text", paddingTop: 10, paddingBottom: 10, paddingLeft: 14, paddingRight: 14, borderWidth: 1, borderColor: p.line2, borderRadius: 12, backgroundColor: p.raised }}>
+        <markdown source={text.trim()} theme={nativeTheme(p, look, syntaxFor(colorScheme, p))} onLinkClick={(event) => event.value && openLink(event.value)} style={{ color: p.text }} />
+      </div>
       <Row gap={2} style={{ height: 24, opacity: hovered ? 1 : 0 }}>
         <Spacer />
         <div style={{ fontSize: 11.5, color: p.faint, marginRight: 4 }}>{timeOfDay(at)}</div>

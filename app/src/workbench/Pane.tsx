@@ -4,7 +4,10 @@ import { chatTitle } from "../chat/useChat";
 import { Tooltip } from "../components/kit";
 import { DALVIK } from "../engine/jadx";
 import { useTheme } from "../theme";
-import { Spacer } from "../components/ui";
+import { Icon, Spacer } from "../components/ui";
+import { type MenuEntry, openMenu } from "../components/ContextMenu";
+import { CODE_LANGUAGES, type CodeLanguage, useSettings } from "../settings/store";
+import { RewriteView } from "./RewriteView";
 import { CodeLines } from "./CodeLines";
 import { DebugView } from "./DebugView";
 import { DiffView } from "./DiffView";
@@ -20,7 +23,7 @@ import { pageOwnsScroll } from "../gpu/ModelView";
 import { useSize } from "../lib/useSize";
 import { TYPING } from "../lib/shortcuts";
 import { goTo } from "./actions";
-import { IconButton, MONO_STYLE, SegItem, useBench } from "./parts";
+import { HOVER, IconButton, MONO_STYLE, SegItem, useBench } from "./parts";
 import { ResourceView } from "./ResourceView";
 import { TabBar } from "./TabBar";
 import { fillsSpace, ToolBody } from "./Tools";
@@ -38,6 +41,27 @@ const DALVIK_MODES: readonly { readonly mode: CodeMode; readonly label: string; 
   { mode: "asm", label: "Smali", icon: "assembly", tip: "The method's Dalvik instructions as smali, the way apktool prints them" },
   { mode: "pseudo", label: "Java", icon: "pseudocode", tip: "The method decompiled to Java by jadx" },
 ];
+
+const LANGUAGE_ICON: Readonly<Partial<Record<CodeLanguage, string>>> = { Pseudocode: "pseudocode", C: "lang-c", "C++": "lang-cpp", Rust: "lang-rust", Go: "lang-go", Swift: "lang-swift", Java: "lang-java" };
+
+/** Which language the pseudocode view shows: the engine's own pseudocode, or the agent's rewrite in another language. */
+function LanguagePicker(): ReactElement {
+  const { p } = useTheme();
+  const { settings, update } = useSettings();
+  const current = settings.codeLanguage;
+  const entries = CODE_LANGUAGES.map((language): MenuEntry => {
+    const icon = language === current ? "check" : LANGUAGE_ICON[language];
+    return { kind: "action", label: language, ...(icon ? { icon } : {}), run: () => update({ codeLanguage: language }) };
+  });
+  return (
+    <Tooltip label="Rewrite this function in another language with the chat's agent">
+      <div onClick={(event) => openMenu(event.x ?? 0, event.y ?? 0, entries)} role="button" aria-label={`Language: ${current}`} style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, height: 26, paddingLeft: 9, paddingRight: 7, borderRadius: 7, backgroundColor: p.fill, fontSize: 12, color: p.text3, cursor: "pointer", hover: HOVER }}>
+        <div style={{ whiteSpace: "nowrap", pointerEvents: "none" }}>{current}</div>
+        <Icon name="updown" size={12} color={p.muted} />
+      </div>
+    </Tooltip>
+  );
+}
 
 /** Below this pane width the view switch shows only icons. */
 const WORDS_FROM = 640;
@@ -83,6 +107,7 @@ function ModeBar({ pane, addr, view, width }: { readonly pane: number; readonly 
           </Tooltip>
         ))}
       </div>
+      {view === "pseudo" && <LanguagePicker />}
       {view === "asm" && <IconButton icon="split" label="Pseudocode beside it, lines linked" on={wb.s.linked} color={wb.s.linked ? p.text : p.muted} size={26} iconSize={15} onClick={() => wb.besidePseudo(addr)} />}
       {view === "asm" && program.arch !== DALVIK && <IconButton icon="hex" label="Show bytes" on={wb.s.showBytes} color={wb.s.showBytes ? p.text : p.muted} size={26} iconSize={15} onClick={() => wb.patch({ showBytes: !wb.s.showBytes })} />}
       <IconButton icon="bookmark" on={marked} color={marked ? p.data : p.muted} label="Bookmark" size={26} iconSize={15} onClick={() => wb.toggleBookmark({ addr, label: nameOf(addr) })} />
@@ -124,11 +149,13 @@ function ThreadView(): ReactElement {
 }
 
 function Body({ tab }: { readonly tab: Tab | undefined }): ReactElement {
+  const language = useSettings().settings.codeLanguage;
   if (!tab) return <EmptyPane />;
   switch (tab.kind) {
     case "fn":
       switch (tab.view) {
         case "pseudo":
+          return language === "Pseudocode" ? <CodeLines addr={tab.addr} view="pseudo" /> : <RewriteView addr={tab.addr} language={language} />;
         case "asm":
           return <CodeLines addr={tab.addr} view={tab.view} />;
         case "graph":
