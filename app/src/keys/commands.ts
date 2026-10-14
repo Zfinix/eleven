@@ -1,7 +1,7 @@
 export const COMMAND_IDS = [
   "goto", "palette", "open", "save", "back", "forward", "find", "findNext", "findPrevious",
   "rename", "comment", "xrefs", "bookmark", "undo", "redo",
-  "graph", "pseudo", "strings", "split", "splitDown", "terminal",
+  "graph", "pseudo", "strings", "split", "splitDown", "terminal", "details",
   "agent", "thread", "stop", "settings",
   "patch", "debug", "continue", "stepOver", "stepIn", "stepOut",
   "confirm", "dismiss", "selectAll", "copy",
@@ -48,6 +48,7 @@ export const COMMANDS: readonly Command[] = [
   { id: "split", label: "Split right", group: "View" },
   { id: "splitDown", label: "Split down", group: "View" },
   { id: "terminal", label: "Terminal", group: "View" },
+  { id: "details", label: "Show or hide details", group: "View" },
   { id: "agent", label: "Agent panel", group: "Agent" },
   { id: "thread", label: "New chat", group: "Agent" },
   { id: "stop", label: "Stop the agent", group: "Agent" },

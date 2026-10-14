@@ -37,7 +37,8 @@ export const ELEVEN_KEYS: Readonly<Record<CommandId, Combo>> = {
   split: "cmd-\\",
   splitDown: "shift-cmd-\\",
   terminal: "ctrl-`",
-  agent: "shift-cmd-a",
+  details: "cmd-j",
+  agent: "cmd-l",
   thread: "cmd-n",
   stop: "",
   settings: "cmd-,",
@@ -69,8 +70,8 @@ export const KEYMAPS: readonly Keymap[] = [
   { id: "ida", name: "IDA Pro", letters: "IDA", keys: { palette: "shift-cmd-p", back: "escape", forward: "cmd-enter", find: "alt-t", findNext: "cmd-t", comment: "shift-;", pseudo: "f5", strings: "shift-f12", bookmark: "alt-m" } },
   { id: "ghidra", name: "Ghidra", letters: "G", keys: { palette: "cmd-3", back: "alt-left", forward: "alt-right", rename: "l", xrefs: "shift-cmd-f", graph: "cmd-space", pseudo: "cmd-e" } },
   { id: "binja", name: "Binary Ninja", letters: "BN", keys: { palette: "cmd-p", back: "escape", pseudo: "tab" } },
-  { id: "vscode", name: "Cursor or VS Code", letters: "VS", keys: { goto: "shift-cmd-o", palette: "shift-cmd-p", back: "ctrl--", forward: "ctrl-shift--", rename: "f2", comment: "cmd-/", xrefs: "shift-f12" } },
-  { id: "zed", name: "Zed", letters: "Z", keys: { goto: "shift-cmd-o", palette: "shift-cmd-p", back: "ctrl--", forward: "ctrl-shift--", rename: "f2", comment: "cmd-/", xrefs: "alt-shift-f12" } },
+  { id: "vscode", name: "Cursor or VS Code", letters: "VS", keys: { goto: "shift-cmd-o", palette: "shift-cmd-p", back: "ctrl--", forward: "ctrl-shift--", rename: "f2", comment: "cmd-/", xrefs: "shift-f12", details: "cmd-j" } },
+  { id: "zed", name: "Zed", letters: "Z", keys: { goto: "shift-cmd-o", palette: "shift-cmd-p", back: "ctrl--", forward: "ctrl-shift--", rename: "f2", comment: "cmd-/", xrefs: "alt-shift-f12", details: "cmd-j" } },
   { id: "xcode", name: "Xcode", letters: "X", keys: { goto: "shift-cmd-o", palette: "shift-cmd-a", agent: "alt-cmd-a", back: "ctrl-cmd-left", forward: "ctrl-cmd-right", comment: "cmd-/" } },
 ];
 

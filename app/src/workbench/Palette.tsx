@@ -79,6 +79,7 @@ function useActions(): readonly Action[] {
         ] as const
       : []),
     { section: "View", icon: "slash", label: "Terminal", command: "terminal", run: () => { close(); wb.reveal("terminal"); } },
+    { section: "View", icon: "panel", label: "Toggle details", command: "details", run: () => wb.patch({ paletteOpen: false, bottomOpen: !s.bottomOpen }) },
     { section: "View", icon: "sidebar", label: "Toggle sidebar", command: null, run: () => wb.patch({ paletteOpen: false, sidebarOpen: !s.sidebarOpen }) },
     { section: "View", icon: "thread", label: "Toggle agent panel", command: "agent", run: () => { close(); wb.toggleTool("agent"); } },
     { section: "File", icon: "references", label: "Compare with another binary…", command: null, run: openCompare },
@@ -157,7 +158,7 @@ function OptionIcon({ option }: { readonly option: Option }): ReactElement {
   const { p } = useTheme();
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 17, height: 17, flexShrink: 0, pointerEvents: "none" }}>
-      <Icon name={option.icon} size={17} color={p.muted} />
+      <Icon name={option.icon} size={17} color={option.kind === "ai" ? p.data : p.muted} />
     </div>
   );
 }

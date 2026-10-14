@@ -1,14 +1,12 @@
-import { execFile } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
-import { promisify } from "node:util";
 
 import { isRecord } from "../lib/guards";
 import type { CommandId } from "./commands";
 import { type Combo, type KeymapId, makeCombo, type Overrides } from "./keymaps";
+import { run } from "../lib/process";
 
-const run = promisify(execFile);
 const HOME = homedir();
 const APP_DIRS = ["/Applications", join(HOME, "Applications")];
 
@@ -119,6 +117,8 @@ const VSCODE_COMMANDS: Readonly<Record<string, CommandId>> = {
   "workbench.action.files.openFileFolder": "open",
   "workbench.action.files.openFile": "open",
   "workbench.action.splitEditor": "split",
+  "workbench.action.togglePanel": "details",
+  "workbench.action.terminal.toggleTerminal": "terminal",
   "workbench.action.openSettings": "settings",
   "actions.find": "find",
   "editor.action.nextMatchFindAction": "findNext",
@@ -137,6 +137,8 @@ const ZED_ACTIONS: Readonly<Record<string, CommandId>> = {
   "editor::FindAllReferences": "xrefs",
   "workspace::Open": "open",
   "pane::SplitRight": "split",
+  "workspace::ToggleBottomDock": "details",
+  "terminal_panel::ToggleFocus": "terminal",
   "zed::OpenSettings": "settings",
   "buffer_search::Deploy": "find",
   "search::SelectNextMatch": "findNext",

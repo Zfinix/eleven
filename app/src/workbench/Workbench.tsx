@@ -123,6 +123,7 @@ function useWorkbenchCommands(wb: WorkbenchState, tab: Tab | undefined): void {
     if (!openAsk(wb, null)) wb.toggleTool("agent");
   });
   useCommand("terminal", () => wb.toggleTool("terminal"));
+  useCommand("details", () => wb.patch({ bottomOpen: !wb.s.bottomOpen }));
 }
 
 function codeType(value: string | undefined): CodeType | null {
