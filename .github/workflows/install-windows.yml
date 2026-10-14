@@ -1,0 +1,33 @@
+name: Windows installer
+
+on:
+  pull_request:
+    paths:
+      - install.ps1
+      - .github/workflows/install-windows.yml
+  push:
+    branches: [main]
+    paths:
+      - install.ps1
+      - .github/workflows/install-windows.yml
+  workflow_dispatch:
+
+jobs:
+  install-windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [powershell, pwsh]
+    env:
+      ELEVEN_NO_LAUNCH: "1"
+      ELEVEN_DEST: ${{ github.workspace }}\eleven-install
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the installer
+        run: ${{ matrix.shell }} -NoProfile -ExecutionPolicy Bypass -Command "Get-Content -Raw install.ps1 | Invoke-Expression"
+      - name: Check what it installed
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "$env:ELEVEN_DEST\bin\Eleven.exe")) { throw "Eleven.exe is missing" }
+          if (-not (Test-Path ([IO.Path]::Combine([Environment]::GetFolderPath("Programs"), "Eleven.lnk")))) { throw "Start menu shortcut is missing" }
