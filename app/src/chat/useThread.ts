@@ -11,8 +11,11 @@ import { currentSettings, type Settings } from "../settings/store";
 import { errorMessage, stringField } from "../lib/guards";
 import { entryProcedure, loadProcedures } from "../engine/procedures";
 import { projectId } from "../engine/project";
-import { DALVIK, openJadx } from "../engine/jadx";
 import { type Opened, rea } from "../engine/rea";
+import { DALVIK, openJadx } from "../engine/jadx";
+import { rizinDisassembly, rizinEntry, rizinFunctions, rizinPseudocode } from "../engine/rizin";
+import { androidHint, engineHint } from "../analysis/hint";
+import { activeBackend } from "../analysis/engines";
 import { prepareTarget, type Target } from "../engine/target";
 import { type SavedThread, saveThread } from "./history";
 import { EMPTY_THREAD, isBusy, type Message, threadReducer, type ThreadState } from "./thread";
@@ -44,7 +47,8 @@ function opening(target: Target | null): readonly string[] {
   if (!target) {
     return [
       "You are working inside Eleven, a reverse-engineering app. No file is open yet.",
-      'When the user names a binary or app to study, open it with the eleven-rea MCP tool open_binary (provider_id "ghidra") so Eleven can show it.',
+      `When the user names a binary or app to study: ${engineHint("<that path>", "")}`,
+      `If it is an Android app (an APK or .dex): ${androidHint("<that path>")}`,
     ];
   }
   if (target.kind === "gpu") {
@@ -62,7 +66,7 @@ function opening(target: Target | null): readonly string[] {
   const slice = target.path === target.original ? "" : ` (analyze ${target.path}, the ${target.arch} slice)`;
   return [
     `You are working inside Eleven, a reverse-engineering app. The user opened ${target.original}${slice}.`,
-    'Use the eleven-rea MCP tools (REA): call open_binary with that path and provider_id "ghidra" first.',
+    engineHint(target.path, target.arch),
   ];
 }
 
@@ -97,10 +101,26 @@ function openedPath(event: AgentEvent, tools: Map<string, string>): string | nul
   return path && opens ? path : null;
 }
 
+/** The file as REA's caches know it, by its fingerprint; REA only opens it (in Ghidra) when something isn't cached yet. */
+function openedFor(target: Target): Opened {
+  return { path: target.path, sha256: projectId(target), format: "", architecture: target.arch };
+}
+
 async function entryName(target: Target, opened: { current: Opened | null }): Promise<string | null> {
   if (target.arch === DALVIK) return null;
-  opened.current ??= await rea.open(target.path);
+  if (activeBackend() === "rizin") return rizinEntry(await rizinFunctions(target.path))?.name ?? null;
+  opened.current ??= openedFor(target);
   return entryProcedure(await loadProcedures(target.path, opened.current.sha256))?.name ?? null;
+}
+
+async function rizinCode(path: string, procedure: string): Promise<string> {
+  const fn = (await rizinFunctions(path)).find((candidate) => candidate.name === procedure);
+  if (!fn) throw new Error(`Rizin found no function named ${procedure}.`);
+  try {
+    return await rizinPseudocode(path, fn.addr);
+  } catch {
+    return rizinDisassembly(path, fn.addr);
+  }
 }
 
 async function jadxCode(target: Target, procedure: string): Promise<string> {
@@ -112,7 +132,8 @@ async function jadxCode(target: Target, procedure: string): Promise<string> {
 
 async function loadCode(target: Target, opened: { current: Opened | null }, procedure: string): Promise<string> {
   if (target.arch === DALVIK) return jadxCode(target, procedure);
-  opened.current ??= await rea.open(target.path);
+  if (activeBackend() === "rizin") return rizinCode(target.path, procedure);
+  opened.current ??= openedFor(target);
   return rea.code(opened.current, procedure, "pseudocode");
 }
 
