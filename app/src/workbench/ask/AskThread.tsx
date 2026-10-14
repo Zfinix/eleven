@@ -15,7 +15,7 @@ import { syntaxFor, useCodeLook } from "../../settings/look";
 import { currentSettings, useSettings } from "../../settings/store";
 import { SANS, useTheme } from "../../theme";
 import { ask, copy } from "../actions";
-import { useProject } from "../History";
+import { useProject } from "../useProject";
 import { type Bench, HOVER, IconButton, TextButton, useBench } from "../parts";
 import { useTypewriter } from "../RewriteView";
 import type { LineRange } from "../state";

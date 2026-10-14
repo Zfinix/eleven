@@ -6,8 +6,8 @@ import { errorMessage } from "../lib/guards";
 import { useTheme } from "../theme";
 import { Icon } from "../components/ui";
 import { goTo } from "./actions";
-import { useProject } from "./History";
 import { ELLIPSIS, HOVER, IconButton, MONO_STYLE, TextButton, useBench } from "./parts";
+import { useProject } from "./useProject";
 
 const KIND: Readonly<Record<EditField, { readonly label: string; readonly done: string; readonly icon: string }>> = {
   names: { label: "Rename", done: "Renamed", icon: "rename" },
@@ -21,7 +21,7 @@ const KIND: Readonly<Record<EditField, { readonly label: string; readonly done: 
   formats: { label: "Number format", done: "Changed format", icon: "hex" },
 };
 
-/** Suggestions decided before this window opened stay in History, not in the chat. */
+/** Suggestions decided before this window opened stay out of the chat. */
 const OPENED = Date.now();
 export const SETTLED_FOR_MS = 6_000;
 
@@ -90,7 +90,7 @@ function Card({ edit, onDismiss }: { readonly edit: Edit; readonly onDismiss: ()
   );
 }
 
-/** The agent's suggestions for this chat, each with Accept and Decline, then Undo once accepted. Decided ones can be dismissed; History keeps them. */
+/** The agent's suggestions for this chat, each with Accept and Decline, then Undo once accepted. Decided ones can be dismissed. */
 export function Suggestions({ chatId }: { readonly chatId: string | null }): ReactElement | null {
   const { program } = useBench();
   const [, setHidden] = useState(0);
