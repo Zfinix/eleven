@@ -4,8 +4,8 @@ import { Tooltip } from "../../components/kit";
 import { Icon, Popover, usePopover } from "../../components/ui";
 import type { ProjectEntry } from "../../engine/project";
 import { explainArch } from "../../lib/explain";
-import { fileIcon } from "../../lib/fileIcon";
-import { useLoaded } from "../../lib/useLoaded";
+import { formatLabel } from "../../lib/fileIcon";
+import { FileIcon } from "../../components/FileIcon";
 import { runCommand } from "../../lib/shortcuts";
 import { comboFor } from "../../keys/keymaps";
 import { useSettings } from "../../settings/store";
@@ -31,12 +31,10 @@ export function useOpenProject(): (entry: ProjectEntry) => void {
   };
 }
 
-/** The icon Finder shows for a project's file: an app's own icon, or the Eleven document icon. */
+/** A project's file icon: its format's logo, an app's own icon, or the Eleven document icon. */
 function ProjectIcon({ path }: { readonly path: string }): ReactElement {
   const { p } = useTheme();
-  const icon = useLoaded<string | null>(() => fileIcon(path), `icon:${path}`);
-  if (icon.kind === "ready" && icon.value) return <img src={icon.value} style={{ width: 17, height: 17, borderRadius: 4 }} />;
-  return <Icon name="folder" size={17} color={p.muted} />;
+  return <FileIcon path={path} px={17} radius={4} fallback={<Icon name="folder" size={17} color={p.muted} />} />;
 }
 
 export function ProjectRows({ onDone }: { readonly onDone: () => void }): ReactElement {
@@ -63,7 +61,7 @@ export function ProjectSwitcher(): ReactElement {
   const { program, chat, wb } = useBench();
   const { settings } = useSettings();
   const menu = usePopover();
-  const format = chat.target?.meta.split(" · ")[0] ?? "";
+  const format = chat.target?.meta.split(" · ")[0] || formatLabel(program.origin || program.path) || "";
   return (
     <div style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", height: 46, paddingRight: 2 }}>

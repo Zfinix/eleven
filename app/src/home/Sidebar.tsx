@@ -1,4 +1,4 @@
-import { type ReactElement, type ReactNode, useState } from "react";
+import { type ReactElement, type ReactNode, useMemo, useState } from "react";
 
 import { type MenuEntry, menuOn } from "../components/ContextMenu";
 
@@ -7,10 +7,9 @@ import { ThreadName } from "../chat/ThreadName";
 import type { ProjectEntry } from "../engine/project";
 import type { CommandId } from "../keys/commands";
 import { comboFor, comboKeys } from "../keys/keymaps";
-import { fileIcon } from "../lib/fileIcon";
-import { useLoaded } from "../lib/useLoaded";
+import { FileIcon } from "../components/FileIcon";
 import { useSettings } from "../settings/store";
-import { type Appearance, useTheme } from "../theme";
+import { type Appearance, onGlass, ThemeContext, useTheme } from "../theme";
 import { appIcon, CommandKeys, Dot, Icon, MenuSurface, Popover, Row, usePopover } from "../components/ui";
 
 const APPEARANCES: readonly Appearance[] = ["Dark", "Light", "System"];
@@ -43,8 +42,8 @@ function short(at: number, now: number): string {
 function projectMeta(project: ProjectEntry, chats: readonly ThreadSummary[], now: number): string {
   const own = chats.filter((chat) => chat.project === project.id);
   const last = Math.max(project.openedAt, ...own.map((chat) => chat.updatedAt));
-  const count = own.length === 0 ? "No chats" : `${own.length} chat${own.length === 1 ? "" : "s"}`;
-  return `${count} · ${ago(last, now)}`;
+  const when = ago(last, now);
+  return own.length === 0 ? when : `${own.length} chat${own.length === 1 ? "" : "s"} · ${when}`;
 }
 
 function rowStyle(on: boolean, fill: string): { readonly borderWidth: number; readonly borderColor: string; readonly backgroundColor: string } {
@@ -74,12 +73,12 @@ function SectionLabel({ text, children }: { readonly text: string; readonly chil
 
 function ProjectTile({ path }: { readonly path: string }): ReactElement {
   const { p } = useTheme();
-  const icon = useLoaded<string | null>(() => fileIcon(path), `icon:${path}`);
-  if (icon.kind === "ready" && icon.value) return <img src={icon.value} style={{ width: 26, height: 26, flexShrink: 0, borderRadius: 7 }} />;
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, flexShrink: 0, borderRadius: 7, backgroundColor: p.fill2, pointerEvents: "none" }}>
-      <Icon name="binary" size={15} color={p.muted} />
-    </div>
+    <FileIcon path={path} px={34} radius={8} fallback={
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, flexShrink: 0, borderRadius: 8, backgroundColor: p.fill2, pointerEvents: "none" }}>
+        <Icon name="binary" size={18} color={p.muted} />
+      </div>
+    } />
   );
 }
 
@@ -90,7 +89,7 @@ function ProjectRow({ project, meta, on, onClick }: { readonly project: ProjectE
       <ProjectTile path={project.original} />
       <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minWidth: 0, lineHeight: 16 }}>
         <div style={{ color: p.text3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{project.name}</div>
-        <div style={{ fontSize: 11.5, color: p.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{meta}</div>
+        <div style={{ fontSize: 11.5, color: p.faint, opacity: 0.7, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{meta}</div>
       </div>
     </div>
   );
@@ -105,14 +104,14 @@ function ChatRow({ title, when, busy, on, onClick, menu }: {
   readonly menu: () => readonly MenuEntry[];
 }): ReactElement {
   const { p } = useTheme();
-  const dot = busy ? p.data : on ? p.string : p.line3;
+  const dot = busy ? p.data : on ? p.string : p.faint;
   return (
     <div {...menuOn(menu, onClick)} role="button" aria-label={title} style={{ display: "flex", alignItems: "center", gap: 10, height: 32, flexShrink: 0, paddingLeft: 8, paddingRight: 8, borderRadius: 8, cursor: "pointer", hover: { opacity: 0.72 }, ...rowStyle(on, p.sel) }}>
       <div style={{ display: "flex", justifyContent: "center", width: 17, flexShrink: 0, pointerEvents: "none" }}>
         <Dot color={dot} />
       </div>
       <div style={{ flexGrow: 1, minWidth: 0, color: p.text3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</div>
-      <div style={{ flexShrink: 0, fontSize: 12, color: busy ? p.data : p.faint }}>{busy ? "Working" : when}</div>
+      <div style={{ flexShrink: 0, fontSize: 12, color: busy ? p.data : p.faint, opacity: busy ? 1 : 0.7 }}>{busy ? "Working" : when}</div>
     </div>
   );
 }
@@ -165,7 +164,7 @@ function AppMenu({ actions }: { readonly actions: AppMenuActions }): ReactElemen
       <div onMouseDown={menu.onTriggerDown} onClick={menu.onTriggerClick} role="button" aria-label="Eleven" aria-expanded={menu.open} style={{ display: "flex", alignItems: "center", gap: 9, flexGrow: 1, minWidth: 0, height: 34, paddingLeft: 8, paddingRight: 8, borderRadius: 8, cursor: "pointer", hover: { opacity: 0.72 }, ...rowStyle(menu.open, p.sel) }}>
         <img src={appIcon(p.icon)} style={{ width: 20, height: 20, borderRadius: 5 }} />
         <div style={{ flexGrow: 1, color: p.text3 }}>Eleven</div>
-        <Icon name="chevron-up" size={11} color={p.faint} />
+        <Icon name="chevron-up" size={11} color={p.muted} />
       </div>
         {menu.open && (
           <Popover side="top" align="start" gap={6} onDismiss={menu.dismiss}>
@@ -229,7 +228,9 @@ export function Sidebar({ projects, project, chats, threads, current, running, a
   readonly menu: AppMenuActions;
   readonly threadMenu: (thread: ThreadSummary, rename: () => void) => readonly MenuEntry[];
 }): ReactElement {
-  const { p } = useTheme();
+  const theme = useTheme();
+  const glass = useMemo(() => ({ ...theme, p: onGlass(theme.p) }), [theme]);
+  const { p } = glass;
   const [renaming, setRenaming] = useState<string | null>(null);
   const [hovered, setHovered] = useState(false);
   const now = Date.now();
@@ -237,6 +238,7 @@ export function Sidebar({ projects, project, chats, threads, current, running, a
   const listed = open ? threads : chats;
   const shown = open ? threads : [...chats].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, RECENT_CHATS);
   return (
+    <ThemeContext.Provider value={glass}>
     <div style={{ display: "flex", flexDirection: "column", width: 272, flexShrink: 0, paddingLeft: 10, paddingRight: 10, paddingBottom: 10 }}>
       <div style={{ height: 46, flexShrink: 0 }} />
       <ActionRow icon="new-chat" label="New chat" command="thread" onClick={onNewThread} />
@@ -263,5 +265,6 @@ export function Sidebar({ projects, project, chats, threads, current, running, a
       </div>
       <AppMenu actions={menu} />
     </div>
+    </ThemeContext.Provider>
   );
 }

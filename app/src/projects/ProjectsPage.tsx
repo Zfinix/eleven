@@ -4,11 +4,11 @@ import { type ReactElement, useState } from "react";
 
 import { listThreads } from "../chat/history";
 import type { Chat } from "../chat/useChat";
+import { FileIcon } from "../components/FileIcon";
 import { Icon, Popover, usePopover } from "../components/ui";
 import { askSavePath, deleteDocument, documentPath, renameDocument } from "../engine/document";
 import { deleteProject, forgetProject, listProjects, type ProjectEntry, renameProject } from "../engine/project";
 import type { Target } from "../engine/target";
-import { fileIcon } from "../lib/fileIcon";
 import { errorMessage } from "../lib/guards";
 import { TYPING } from "../lib/shortcuts";
 import { useLoaded } from "../lib/useLoaded";
@@ -48,9 +48,7 @@ function kindLabel(kind: ProjectEntry["kind"]): string {
 
 function ProjectIcon({ path, px }: { readonly path: string; readonly px: number }): ReactElement {
   const { p } = useTheme();
-  const icon = useLoaded<string | null>(() => fileIcon(path), `icon:${path}`);
-  if (icon.kind === "ready" && icon.value) return <img src={icon.value} style={{ width: px, height: px, borderRadius: px / 4.5 }} />;
-  return <Icon name="folder" size={px * 0.7} color={p.muted} />;
+  return <FileIcon path={path} px={px} fallback={<Icon name="folder" size={px * 0.7} color={p.muted} />} />;
 }
 
 function Pill({ text }: { readonly text: string }): ReactElement {
