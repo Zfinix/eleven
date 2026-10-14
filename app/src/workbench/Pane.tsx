@@ -98,6 +98,7 @@ function ModeBar({ pane, addr, view, width }: { readonly pane: number; readonly 
     <div style={{ display: "flex", alignItems: "center", gap: 8, height: 34, flexShrink: 0, paddingLeft: 10, paddingRight: 8, overflow: "hidden" }}>
       <GoTo addr={addr} />
       <Spacer />
+      {view === "pseudo" && <LanguagePicker />}
       <div role="radiogroup" aria-label="View" style={{ display: "flex", flexShrink: 0, gap: 2, padding: 2, borderRadius: 8, backgroundColor: p.fill }}>
         {modes.map((m) => (
           <Tooltip key={m.mode} label={words ? m.tip : `${m.label}: ${m.tip}`}>
@@ -107,7 +108,6 @@ function ModeBar({ pane, addr, view, width }: { readonly pane: number; readonly 
           </Tooltip>
         ))}
       </div>
-      {view === "pseudo" && <LanguagePicker />}
       {view === "asm" && <IconButton icon="split" label="Pseudocode beside it, lines linked" on={wb.s.linked} color={wb.s.linked ? p.text : p.muted} size={26} iconSize={15} onClick={() => wb.besidePseudo(addr)} />}
       {view === "asm" && program.arch !== DALVIK && <IconButton icon="hex" label="Show bytes" on={wb.s.showBytes} color={wb.s.showBytes ? p.text : p.muted} size={26} iconSize={15} onClick={() => wb.patch({ showBytes: !wb.s.showBytes })} />}
       <IconButton icon="bookmark" on={marked} color={marked ? p.data : p.muted} label="Bookmark" size={26} iconSize={15} onClick={() => wb.toggleBookmark({ addr, label: nameOf(addr) })} />
