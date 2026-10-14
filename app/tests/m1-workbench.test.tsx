@@ -112,6 +112,10 @@ test("M1: clicking a call in the code jumps to that function", async () => {
   if (!link) throw new Error("no call link in the code");
   ui.renderer.scrollIntoView(link.id);
   ui.renderer.flush();
+  const box = ui.renderer.getElementBounds(link.id);
+  if (!box) throw new Error(`${link.name} has no layout box`);
+  ui.renderer.nativeSimulateMouseMove(box.x + box.width / 2, box.y + box.height / 2);
+  await settle(() => !text().includes("The machine instructions in order"));
   clickId(link.id);
   await settle(() => text().split(link.name).length > 3);
 }, 180_000);
