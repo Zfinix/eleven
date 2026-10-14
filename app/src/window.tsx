@@ -7,12 +7,14 @@ import { startAppBridge } from "./bridge/live";
 import { dispatchShortcut } from "./lib/shortcuts";
 import { prepareTarget, type Target } from "./engine/target";
 import { adoptToolchain } from "./engine/toolchain";
+import { startTelemetry } from "./lib/telemetry";
 import { startUpdates } from "./lib/update";
 
 await adoptLoginShell();
 adoptToolchain();
 startAppBridge();
 startUpdates();
+startTelemetry();
 
 const initialPath = process.argv[2];
 const initial: Target | null = initialPath ? prepareTarget(initialPath) : null;

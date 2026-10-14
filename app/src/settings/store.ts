@@ -95,6 +95,7 @@ export type Settings = {
   readonly customToolServer: string;
   readonly hidePaths: boolean;
   readonly askBeforeWholeFile: boolean;
+  readonly countInstall: boolean;
   readonly crashReports: boolean;
   readonly usageStats: boolean;
   readonly disabledSkills: readonly string[];
@@ -178,6 +179,7 @@ export const DEFAULT_SETTINGS: Settings = {
   customToolServer: "",
   hidePaths: true,
   askBeforeWholeFile: false,
+  countInstall: true,
   crashReports: false,
   usageStats: false,
   disabledSkills: [],
@@ -281,6 +283,7 @@ const SETTINGS: z.ZodType<Settings> = z.object({
   customToolServer: z.string().catch(D.customToolServer),
   hidePaths: z.boolean().catch(D.hidePaths),
   askBeforeWholeFile: z.boolean().catch(D.askBeforeWholeFile),
+  countInstall: z.boolean().catch(D.countInstall),
   crashReports: z.boolean().catch(D.crashReports),
   usageStats: z.boolean().catch(D.usageStats),
   disabledSkills: z.array(z.string()).catch([]),

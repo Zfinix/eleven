@@ -139,7 +139,7 @@ export function App({ initial }: { readonly initial: Target | null }): ReactElem
   } }), [appearance]);
   return (
     <ThemeContext.Provider value={theme}>
-      <ErrorBoundary>
+      <ErrorBoundary onHome={() => setScreen(HOME)}>
         {home ? (
           <Home chat={chat} routes={{ onWorkbench: (picked) => setScreen({ kind: "workbench", target: picked }), onSetup: () => setScreen({ kind: "setup" }), onSettings: (page) => setScreen({ kind: "settings", page }) }} />
         ) : (

@@ -377,13 +377,14 @@ export function buildPages(c: Ctx): Readonly<Record<Page, readonly GroupModel[]>
       ] },
     ],
     privacy: [
-      { label: "What leaves your computer", foot: `Eleven has no servers of its own. Projects, chats and caches never leave ${THIS_DEVICE} unless you export them.`, rows: [
+      { label: "What leaves your computer", foot: `Projects, chats and caches never leave ${THIS_DEVICE} unless you export them.`, rows: [
         info("The agent you use", "Code and questions you send go to that agent’s provider, under its own privacy terms. Local agents keep everything here.", { status: { text: agentName, tone: "quiet" } }),
         tg("hidePaths", "Hide your name in paths", "Agents see ~/Downloads instead of /Users/yourname/Downloads."),
         tg("askBeforeWholeFile", "Ask before sending a whole file", "Agents normally send only the functions they read. Ask before they upload the entire app."),
       ] },
       { label: "Help improve Eleven", rows: [
-        tg("crashReports", "Send crash reports", "Only where Eleven crashed and its version. Never your files or chats."),
+        tg("countInstall", "Count this install", "Sends a random ID, the version and your system when Eleven opens, so we know how many people use it."),
+        tg("crashReports", "Send crash reports", "Where Eleven crashed, its version and your system. Never your files or chats."),
         tg("usageStats", "Share how features are used", "Counts like how often the graph is opened. Off by default."),
       ] },
     ],
