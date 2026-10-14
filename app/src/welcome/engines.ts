@@ -1,9 +1,7 @@
-import { execFile, spawn } from "node:child_process";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { open } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { promisify } from "node:util";
 
 import { findOnPath } from "../agents/detect";
 import { pathSetting } from "../settings/store";
@@ -13,8 +11,8 @@ import { adoptToolchain, enginesDir } from "../engine/toolchain";
 import { OS, THIS_DEVICE, unzip } from "../lib/platform";
 import { ghidraHome, javaCheck, jdkHome } from "./checks";
 import { buildDecompiler, hasDecompiler } from "./decompiler";
+import { run, start } from "../lib/process";
 
-const run = promisify(execFile);
 const BREW_PATHS = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"] as const;
 const RIZIN_PATHS = ["/opt/homebrew/bin/rizin", "/usr/local/bin/rizin"] as const;
 const GHIDRA_RELEASE = "https://api.github.com/repos/NationalSecurityAgency/ghidra/releases/latest";
@@ -131,7 +129,7 @@ async function brewInstall(id: EngineId, formula: string, note: string): Promise
   const brew = brewPath();
   if (!brew) throw new Error("Homebrew is needed for this. Install it from brew.sh, then try again.");
   setInstall(id, { phase: "running", progress: null, note });
-  const child = spawn(brew, ["install", formula], { env: { ...process.env, HOMEBREW_NO_AUTO_UPDATE: "1", HOMEBREW_NO_ENV_HINTS: "1" } });
+  const child = start(brew, ["install", formula], { env: { ...process.env, HOMEBREW_NO_AUTO_UPDATE: "1", HOMEBREW_NO_ENV_HINTS: "1" } });
   const watch = (chunk: Buffer): void => {
     const line = lastLine(chunk.toString());
     if (!line) return;

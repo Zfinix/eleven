@@ -1,24 +1,20 @@
-import { execFile, execFileSync } from "node:child_process";
 import { closeSync, existsSync, openSync, readdirSync, readSync } from "node:fs";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
-import { promisify } from "node:util";
+import { delimiter, dirname, join } from "node:path";
 
 import { isRecord, stringField, type JsonRecord } from "../lib/guards";
 import { cacheDir } from "../settings/actions";
 import type { Caller, Fn, Refs, SourceText, TableRow } from "../workbench/model";
+import { run, runSync } from "../lib/process";
+import { OS, zipListing } from "../lib/platform";
 import { apkFiles, type ApkFiles, readResourceStrings, smaliClass, smaliFile, smaliMethod } from "./apk";
 import type { Procedure } from "./procedures";
 
-const run = promisify(execFile);
 
 const ACC_NATIVE = 0x100;
 const OPEN_FILES = 64;
 const KEPT_CLASSES = 48;
-
-/** The arch an opened Android app gets, which routes it to jadx instead of Ghidra. */
-export const DALVIK = "dalvik";
 
 type JadxMethod = {
   readonly addr: string;
@@ -61,17 +57,22 @@ function records(value: unknown, key: string): readonly JsonRecord[] {
   return Array.isArray(field) ? field.filter(isRecord) : [];
 }
 
+const JADX = OS === "windows" ? "jadx.bat" : "jadx";
+
+/** The arch an opened Android app gets, which routes it to jadx instead of Ghidra. */
+export const DALVIK = "dalvik";
+
 /** jadx from ELEVEN_JADX, the PATH, or the newest copy unpacked in ~/.local/share. */
 export function jadxCommand(): string | null {
   const chosen = process.env.ELEVEN_JADX;
   if (chosen && existsSync(chosen)) return chosen;
-  const dirs = (process.env.PATH ?? "").split(":").concat("/opt/homebrew/bin", "/usr/local/bin");
-  const onPath = dirs.filter(Boolean).map((dir) => join(dir, "jadx")).find((bin) => existsSync(bin));
+  const dirs = (process.env.PATH ?? "").split(delimiter).concat("/opt/homebrew/bin", "/usr/local/bin");
+  const onPath = dirs.filter(Boolean).map((dir) => join(dir, JADX)).find((bin) => existsSync(bin));
   if (onPath) return onPath;
   const share = join(homedir(), ".local", "share");
   if (!existsSync(share)) return null;
   const copies = readdirSync(share).filter((name) => name.startsWith("jadx-")).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
-  return copies.map((name) => join(share, name, "bin", "jadx")).find((bin) => existsSync(bin)) ?? null;
+  return copies.map((name) => join(share, name, "bin", JADX)).find((bin) => existsSync(bin)) ?? null;
 }
 
 function head(path: string, size: number): string {
@@ -90,8 +91,9 @@ export function isAndroidCode(path: string): boolean {
     const magic = head(path, 4);
     if (magic === "dex\n") return true;
     if (magic !== "PK\u0003\u0004") return false;
-    const listing = execFileSync("unzip", ["-Z1", path], { encoding: "utf8", maxBuffer: 64 << 20 });
-    return listing.split("\n").some((entry) => /^classes\d*\.dex$/.test(entry));
+    const [lister, args] = zipListing(path);
+    const listing = runSync(lister, args, { maxBuffer: 64 << 20 });
+    return listing.split(/\r?\n/).some((entry) => /^classes\d*\.dex$/.test(entry));
   } catch {
     return false;
   }

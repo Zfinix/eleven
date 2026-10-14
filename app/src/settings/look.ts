@@ -1,3 +1,4 @@
+import { OS, type Os } from "../lib/platform";
 import type { Palette } from "../theme";
 import { type CodeFont, currentSettings, type Settings, useSettings } from "./store";
 
@@ -12,10 +13,21 @@ export type Syntax = {
 
 const SPACING: Readonly<Record<Settings["lineSpacing"], number>> = { Compact: 1.35, Normal: 1.6, Relaxed: 1.85 };
 
-const FAMILY: Readonly<Record<CodeFont, string>> = { "JetBrains Mono": "JetBrains Mono", "SF Mono": "SF Mono", Menlo: "Menlo" };
+/** The monospace fonts each system ships, offered next to the bundled JetBrains Mono. */
+const SYSTEM_FONTS: Readonly<Record<Os, readonly CodeFont[]>> = {
+  mac: ["SF Mono", "Menlo"],
+  windows: ["Cascadia Mono", "Consolas"],
+  linux: ["DejaVu Sans Mono", "Liberation Mono"],
+};
 
+/** The code fonts worth offering on this computer. */
+export function codeFontsHere(): readonly CodeFont[] {
+  return ["JetBrains Mono", ...SYSTEM_FONTS[OS]];
+}
+
+/** A saved font from another system falls back to the bundled one, so code never renders in a missing font. */
 export function codeFamily(font: CodeFont): string {
-  return FAMILY[font];
+  return codeFontsHere().includes(font) ? font : "JetBrains Mono";
 }
 
 export function lineHeightFor(size: number, spacing: Settings["lineSpacing"]): number {

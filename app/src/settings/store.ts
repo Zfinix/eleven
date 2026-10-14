@@ -40,7 +40,7 @@ export const CODE_LANGUAGES = ["Pseudocode", "C", "C++", "Rust", "Go", "Swift", 
 
 export type CodeLanguage = (typeof CODE_LANGUAGES)[number];
 
-export const CODE_FONTS = ["JetBrains Mono", "SF Mono", "Menlo"] as const;
+export const CODE_FONTS = ["JetBrains Mono", "SF Mono", "Menlo", "Cascadia Mono", "Consolas", "DejaVu Sans Mono", "Liberation Mono"] as const;
 
 export type CodeFont = (typeof CODE_FONTS)[number];
 

@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, statSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
@@ -8,6 +7,7 @@ import { unpackBundle } from "./apk";
 import { DALVIK, isAndroidCode } from "./jadx";
 import { cacheRoot, OS } from "../lib/platform";
 import { binaryInfoOf, type Slice } from "./binaryInfo";
+import { runSync } from "../lib/process";
 
 export type TargetKind = "binary" | "app" | "gpu" | "model";
 
@@ -33,7 +33,7 @@ const SLICE_DIR = join(cacheRoot(), "slices");
 
 function tool(command: string, args: readonly string[]): string {
   try {
-    return execFileSync(command, [...args], { encoding: "utf8" }).trim();
+    return runSync(command, [...args]).trim();
   } catch {
     return "";
   }

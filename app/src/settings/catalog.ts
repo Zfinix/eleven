@@ -23,6 +23,7 @@ import { openLink, pickPath, showInFinder, tildePath } from "./system";
 import { ASSETS } from "../lib/assets";
 import { dataRoot, FILE_MANAGER, OS, THIS_DEVICE } from "../lib/platform";
 import { MOD } from "../lib/platform";
+import { codeFontsHere } from "./look";
 
 export type Ctx = {
   readonly settings: Settings;
@@ -313,7 +314,7 @@ export function buildPages(c: Ctx): Readonly<Record<Page, readonly GroupModel[]>
         { title: "Frost", desc: "How much the desktop behind the window is blurred.", keywords: "glass blur frosted window background", dim: s.transparency === 0, control: { kind: "range", min: 0, max: 100, step: 5, value: s.frost, unit: "%", set: (frost) => c.update({ frost }) } },
       ] },
       { label: "Code", preview: "code", rows: [
-        sel("codeFont", "Code font", "Used for pseudocode, assembly, hex and code in replies.", ["JetBrains Mono", "SF Mono", "Menlo"]),
+        sel("codeFont", "Code font", "Used for pseudocode, assembly, hex and code in replies.", codeFontsHere()),
         { title: "Code size", desc: "Applies to every code view, the graph and replies.", control: { kind: "range", min: 10, max: 18, step: 1, value: s.codeFontSize, unit: " pt", set: (value) => {
           const size = ([10, 11, 12, 13, 14, 15, 16, 17, 18] as const).find((candidate) => candidate === value);
           if (size) c.update({ codeFontSize: size });

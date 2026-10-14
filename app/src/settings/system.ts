@@ -1,12 +1,12 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join } from "node:path";
+import { isAbsolute } from "node:path";
 
 import { findOnPath } from "../agents/detect";
-import { stringField } from "../lib/guards";
 import { reaLaunch } from "../engine/rea";
 import { currentSettings, type PathKey, pathSetting } from "./store";
 import { choosePath, openExternal, reveal } from "../lib/platform";
+import packageJson from "../../package.json";
 
 export type Found =
   | { readonly kind: "found"; readonly path: string; readonly source: string }
@@ -32,7 +32,7 @@ function fromEnv(key: PathKey, name: string, fix: string): Found {
 }
 
 export function findGhidraFolder(): Found {
-  return fromEnv("ghidraDir", "GHIDRA_INSTALL_DIR", "Install Ghidra into ~/Applications or /Applications, or choose its folder here.");
+  return fromEnv("ghidraDir", "GHIDRA_INSTALL_DIR", "Install Ghidra from Settings → Engines, or choose its folder here.");
 }
 
 export function findJavaFolder(): Found {
@@ -52,25 +52,9 @@ export function findRea(): Found {
   return { kind: "missing", fix: "Install REA so the rea command works in Terminal, or choose it here." };
 }
 
-function versionFromPackage(): string | null {
-  try {
-    return stringField(JSON.parse(readFileSync(join(import.meta.dir, "..", "..", "package.json"), "utf8")), "version") ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function versionFromBundle(): string | null {
-  try {
-    const plist = readFileSync(join(dirname(process.execPath), "..", "Info.plist"), "utf8");
-    return /<key>CFBundleShortVersionString<\/key>\s*<string>([^<]+)<\/string>/.exec(plist)?.[1] ?? null;
-  } catch {
-    return null;
-  }
-}
-
+/** Built into the app when it's compiled, so it's right on every system. */
 export function appVersion(): string {
-  return versionFromPackage() ?? versionFromBundle() ?? "Unknown";
+  return packageJson.version;
 }
 
 

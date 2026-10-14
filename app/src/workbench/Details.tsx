@@ -7,14 +7,14 @@ import { loadProject, onProjectChange, updateProject } from "../engine/project";
 import type { Refs } from "./model";
 import { goTo, subjectMenu } from "./actions";
 import { referencesTo, type XRef } from "./layout";
-import { ErrorCard, fieldLook } from "../components/kit";
+import { EmptyState, ErrorCard, fieldLook } from "../components/kit";
 import { patchBytes } from "./patch";
 import { HOVER, MONO_STYLE, TextButton, useBench } from "./parts";
 import { TYPING } from "../lib/shortcuts";
 import { TerminalView } from "../terminal/TerminalView";
 import { dirname } from "node:path";
 import { showAddress } from "../settings/look";
-import { MOD } from "../lib/platform";
+import { MOD, OS } from "../lib/platform";
 
 function RefRow({ addr, at }: { readonly addr: string; readonly at: string }): ReactElement {
   const { p } = useTheme();
@@ -127,6 +127,7 @@ export function Patches(): ReactElement {
 
 export function Terminal(): ReactElement {
   const { program } = useBench();
+  if (OS === "windows") return <EmptyState title="The terminal isn't available on Windows yet" hint="Open Windows Terminal or PowerShell next to Eleven for now." />;
   return <TerminalView cwd={dirname(program.origin)} />;
 }
 

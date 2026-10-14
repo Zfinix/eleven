@@ -1,15 +1,13 @@
-import { execFile, spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { promisify } from "node:util";
 
 import { newer } from "../settings/actions";
 import { currentSettings } from "../settings/store";
 import { appVersion } from "../settings/system";
 import { isRecord } from "./guards";
 import { cacheRoot, OS, unzip } from "./platform";
+import { run, startWith } from "./process";
 
-const run = promisify(execFile);
 const RELEASES = "https://api.github.com/repos/Zfinix/eleven/releases";
 const MIRROR = "https://dl.chizi.app";
 const STAGE = join(cacheRoot(), "update");
@@ -81,7 +79,7 @@ function stagedVersion(): string | null {
 /** Swaps the staged app in once this process exits, however it exits. */
 function installOnQuit(app: string): void {
   const script = 'while kill -0 "$1" 2>/dev/null; do sleep 0.5; done; rm -rf "$3.old"; mv "$3" "$3.old" && { mv "$2" "$3" || mv "$3.old" "$3"; }; rm -rf "$3.old" "$4"';
-  spawn("/bin/sh", ["-c", script, "sh", String(process.pid), STAGED_APP, app, STAGE], { detached: true, stdio: "ignore" }).unref();
+  startWith("/bin/sh", ["-c", script, "sh", String(process.pid), STAGED_APP, app, STAGE], { detached: true, stdio: "ignore" }).unref();
 }
 
 async function checkForUpdate(app: string): Promise<void> {

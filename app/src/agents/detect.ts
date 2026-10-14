@@ -1,15 +1,13 @@
-import { execFile } from "node:child_process";
 import { accessSync, constants, existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, delimiter, join } from "node:path";
-import { promisify } from "node:util";
 
 import { isRecord, stringField } from "../lib/guards";
 import { OS } from "../lib/platform";
 import { AGENT_CLI } from "./clis";
 import type { AgentEntry } from "./registry";
+import { run } from "../lib/process";
 
-const run = promisify(execFile);
 
 export type NativeCommand = { readonly path: string; readonly args: readonly string[] };
 

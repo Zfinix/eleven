@@ -1,5 +1,6 @@
 import { type IBufferCell, Terminal } from "@xterm/headless";
 import type { Subprocess } from "bun";
+import { OS } from "../lib/platform";
 
 export type Run = {
   readonly text: string;
@@ -105,8 +106,9 @@ export class Shell {
   private start(): void {
     this.exited = false;
     this.term.reset();
-    const shell = process.env.SHELL ?? "/bin/zsh";
+    const shell = process.env.SHELL ?? (OS === "mac" ? "/bin/zsh" : "/bin/sh");
     this.proc = Bun.spawn([shell, "-l"], {
+      windowsHide: true,
       cwd: this.cwd,
       env: { ...process.env, TERM: "xterm-256color", COLORTERM: "truecolor", TERM_PROGRAM: "Eleven" },
       terminal: {

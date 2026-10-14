@@ -1,12 +1,11 @@
-import { execFile } from "node:child_process";
 import { stat } from "node:fs/promises";
 import { basename } from "node:path";
-import { promisify } from "node:util";
 
 import type { LoadEffect, ModelInfo, ModelRisk, PickleName } from "../types";
 import { bytes, head } from "./read";
+import { run, runBytes } from "../../lib/process";
+import { zipEntry, zipListing } from "../../lib/platform";
 
-const run = promisify(execFile);
 const MAX_PICKLE = 64 * 1024 * 1024;
 
 /** Imports that let a pickle run code on whoever loads it. */
@@ -125,10 +124,12 @@ function packageOf(name: string): string {
 async function pickleBytes(path: string): Promise<Buffer> {
   const start = await head(path, 4);
   if (start.toString("latin1", 0, 2) !== "PK") return head(path, MAX_PICKLE);
-  const { stdout: listing } = await run("unzip", ["-Z1", path], { maxBuffer: 16 * 1024 * 1024 });
-  const entry = listing.split("\n").find((name) => name.endsWith("data.pkl"));
+  const [lister, listArgs] = zipListing(path);
+  const { stdout: listing } = await run(lister, listArgs, { maxBuffer: 16 * 1024 * 1024 });
+  const entry = listing.split(/\r?\n/).find((name) => name.endsWith("data.pkl"));
   if (!entry) return Buffer.alloc(0);
-  const { stdout } = await run("unzip", ["-p", path, entry], { encoding: "buffer", maxBuffer: MAX_PICKLE });
+  const [reader, readArgs] = zipEntry(path, entry);
+  const { stdout } = await runBytes(reader, readArgs, { maxBuffer: MAX_PICKLE });
   return stdout;
 }
 

@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 
 import { supportPath } from "../lib/support";
 import { currentSettings } from "../settings/store";
@@ -40,7 +40,7 @@ function rizinInstalled(): boolean {
 }
 
 function onPath(bin: string): boolean {
-  const dirs = (process.env.PATH ?? "").split(":").concat("/opt/homebrew/bin", "/usr/local/bin");
+  const dirs = (process.env.PATH ?? "").split(delimiter).concat("/opt/homebrew/bin", "/usr/local/bin");
   return dirs.some((dir) => dir && existsSync(join(dir, bin)));
 }
 

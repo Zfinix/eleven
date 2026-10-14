@@ -1,17 +1,15 @@
-import { execFile } from "node:child_process";
 import { readdirSync } from "node:fs";
 
 import { currentSettings } from "../settings/store";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { promisify } from "node:util";
 
 import { isRecord } from "../lib/guards";
 import type { Lane, Recording, Span } from "./types";
 import { parseXml, tableRows, type XmlNode } from "./xml";
-import { cacheRoot } from "../lib/platform";
+import { cacheRoot, OS } from "../lib/platform";
+import { run } from "../lib/process";
 
-const run = promisify(execFile);
 /** Where GPU recordings are kept, so Settings can size and clear them. */
 export const RECORDINGS_DIR = join(cacheRoot(), "recordings");
 const RECORDINGS = RECORDINGS_DIR;
@@ -174,6 +172,7 @@ export function runTitle(trace: string): string {
 
 /** Runs the app under the chosen Instruments template for the chosen time. Only called after the user agrees. */
 export async function recordGpuRun(executable: string, args: readonly string[]): Promise<string> {
+  if (OS !== "mac") throw new Error("GPU recording uses Apple's Instruments, which only runs on macOS.");
   await mkdir(RECORDINGS, { recursive: true });
   const trace = join(RECORDINGS, `${basename(executable)}-${Date.now()}.trace`);
   await rm(trace, { recursive: true, force: true });

@@ -1,10 +1,10 @@
-import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
 import { type RecentOpen, recentOpens } from "./store";
 import { STARTER_FILES } from "../lib/platform";
+import { runSync } from "../lib/process";
 
 export type FileKind = "app" | "binary" | "gpu" | "model";
 
@@ -25,7 +25,7 @@ const STARTERS = STARTER_FILES;
 
 function tool(command: string, args: readonly string[]): string {
   try {
-    return execFileSync(command, [...args], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return runSync(command, [...args], { stdio: ["ignore", "pipe", "ignore"] }).trim();
   } catch {
     return "";
   }

@@ -1,15 +1,13 @@
-import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { access, chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { promisify } from "node:util";
 
 import { findOnPath, type NativeCommand } from "./detect";
 import type { AgentEntry, BinaryBuild, Env } from "./registry";
-import { cacheRoot, OS } from "../lib/platform";
+import { cacheRoot, OS, unzip } from "../lib/platform";
 import { npxCommand } from "../engine/toolchain";
+import { run } from "../lib/process";
 
-const run = promisify(execFile);
 const INSTALL_DIR = join(cacheRoot(), "agents", "bin");
 
 export type Launch = { readonly command: string; readonly args: readonly string[]; readonly env: Env };
@@ -37,7 +35,8 @@ async function unpack(bytes: Buffer, archive: string, dir: string): Promise<void
   await mkdir(dir, { recursive: true });
   const file = join(dir, archive.split("/").pop() ?? "agent-archive");
   await writeFile(file, bytes);
-  await run("tar", ["-xf", file, "-C", dir]);
+  if (file.endsWith(".zip")) await unzip(file, dir);
+  else await run("tar", ["-xf", file, "-C", dir]);
   await rm(file);
 }
 

@@ -5,7 +5,7 @@ import { noteTyping } from "../lib/shortcuts";
 import { useSize } from "../lib/useSize";
 import { MONO, useTheme } from "../theme";
 import { type Run, type Screen, shellIn } from "./shell";
-import { readClipboard } from "../lib/platform";
+import { OS, readClipboard } from "../lib/platform";
 
 const FONT_SIZE = 12;
 const LINE_HEIGHT = 18;
@@ -61,8 +61,9 @@ export function TerminalView({ cwd }: { readonly cwd: string }): ReactElement {
     const key = event.key?.toLowerCase();
     if (!key) return;
     const mods = { ctrl: event.modifiers?.ctrl ?? false, alt: event.modifiers?.alt ?? false, shift: event.modifiers?.shift ?? false, cmd: event.modifiers?.cmd ?? false };
-    if (mods.cmd && key === "v") return shell.paste(readClipboard());
-    if (mods.cmd && key === "k") return shell.clear();
+    const command = OS === "mac" ? mods.cmd : mods.ctrl && mods.shift;
+    if (command && key === "v") return shell.paste(readClipboard());
+    if (command && key === "k") return shell.clear();
     shell.key(key, event.keyChar, mods);
   };
   const onScroll = (event: EventPayload): void => {

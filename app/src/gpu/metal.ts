@@ -1,13 +1,11 @@
-import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { promisify } from "node:util";
 
 import type { Binding, FunctionKind, ShaderFunction, ShaderLibrary } from "./types";
-import { cacheRoot } from "../lib/platform";
+import { cacheRoot, OS } from "../lib/platform";
+import { run } from "../lib/process";
 
-const run = promisify(execFile);
 const CACHE = cacheRoot();
 const MAX_FUNCTIONS = 400;
 const MAX_IR_LINES = 400;
@@ -18,6 +16,7 @@ async function disassemble(path: string): Promise<string> {
   try {
     return await readFile(file, "utf8");
   } catch {
+    if (OS !== "mac") throw new Error("Reading Metal shaders needs Apple's Metal tools, which only run on macOS.");
     const { stdout: tool } = await run("xcrun", ["--find", "metal-objdump"]);
     const { stdout } = await run(tool.trim(), ["--disassemble", path], { maxBuffer: 512 * 1024 * 1024 });
     await mkdir(dirname(file), { recursive: true });

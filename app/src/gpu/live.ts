@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 
@@ -10,6 +9,7 @@ import { cudaKernelIr, readComputeLibraries } from "./compute";
 import { MODEL_FILE, readModel } from "./models";
 import type { LoadedBy, ModelInfo, Recording, ShaderLibrary } from "./types";
 import type { GpuSource } from "./source";
+import { runSync } from "../lib/process";
 
 const MAX_FILES = 40;
 const MAX_DEPTH = 6;
@@ -22,7 +22,7 @@ function appRoot(path: string): string | null {
 
 export function bundleExecutable(app: string): string | null {
   try {
-    const name = execFileSync("plutil", ["-extract", "CFBundleExecutable", "raw", join(app, "Contents", "Info.plist")], { encoding: "utf8" }).trim();
+    const name = runSync("plutil", ["-extract", "CFBundleExecutable", "raw", join(app, "Contents", "Info.plist")]).trim();
     const path = join(app, "Contents", "MacOS", name);
     return existsSync(path) ? path : null;
   } catch {

@@ -1,10 +1,12 @@
-import { type ChildProcess, spawn } from "node:child_process";
-import { basename, join } from "node:path";
+import type { ChildProcess } from "node:child_process";
+import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { useEffect, useState } from "react";
 
 import { isRecord } from "../lib/guards";
 import type { Look } from "./highlightServer";
+import { FROM_SOURCE } from "../lib/platform";
+import { startWith } from "../lib/process";
 
 export type { Look } from "./highlightServer";
 
@@ -43,9 +45,8 @@ async function readReplies(child: ChildProcess): Promise<void> {
 /** The same Eleven executable started with --eleven-highlight, so WebAssembly never runs in the window's process. */
 function started(): ChildProcess {
   if (helper) return helper;
-  const dev = basename(process.execPath).startsWith("bun");
-  const args = dev ? [join(import.meta.dir, "..", "main.tsx"), "--eleven-highlight"] : ["--eleven-highlight"];
-  const child = spawn(process.execPath, args, { stdio: ["pipe", "pipe", "ignore"] });
+  const args = FROM_SOURCE ? [join(import.meta.dir, "..", "main.tsx"), "--eleven-highlight"] : ["--eleven-highlight"];
+  const child = startWith(process.execPath, args, { stdio: ["pipe", "pipe", "ignore"] });
   child.on("exit", () => {
     if (helper === child) helper = null;
     for (const waiting of pending.values()) waiting.reject(new Error("The highlighter stopped."));

@@ -16,7 +16,8 @@ function skillDirs(): readonly string[] {
   return [existsSync(bundled) ? bundled : dev, user].filter(existsSync);
 }
 
-function frontmatter(text: string): { readonly meta: ReadonlyMap<string, string>; readonly body: string } {
+function frontmatter(raw: string): { readonly meta: ReadonlyMap<string, string>; readonly body: string } {
+  const text = raw.replace(/\r\n/g, "\n");
   const match = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(text);
   if (!match?.[1]) return { meta: new Map(), body: text.trim() };
   const meta = new Map(match[1].split("\n").flatMap((line) => {

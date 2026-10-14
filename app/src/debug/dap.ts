@@ -1,7 +1,8 @@
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import type { ChildProcessWithoutNullStreams } from "node:child_process";
 
 import { isRecord } from "../lib/guards";
 import { Decoder, frame } from "./wire";
+import { start, stop } from "../lib/process";
 
 export type DapEvent = { readonly event: string; readonly body: unknown };
 
@@ -34,7 +35,7 @@ export class DapClient {
   private seq = 1;
 
   constructor(command: string, args: readonly string[] = []) {
-    this.proc = spawn(command, [...args], { stdio: ["pipe", "pipe", "pipe"] });
+    this.proc = start(command, args);
     this.proc.stdout.on("data", (chunk: Buffer) => this.receive(chunk));
     this.proc.on("exit", () => this.failAll(new Error("The debugger stopped.")));
   }
@@ -165,6 +166,6 @@ export class DapClient {
     } catch {
       // the adapter may already be gone
     }
-    this.proc.kill();
+    stop(this.proc);
   }
 }

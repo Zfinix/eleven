@@ -1,15 +1,13 @@
-import { execFile } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { promisify } from "node:util";
 
 import { reaLaunch } from "../engine/rea";
-import { enginesDir } from "../engine/toolchain";
-import { ANALYZE_HEADLESS, exe, jdkLocations, THIS_DEVICE } from "../lib/platform";
+import { enginesDir, newestJdkFirst } from "../engine/toolchain";
+import { ANALYZE_HEADLESS, cacheRoot, exe, jdkLocations, THIS_DEVICE } from "../lib/platform";
+import { run } from "../lib/process";
 import { hasDecompiler } from "./decompiler";
 
-const run = promisify(execFile);
 const HOME = homedir();
 const MIN_JAVA = 21;
 
@@ -83,7 +81,7 @@ export function jdkHome(): string | null {
   const fromEnv = process.env.JAVA_HOME;
   if (fromEnv && existsSync(join(fromEnv, "bin", exe("java")))) return fromEnv;
   const homes = JDK_HOMES.flatMap(([parent, suffix]) => children(parent).map((dir) => join(dir, suffix)));
-  return homes.filter((home) => existsSync(join(home, "bin", exe("java")))).sort(newestFirst)[0] ?? null;
+  return homes.filter((home) => existsSync(join(home, "bin", exe("java")))).sort(newestJdkFirst)[0] ?? null;
 }
 
 function javaMajor(home: string): number | null {
@@ -119,7 +117,7 @@ async function reaCheck(): Promise<Check> {
 }
 
 function cacheCheck(): Check {
-  return { key: "cache", status: "info", title: "Cache", detail: "~/Library/Caches/eleven. Files you opened before load instantly." };
+  return { key: "cache", status: "info", title: "Cache", detail: `${cacheRoot().replace(homedir(), "~")}. Files you opened before load instantly.` };
 }
 
 export async function runChecks(): Promise<readonly Check[]> {

@@ -1,15 +1,13 @@
-import { execFile } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { promisify } from "node:util";
 
 import { deleteThread, listThreads } from "../chat/history";
 import { RECORDINGS_DIR } from "../gpu/trace";
 import { supportPath } from "../lib/support";
 import { currentSettings } from "./store";
 import { cacheRoot, copyToClipboard, exe, trash } from "../lib/platform";
+import { run } from "../lib/process";
 
-const run = promisify(execFile);
 
 export const PROJECTS_DIR = supportPath("projects");
 export const THREADS_DIR = supportPath("threads");

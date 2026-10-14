@@ -1,9 +1,7 @@
-import { execFile, execFileSync, spawn } from "node:child_process";
 import { homedir } from "node:os";
-import { join } from "node:path";
-import { promisify } from "node:util";
+import { basename, join } from "node:path";
+import { run, runSync, startWith } from "./process";
 
-const run = promisify(execFile);
 
 export type Os = "mac" | "linux" | "windows";
 
@@ -48,7 +46,7 @@ export const FILE_MANAGER = OS === "mac" ? "Finder" : OS === "windows" ? "File E
 
 function detached(command: string, args: readonly string[]): void {
   try {
-    spawn(command, [...args], { detached: true, stdio: "ignore" }).unref();
+    startWith(command, [...args], { detached: true, stdio: "ignore" }).unref();
   } catch {
     return;
   }
@@ -64,7 +62,7 @@ export function reveal(path: string): void {
 /** Opens a link in the browser, or a file or folder with its usual app. */
 export function openExternal(target: string): void {
   if (OS === "mac") detached("open", [target]);
-  else if (OS === "windows") detached("cmd.exe", ["/c", "start", "", target]);
+  else if (OS === "windows") detached("rundll32", ["url.dll,FileProtocolHandler", target]);
   else detached("xdg-open", [target]);
 }
 
@@ -87,15 +85,15 @@ function linuxCopier(): readonly string[] | null {
 
 /** Puts text on the clipboard. */
 export function copyToClipboard(text: string): Promise<void> {
-  const command = OS === "mac" ? ["pbcopy"] : OS === "windows" ? ["clip.exe"] : linuxCopier();
+  const command = OS === "mac" ? ["pbcopy"] : OS === "windows" ? ["powershell.exe", "-NoProfile", "-Command", "[Console]::InputEncoding=[Text.Encoding]::UTF8; Set-Clipboard -Value ([Console]::In.ReadToEnd())"] : linuxCopier();
   const [program, ...args] = command ?? [];
   if (!program) return Promise.resolve();
   return new Promise((resolve) => {
     try {
-      const child = spawn(program, args, { stdio: ["pipe", "ignore", "ignore"] });
+      const child = startWith(program, args, { stdio: ["pipe", "ignore", "ignore"] });
       child.once("error", () => resolve());
       child.once("close", () => resolve());
-      child.stdin.end(text);
+      child.stdin?.end(text);
     } catch {
       resolve();
     }
@@ -104,11 +102,12 @@ export function copyToClipboard(text: string): Promise<void> {
 
 /** The text on the clipboard, or "" when there is none or it can't be read. */
 export function readClipboard(): string {
-  const command = OS === "mac" ? ["pbpaste"] : OS === "windows" ? ["powershell.exe", "-NoProfile", "-Command", "Get-Clipboard -Raw"] : process.env.WAYLAND_DISPLAY ? ["wl-paste", "--no-newline"] : ["xclip", "-selection", "clipboard", "-o"];
+  const command = OS === "mac" ? ["pbpaste"] : OS === "windows" ? ["powershell.exe", "-NoProfile", "-Command", "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Clipboard -Raw"] : process.env.WAYLAND_DISPLAY ? ["wl-paste", "--no-newline"] : ["xclip", "-selection", "clipboard", "-o"];
   const [program, ...args] = command;
   if (!program) return "";
   try {
-    return execFileSync(program, args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    const text = runSync(program, args, { stdio: ["ignore", "pipe", "ignore"] });
+    return OS === "windows" ? text.replace(/\r?\n$/, "") : text;
   } catch {
     return "";
   }
@@ -117,9 +116,9 @@ export function readClipboard(): string {
 /** Whether the system is in dark mode, where the OS will say. */
 export function systemDark(): boolean {
   try {
-    if (OS === "mac") return execFileSync("defaults", ["read", "-g", "AppleInterfaceStyle"], { encoding: "utf8", stdio: "pipe" }).trim() === "Dark";
-    if (OS === "windows") return execFileSync("reg", ["query", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", "/v", "AppsUseLightTheme"], { encoding: "utf8", stdio: "pipe" }).includes("0x0");
-    return /dark/i.test(execFileSync("gsettings", ["get", "org.gnome.desktop.interface", "color-scheme"], { encoding: "utf8", stdio: "pipe" }));
+    if (OS === "mac") return runSync("defaults", ["read", "-g", "AppleInterfaceStyle"], { stdio: "pipe" }).trim() === "Dark";
+    if (OS === "windows") return runSync("reg", ["query", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", "/v", "AppsUseLightTheme"], { stdio: "pipe" }).includes("0x0");
+    return /dark/i.test(runSync("gsettings", ["get", "org.gnome.desktop.interface", "color-scheme"], { stdio: "pipe" }));
   } catch {
     return false;
   }
@@ -194,7 +193,7 @@ export function choosePath(kind: "folder" | "file", prompt: string): Promise<str
     const dialog = kind === "folder"
       ? `$d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description = ${psQuote(clean)}; if ($d.ShowDialog() -eq 'OK') { $d.SelectedPath }`
       : `$d = New-Object System.Windows.Forms.OpenFileDialog; $d.Title = ${psQuote(clean)}; if ($d.ShowDialog() -eq 'OK') { $d.FileName }`;
-    return firstLine("powershell.exe", ["-NoProfile", "-STA", "-Command", `Add-Type -AssemblyName System.Windows.Forms; ${dialog}`]);
+    return firstLine("powershell.exe", ["-NoProfile", "-STA", "-Command", `[Console]::OutputEncoding=[Text.Encoding]::UTF8; Add-Type -AssemblyName System.Windows.Forms; ${dialog}`]);
   }
   return firstLine("zenity", ["--file-selection", ...(kind === "folder" ? ["--directory"] : []), `--title=${clean}`]);
 }
@@ -204,7 +203,7 @@ export function chooseSavePath(prompt: string, name: string, folder: string): Pr
   const clean = prompt.replace(/"/g, "");
   if (OS === "mac") return firstLine("osascript", ["-e", `POSIX path of (choose file name with prompt "${clean}" default name "${name.replace(/"/g, "")}" default location (POSIX file "${folder.replace(/"/g, "")}"))`]);
   if (OS === "windows") {
-    return firstLine("powershell.exe", ["-NoProfile", "-STA", "-Command", `Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.SaveFileDialog; $d.Title = ${psQuote(clean)}; $d.FileName = ${psQuote(name)}; $d.InitialDirectory = ${psQuote(folder)}; if ($d.ShowDialog() -eq 'OK') { $d.FileName }`]);
+    return firstLine("powershell.exe", ["-NoProfile", "-STA", "-Command", `[Console]::OutputEncoding=[Text.Encoding]::UTF8; Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.SaveFileDialog; $d.Title = ${psQuote(clean)}; $d.FileName = ${psQuote(name)}; $d.InitialDirectory = ${psQuote(folder)}; if ($d.ShowDialog() -eq 'OK') { $d.FileName }`]);
   }
   return firstLine("zenity", ["--file-selection", "--save", "--confirm-overwrite", `--title=${clean}`, `--filename=${join(folder, name)}`]);
 }
@@ -212,6 +211,11 @@ export function chooseSavePath(prompt: string, name: string, folder: string): Pr
 /** How to list a zip's entries: unzip, or the tar.exe Windows ships, since Windows has no unzip. */
 export function zipListing(path: string): readonly [string, readonly string[]] {
   return OS === "windows" ? ["tar.exe", ["-tf", path]] : ["unzip", ["-Z1", path]];
+}
+
+/** How to print one zip entry's bytes. */
+export function zipEntry(path: string, entry: string): readonly [string, readonly string[]] {
+  return OS === "windows" ? ["tar.exe", ["-xOf", path, entry]] : ["unzip", ["-p", path, entry]];
 }
 
 /** How to unpack one zip entry into a folder, keeping its path inside the zip. */
@@ -253,6 +257,9 @@ export function jdkLocations(engines: string): readonly (readonly [parent: strin
 }
 
 /** Unpacks a .zip into a folder with whatever this OS has built in. */
+/** Python's zip extractor drops the executable bit, which breaks Ghidra's launch scripts; this one restores each file's mode. */
+const KEEP_MODES = "import os,sys,zipfile\nz=zipfile.ZipFile(sys.argv[1])\nfor i in z.infolist():\n p=z.extract(i,sys.argv[2])\n m=i.external_attr>>16\n if m: os.chmod(p,m)";
+
 export async function unzip(file: string, into: string): Promise<void> {
   const options = { timeout: 300000, maxBuffer: 1 << 24 };
   if (OS === "mac") await run("ditto", ["-x", "-k", file, into], options);
@@ -261,10 +268,13 @@ export async function unzip(file: string, into: string): Promise<void> {
     try {
       await run("unzip", ["-q", "-o", file, "-d", into], options);
     } catch {
-      await run("python3", ["-m", "zipfile", "-e", file, into], options);
+      await run("python3", ["-c", KEEP_MODES, file, into], options);
     }
   }
 }
+
+/** True when running from source under bun, false in the packaged app. */
+export const FROM_SOURCE = basename(process.execPath).startsWith("bun");
 
 /** The command key in copy: ⌘ on the Mac, Ctrl elsewhere. */
 export const MOD = OS === "mac" ? "⌘" : "Ctrl+";

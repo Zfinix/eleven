@@ -1,6 +1,6 @@
 import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { useEffect, useState } from "react";
 
 import { findOnPath } from "../agents/detect";
@@ -57,7 +57,7 @@ function idaPath(): string | null {
 function reaProgram(): string | null {
   const { command, args } = reaLaunch();
   const program = command === "node" ? (args[0] ?? command) : command;
-  return program.startsWith("/") ? existing(program) : findOnPath(program);
+  return isAbsolute(program) ? existing(program) : findOnPath(program);
 }
 
 let checkedAt: Date | null = null;

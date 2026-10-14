@@ -1,11 +1,12 @@
-import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readlinkSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, readlinkSync } from "node:fs";
 import { homedir, totalmem } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 
+import { activeProvider } from "../analysis/engines";
 import { ANALYZE_HEADLESS, exe, jdkLocations, OS } from "../lib/platform";
 import { supportPath } from "../lib/support";
 import { currentSettings, type Settings } from "../settings/store";
+import { runSync } from "../lib/process";
 
 const HOME = homedir();
 
@@ -39,13 +40,30 @@ function versionOf(path: string): readonly number[] {
   return (path.match(/\d+(\.\d+)*/g)?.at(-1) ?? "0").split(".").map(Number);
 }
 
-function newestFirst(a: string, b: string): number {
-  const [x, y] = [versionOf(a), versionOf(b)];
+function newer(x: readonly number[], y: readonly number[]): number {
   for (let ix = 0; ix < Math.max(x.length, y.length); ix++) {
     const diff = (y[ix] ?? 0) - (x[ix] ?? 0);
     if (diff !== 0) return diff;
   }
   return 0;
+}
+
+function newestFirst(a: string, b: string): number {
+  return newer(versionOf(a), versionOf(b));
+}
+
+/** A JDK's version from its release file. Folder names mislead: java-17-openjdk-amd64 ends in 64. */
+function jdkVersion(home: string): readonly number[] {
+  try {
+    const version = /JAVA_VERSION="([^"]+)"/.exec(readFileSync(join(home, "release"), "utf8"))?.[1] ?? "0";
+    return version.split(/[._+-]/).map(Number).filter(Number.isFinite);
+  } catch {
+    return [0];
+  }
+}
+
+export function newestJdkFirst(a: string, b: string): number {
+  return newer(jdkVersion(a), jdkVersion(b));
 }
 
 function ghidraHomes(parent: string): readonly string[] {
@@ -58,7 +76,7 @@ function findGhidra(): string | null {
 
 function findJdk(): string | null {
   const homes = JDK_GLOBS.flatMap(([parent, suffix]) => children(parent).map((dir) => (suffix ? join(dir, suffix) : dir)));
-  return homes.filter((home) => existsSync(join(home, "bin", exe("java")))).sort(newestFirst)[0] ?? null;
+  return homes.filter((home) => existsSync(join(home, "bin", exe("java")))).sort(newestJdkFirst)[0] ?? null;
 }
 
 /** Bun formats dates in UTC unless TZ is set, so take the Mac's own zone from /etc/localtime. */
@@ -108,7 +126,7 @@ const REA_CHECKOUTS = [
 
 function reaMajor(command: string, args: readonly string[]): number {
   try {
-    const version = execFileSync(command, [...args, "--version"], { encoding: "utf8", timeout: 5000 }).trim();
+    const version = runSync(command, [...args, "--version"], { timeout: 15000 }).trim();
     return Number(version.split(".")[0]) || 0;
   } catch {
     return 0;
@@ -165,7 +183,7 @@ export function adoptToolchain(): void {
   const skipped = skippedAnalyzers(currentSettings());
   if (skipped !== null) process.env.REA_GHIDRA_DISABLED_ANALYZERS = skipped;
   else if (process.env.REA_GHIDRA_DISABLED_ANALYZERS === undefined) process.env.REA_GHIDRA_DISABLED_ANALYZERS = DEFAULT_SKIPPED.join(",");
-  if (!process.env.REA_ANALYSIS_PROVIDER) process.env.REA_ANALYSIS_PROVIDER = "ghidra";
+  setEnv("REA_ANALYSIS_PROVIDER", activeProvider() ?? INHERITED.REA_ANALYSIS_PROVIDER ?? "ghidra");
   setEnv("ELEVEN_REA", settings.reaPath || INHERITED.ELEVEN_REA || findRea());
   setEnv("ELEVEN_RIZIN", settings.rizinPath || INHERITED.ELEVEN_RIZIN || findRizin());
   setEnv("ELEVEN_LLDB_DAP", settings.lldbDap || INHERITED.ELEVEN_LLDB_DAP);

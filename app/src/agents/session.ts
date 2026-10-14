@@ -1,6 +1,6 @@
-import { type ChildProcess, spawn } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { readFileSync, statSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, isAbsolute, join } from "node:path";
 
 import * as acp from "@agentclientprotocol/sdk";
 
@@ -18,18 +18,19 @@ import { isReadOnly, onlySuggests, permissionTool, REA_SERVER, reaToolName } fro
 import { type AgentEntry, shortName } from "./registry";
 import { configOptions, legacyModes, mergeOptions, translate } from "./translate";
 import { rememberModels } from "./models";
+import { FROM_SOURCE } from "../lib/platform";
+import { start, stop } from "../lib/process";
 
 type Emit = (event: AgentEvent) => void;
 type Answer = (choiceId: string | null) => void;
 
 const STDERR_TAIL = 2000;
 const EXIT_GRACE_MS = 400;
-const PASS_THROUGH_ENV = ["GHIDRA_INSTALL_DIR", "JAVA_HOME", "PATH", "HOME", "ELEVEN_REA", "ELEVEN_SUPPORT"] as const;
+const PASS_THROUGH_ENV = ["GHIDRA_INSTALL_DIR", "JAVA_HOME", "PATH", "HOME", "ELEVEN_REA", "ELEVEN_SUPPORT", "SystemRoot", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP", "PATHEXT"] as const;
 
 /** Eleven itself, started with `flag` to serve one of its MCP servers. */
 function selfServer(name: string, flag: string, env: acp.EnvVariable[]): acp.McpServer {
-  const dev = basename(process.execPath).startsWith("bun");
-  const args = dev ? [join(import.meta.dir, "..", "main.tsx"), flag] : [flag];
+  const args = FROM_SOURCE ? [join(import.meta.dir, "..", "main.tsx"), flag] : [flag];
   return { name, command: process.execPath, args, env };
 }
 
@@ -86,7 +87,7 @@ function inputNumber(input: unknown, keys: readonly string[]): number | null {
 
 function inputPaths(input: unknown): readonly string[] {
   if (typeof input !== "object" || input === null) return [];
-  return Object.values(input).filter((value): value is string => typeof value === "string" && value.startsWith("/"));
+  return Object.values(input).filter((value): value is string => typeof value === "string" && isAbsolute(value));
 }
 
 /** A tool call that reads or sends the whole open file: read_bytes over all of it, or any non-REA tool given its path. */
@@ -138,7 +139,7 @@ function allowOption(request: acp.RequestPermissionRequest): acp.RequestPermissi
 
 function startFailure(agent: AgentEntry, native: NativeCommand | null, detail: string): string {
   if (!/auth|sign.?in|log.?in|credential|api key/i.test(detail)) return `Couldn't start ${agent.name}. ${detail}`;
-  const command = native ? (native.path.split("/").pop() ?? agent.name) : agent.name;
+  const command = native ? basename(native.path) : agent.name;
   return `${agent.name} needs you to sign in. Run \`${command} login\` in Terminal, then try again. ${detail}`;
 }
 
@@ -205,7 +206,7 @@ export class AgentSession {
   }
 
   private connect(launch: Launch): acp.ClientSideConnection {
-    const child = spawn(launch.command, [...launch.args], { cwd: this.cwd, stdio: ["pipe", "pipe", "pipe"], env: { ...process.env, ...launch.env } });
+    const child = start(launch.command, launch.args, { cwd: this.cwd, env: { ...process.env, ...launch.env } });
     child.stderr.on("data", (chunk: Buffer) => {
       this.stderrTail = (this.stderrTail + chunk.toString()).slice(-STDERR_TAIL);
     });
@@ -288,6 +289,6 @@ export class AgentSession {
 
   stop(): void {
     this.stopped = true;
-    this.child?.kill();
+    if (this.child) stop(this.child);
   }
 }
