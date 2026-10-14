@@ -6,8 +6,9 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { hidePaths } from "../src/bridge/privacy";
-import { newestJdkFirst } from "../src/engine/toolchain";
+import { jdkVersion } from "../src/engine/toolchain";
 import { dataRoot } from "../src/lib/platform";
+import { newestFirst } from "../src/lib/version";
 import { loadSkills } from "../src/skills/load";
 
 function jdk(root: string, folder: string, version: string): string {
@@ -21,7 +22,7 @@ test("JDKs sort by their release file, not the numbers in the folder name", () =
   const root = mkdtempSync(join(tmpdir(), "jdks-"));
   const distro = jdk(root, "java-17-openjdk-amd64", "17.0.12");
   const ours = jdk(root, "jdk-21.0.5+11", "21.0.5");
-  expect([distro, ours].sort(newestJdkFirst)[0]).toBe(ours);
+  expect([distro, ours].sort(newestFirst(jdkVersion))[0]).toBe(ours);
 });
 
 test("hiding folder paths also covers JSON, where Windows doubles backslashes", () => {

@@ -1,12 +1,13 @@
 import { existsSync, readdirSync, readFileSync, readlinkSync } from "node:fs";
 import { homedir, totalmem } from "node:os";
-import { delimiter, dirname, join } from "node:path";
+import { basename, delimiter, dirname, join } from "node:path";
 
 import { activeProvider } from "../analysis/engines";
 import { ANALYZE_HEADLESS, exe, jdkLocations, OS } from "../lib/platform";
 import { supportPath } from "../lib/support";
 import { currentSettings, type Settings } from "../settings/store";
 import { runSync } from "../lib/process";
+import { newestFirst } from "../lib/version";
 
 const HOME = homedir();
 
@@ -36,34 +37,22 @@ function children(dir: string): readonly string[] {
   }
 }
 
-function versionOf(path: string): readonly number[] {
-  return (path.match(/\d+(\.\d+)*/g)?.at(-1) ?? "0").split(".").map(Number);
-}
-
-function newer(x: readonly number[], y: readonly number[]): number {
-  for (let ix = 0; ix < Math.max(x.length, y.length); ix++) {
-    const diff = (y[ix] ?? 0) - (x[ix] ?? 0);
-    if (diff !== 0) return diff;
+function readMatch(file: string, pattern: RegExp): string | null {
+  try {
+    return pattern.exec(readFileSync(file, "utf8"))?.[1] ?? null;
+  } catch {
+    return null;
   }
-  return 0;
 }
 
-function newestFirst(a: string, b: string): number {
-  return newer(versionOf(a), versionOf(b));
+/** Ghidra's version from its application.properties, else from its folder name (ghidra_12.1.4_PUBLIC). */
+export function ghidraVersion(home: string): string | null {
+  return readMatch(join(home, "Ghidra", "application.properties"), /application\.version=(\S+)/) ?? basename(home);
 }
 
 /** A JDK's version from its release file. Folder names mislead: java-17-openjdk-amd64 ends in 64. */
-function jdkVersion(home: string): readonly number[] {
-  try {
-    const version = /JAVA_VERSION="([^"]+)"/.exec(readFileSync(join(home, "release"), "utf8"))?.[1] ?? "0";
-    return version.split(/[._+-]/).map(Number).filter(Number.isFinite);
-  } catch {
-    return [0];
-  }
-}
-
-export function newestJdkFirst(a: string, b: string): number {
-  return newer(jdkVersion(a), jdkVersion(b));
+export function jdkVersion(home: string): string | null {
+  return readMatch(join(home, "release"), /JAVA_VERSION="([^"]+)"/);
 }
 
 function ghidraHomes(parent: string): readonly string[] {
@@ -71,12 +60,12 @@ function ghidraHomes(parent: string): readonly string[] {
 }
 
 function findGhidra(): string | null {
-  return GHIDRA_PARENTS.flatMap(ghidraHomes).sort(newestFirst)[0] ?? null;
+  return GHIDRA_PARENTS.flatMap(ghidraHomes).sort(newestFirst(ghidraVersion))[0] ?? null;
 }
 
 function findJdk(): string | null {
   const homes = JDK_GLOBS.flatMap(([parent, suffix]) => children(parent).map((dir) => (suffix ? join(dir, suffix) : dir)));
-  return homes.filter((home) => existsSync(join(home, "bin", exe("java")))).sort(newestJdkFirst)[0] ?? null;
+  return homes.filter((home) => existsSync(join(home, "bin", exe("java")))).sort(newestFirst(jdkVersion))[0] ?? null;
 }
 
 /** Bun formats dates in UTC unless TZ is set, so take the Mac's own zone from /etc/localtime. */

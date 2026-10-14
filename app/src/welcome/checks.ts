@@ -1,11 +1,12 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { reaLaunch } from "../engine/rea";
-import { enginesDir, newestJdkFirst } from "../engine/toolchain";
+import { enginesDir, ghidraVersion, jdkVersion } from "../engine/toolchain";
 import { ANALYZE_HEADLESS, cacheRoot, exe, jdkLocations, THIS_DEVICE } from "../lib/platform";
 import { run } from "../lib/process";
+import { newestFirst, versionIn } from "../lib/version";
 import { hasDecompiler } from "./decompiler";
 
 const HOME = homedir();
@@ -34,19 +35,6 @@ function children(dir: string): readonly string[] {
   }
 }
 
-function versionOf(path: string): readonly number[] {
-  return (path.match(/\d+(\.\d+)*/g)?.at(-1) ?? "0").split(".").map(Number);
-}
-
-function newestFirst(a: string, b: string): number {
-  const [x, y] = [versionOf(a), versionOf(b)];
-  for (let ix = 0; ix < Math.max(x.length, y.length); ix++) {
-    const diff = (y[ix] ?? 0) - (x[ix] ?? 0);
-    if (diff !== 0) return diff;
-  }
-  return 0;
-}
-
 function tildify(path: string): string {
   return path.startsWith(`${HOME}/`) ? `~${path.slice(HOME.length)}` : path;
 }
@@ -55,23 +43,13 @@ export function ghidraHome(): string | null {
   const fromEnv = process.env.GHIDRA_INSTALL_DIR;
   if (fromEnv && existsSync(join(fromEnv, "support", ANALYZE_HEADLESS))) return fromEnv;
   const homes = GHIDRA_PARENTS.flatMap((parent) => children(parent).flatMap((dir) => [dir, ...children(dir)]));
-  return homes.filter((dir) => /ghidra_[\d.]+_PUBLIC$/i.test(dir) && existsSync(join(dir, "support", ANALYZE_HEADLESS))).sort(newestFirst)[0] ?? null;
-}
-
-function ghidraVersion(home: string): string {
-  const fromName = home.match(/ghidra_([\d.]+)_PUBLIC/i)?.[1];
-  if (fromName) return fromName;
-  try {
-    return readFileSync(join(home, "Ghidra", "application.properties"), "utf8").match(/application\.version=(\S+)/)?.[1] ?? "";
-  } catch {
-    return "";
-  }
+  return homes.filter((dir) => /ghidra_[\d.]+_PUBLIC$/i.test(dir) && existsSync(join(dir, "support", ANALYZE_HEADLESS))).sort(newestFirst(ghidraVersion))[0] ?? null;
 }
 
 function ghidraCheck(): Check {
   const home = ghidraHome();
   if (!home) return { key: "ghidra", status: "problem", title: "Ghidra not found", detail: "Install Ghidra 12 or set GHIDRA_INSTALL_DIR, then restart Eleven." };
-  const version = ghidraVersion(home);
+  const version = versionIn(ghidraVersion(home))?.version;
   const title = version ? `Ghidra ${version}` : "Ghidra";
   if (!hasDecompiler(home)) return { key: "ghidra", status: "problem", title, detail: `${tildify(home)} has no decompiler for ${THIS_DEVICE}, so code won't show. Install Ghidra in Setup to build it.` };
   return { key: "ghidra", status: "ok", title, detail: `${tildify(home)} with its decompiler` };
@@ -81,18 +59,14 @@ export function jdkHome(): string | null {
   const fromEnv = process.env.JAVA_HOME;
   if (fromEnv && existsSync(join(fromEnv, "bin", exe("java")))) return fromEnv;
   const homes = JDK_HOMES.flatMap(([parent, suffix]) => children(parent).map((dir) => join(dir, suffix)));
-  return homes.filter((home) => existsSync(join(home, "bin", exe("java")))).sort(newestJdkFirst)[0] ?? null;
+  return homes.filter((home) => existsSync(join(home, "bin", exe("java")))).sort(newestFirst(jdkVersion))[0] ?? null;
 }
 
+/** Java 8 and older report themselves as 1.x. */
 function javaMajor(home: string): number | null {
-  try {
-    const version = readFileSync(join(home, "release"), "utf8").match(/JAVA_VERSION="([^"]+)"/)?.[1] ?? "";
-    const [first, second] = version.split(".").map(Number);
-    const major = first === 1 ? second : first;
-    return major !== undefined && Number.isFinite(major) ? major : null;
-  } catch {
-    return null;
-  }
+  const version = versionIn(jdkVersion(home));
+  if (version === null) return null;
+  return version.major === 1 ? version.minor : version.major;
 }
 
 export function javaCheck(): Check {

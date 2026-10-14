@@ -92,16 +92,6 @@ export async function latestRelease(repo: string, beta = false): Promise<Release
   }
 }
 
-export function newer(candidate: string, current: string): boolean {
-  const a = candidate.split(".").map(Number);
-  const b = current.split(".").map(Number);
-  for (let ix = 0; ix < Math.max(a.length, b.length); ix += 1) {
-    const diff = (a[ix] ?? 0) - (b[ix] ?? 0);
-    if (diff !== 0) return diff > 0;
-  }
-  return false;
-}
-
 export async function rizinVersion(program: string): Promise<string | null> {
   try {
     const { stdout } = await run(program, ["-v"]);

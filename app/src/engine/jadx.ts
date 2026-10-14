@@ -10,6 +10,7 @@ import { run, runSync } from "../lib/process";
 import { OS, zipListing } from "../lib/platform";
 import { apkFiles, type ApkFiles, readResourceStrings, smaliClass, smaliFile, smaliMethod } from "./apk";
 import type { Procedure } from "./procedures";
+import { newestFirst } from "../lib/version";
 
 
 const ACC_NATIVE = 0x100;
@@ -71,7 +72,7 @@ export function jadxCommand(): string | null {
   if (onPath) return onPath;
   const share = join(homedir(), ".local", "share");
   if (!existsSync(share)) return null;
-  const copies = readdirSync(share).filter((name) => name.startsWith("jadx-")).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+  const copies = readdirSync(share).filter((name) => name.startsWith("jadx-")).sort(newestFirst((name) => name));
   return copies.map((name) => join(share, name, "bin", JADX)).find((bin) => existsSync(bin)) ?? null;
 }
 

@@ -1,11 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { newer } from "../settings/actions";
 import { currentSettings } from "../settings/store";
 import { appVersion } from "../settings/system";
 import { isRecord } from "./guards";
 import { cacheRoot, OS, unzip } from "./platform";
+import { isNewer } from "./version";
 import { run, startWith } from "./process";
 
 const RELEASES = "https://api.github.com/repos/Zfinix/eleven/releases";
@@ -85,9 +85,9 @@ function installOnQuit(app: string): void {
 async function checkForUpdate(app: string): Promise<void> {
   const current = appVersion();
   const staged = stagedVersion();
-  if (staged !== null && newer(staged, current)) return installOnQuit(app);
+  if (staged !== null && isNewer(staged, current)) return installOnQuit(app);
   const release = await latestRelease();
-  if (release === null || !newer(release.version, current)) return rmSync(STAGE, { recursive: true, force: true });
+  if (release === null || !isNewer(release.version, current)) return rmSync(STAGE, { recursive: true, force: true });
   if (await stage(release)) installOnQuit(app);
 }
 

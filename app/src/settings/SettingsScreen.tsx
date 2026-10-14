@@ -9,7 +9,8 @@ import { useAgents } from "../chat/useAgents";
 import { signedIn } from "../welcome/agentSetup";
 import { Shell } from "../Shell";
 import { useTheme } from "../theme";
-import { copyText, ghidraVersion, latestRelease, newer, rizinVersion } from "./actions";
+import { copyText, ghidraVersion, latestRelease, rizinVersion } from "./actions";
+import { isNewer } from "../lib/version";
 import { buildPages, type Ctx, rowMatches } from "./catalog";
 import { GroupView, PageHeader, SettingsToast } from "./controls";
 import { AddressPreview, CodePreview, PresetCards, ThemeCards, WindowPreview } from "./extras";
@@ -76,7 +77,7 @@ export function SettingsScreen({ initial = "general", onBack, onSetup }: { reado
     const here = id === "rizin" ? (info.engines.rizin.path ? await rizinVersion(info.engines.rizin.path) : null) : info.engines.ghidra.path ? ghidraVersion(info.engines.ghidra.path) : null;
     const release = await latestRelease(id === "rizin" ? "rizinorg/rizin" : "NationalSecurityAgency/ghidra");
     if (!release) return toast("Couldn’t reach the update server");
-    if (here && newer(release.version, here)) {
+    if (here && isNewer(release.version, here)) {
       openLink(release.url);
       return toast(`${name} ${release.version} is out. Opened the download page`);
     }
