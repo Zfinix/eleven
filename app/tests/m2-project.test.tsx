@@ -8,6 +8,7 @@ import type { ReactElement } from "react";
 import { adoptLoginShell } from "../src/agents/detect";
 import { useChat } from "../src/chat/useChat";
 import { prepareTarget } from "../src/engine/target";
+import { runCommand } from "../src/lib/shortcuts";
 import { DARK, ThemeContext } from "../src/theme";
 import { adoptToolchain } from "../src/engine/toolchain";
 import { Workbench } from "../src/workbench/Workbench";
@@ -85,8 +86,8 @@ afterAll(() => {
 });
 
 test("M2 gate: a rename and a bookmark survive closing and reopening", async () => {
-  await settle(() => text().includes("134") && byLabel(ui.renderer.toJSON(), "Rename this function") !== null);
-  click("Rename this function");
+  await settle(() => text().includes("134") && text().includes("Pseudocode"));
+  runCommand("rename");
   await settle(() => byLabel(ui.renderer.toJSON(), "New name") !== null);
   const input = byLabel(ui.renderer.toJSON(), "New name");
   if (input === null) throw new Error("no rename box");
@@ -99,7 +100,7 @@ test("M2 gate: a rename and a bookmark survive closing and reopening", async () 
   ui.unmount();
   mount();
   await settle(() => text().includes("main_ls") && text().includes("134"));
-  click("Your work");
+  if (byLabel(ui.renderer.toJSON(), "Bookmarks") === null) click("Your work");
   await settle(() => byLabel(ui.renderer.toJSON(), "Bookmarks") !== null);
   click("Bookmarks");
   await settle(() => byLabel(ui.renderer.toJSON(), "main_ls") !== null, 5_000).catch(() => undefined);

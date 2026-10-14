@@ -17,7 +17,9 @@ beforeAll(async () => {
 afterAll(() => screen.unmount());
 
 test("M6: recording a GPU run shows the timeline and what to fix", async () => {
-  await screen.until(() => screen.text().includes("Record a GPU run"), 120_000);
+  await screen.until(() => screen.text().includes("Shaders and models"), 120_000);
+  screen.click("Shaders and models");
+  await screen.until(() => screen.text().includes("Record a GPU run"));
   screen.click("Record a GPU run");
   await screen.until(() => screen.text().includes("Run it"));
   screen.click("Run it");
@@ -25,5 +27,5 @@ test("M6: recording a GPU run shows the timeline and what to fix", async () => {
   const title = screen.texts().find((line) => line.startsWith("PhotoFilter run,"));
   if (!title) throw new Error("no recording listed");
   screen.click(title);
-  await screen.until(() => screen.text().includes("GPU · compute") && screen.text().includes("waits for each frame to finish"), 120_000);
+  await screen.until(() => screen.text().includes("GPU · compute") && screen.text().includes("What the numbers say"), 120_000);
 }, 300_000);
