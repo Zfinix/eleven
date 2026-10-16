@@ -1,5 +1,6 @@
 import type { MenuItemSpec, MenuSpec } from "@gpuix/native";
 
+import { tr } from "../i18n";
 import { type CommandId, isCommandId } from "./commands";
 import { type Combo, isBareCombo } from "./keymaps";
 import { isMenuActionId, type MenuActionId } from "./menuActions";
@@ -38,26 +39,26 @@ const SEPARATOR: MenuItemSpec = { role: "separator" };
  */
 function command(ctx: MenuContext, id: CommandId, label: string): MenuItemSpec {
   const combo = ctx.combo(id);
-  const item: MenuItemSpec = { id: choiceId({ kind: "command", id }), label, enabled: ctx.bound(id) };
+  const item: MenuItemSpec = { id: choiceId({ kind: "command", id }), label: tr(label), enabled: ctx.bound(id) };
   return combo && !isBareCombo(combo) ? { ...item, keys: combo } : item;
 }
 
 function action(ctx: MenuContext, id: MenuActionId, label: string): MenuItemSpec {
-  return { id: choiceId({ kind: "action", id }), label, enabled: ctx.offered(id) };
+  return { id: choiceId({ kind: "action", id }), label: tr(label), enabled: ctx.offered(id) };
 }
 
 function app(id: AppItem, label: string): MenuItemSpec {
-  return { id: choiceId({ kind: "app", id }), label };
+  return { id: choiceId({ kind: "app", id }), label: tr(label) };
 }
 
 /** Text fields handle these themselves, so they press the standard keys and are always on. */
 function edit(label: string, keys: string): MenuItemSpec {
-  return { label, keys };
+  return { label: tr(label), keys };
 }
 
 function recentMenu(ctx: MenuContext): MenuItemSpec {
-  if (ctx.recent.length === 0) return { label: "Open Recent", enabled: false, items: [] };
-  return { label: "Open Recent", items: ctx.recent.map((project) => ({ id: choiceId({ kind: "recent", id: project.id }), label: project.name })) };
+  if (ctx.recent.length === 0) return { label: tr("Open Recent"), enabled: false, items: [] };
+  return { label: tr("Open Recent"), items: ctx.recent.map((project) => ({ id: choiceId({ kind: "recent", id: project.id }), label: project.name })) };
 }
 
 export function menuBar(ctx: MenuContext): MenuSpec[] {
@@ -70,20 +71,20 @@ export function menuBar(ctx: MenuContext): MenuSpec[] {
       SEPARATOR,
       { role: "services" },
       SEPARATOR,
-      { role: "hide", label: "Hide Eleven" },
+      { role: "hide", label: tr("Hide Eleven") },
       { role: "hideOthers" },
       { role: "showAll" },
       SEPARATOR,
-      { role: "quit", label: "Quit Eleven" },
+      { role: "quit", label: tr("Quit Eleven") },
     ] },
-    { label: "File", items: [
+    { label: tr("File"), items: [
       command(ctx, "thread", "New Chat"),
       command(ctx, "open", "Open…"),
       recentMenu(ctx),
       SEPARATOR,
       command(ctx, "save", "Save Project"),
       SEPARATOR,
-      { label: "Export", items: [
+      { label: tr("Export"), items: [
         action(ctx, "exportPseudocode", "Pseudocode of This Function"),
         action(ctx, "exportAssembly", "Assembly of This Function"),
         SEPARATOR,
@@ -95,7 +96,7 @@ export function menuBar(ctx: MenuContext): MenuSpec[] {
       SEPARATOR,
       { role: "close" },
     ] },
-    { label: "Edit", items: [
+    { label: tr("Edit"), items: [
       edit("Undo", "cmd-z"),
       edit("Redo", "shift-cmd-z"),
       SEPARATOR,
@@ -108,7 +109,7 @@ export function menuBar(ctx: MenuContext): MenuSpec[] {
       command(ctx, "findNext", "Find Next"),
       command(ctx, "findPrevious", "Find Previous"),
     ] },
-    { label: "Navigate", items: [
+    { label: tr("Navigate"), items: [
       command(ctx, "goto", "Go to Address or Symbol…"),
       command(ctx, "palette", "Search Everything…"),
       SEPARATOR,
@@ -117,20 +118,20 @@ export function menuBar(ctx: MenuContext): MenuSpec[] {
       SEPARATOR,
       command(ctx, "xrefs", "Cross-References"),
     ] },
-    { label: "Modify", items: [
+    { label: tr("Modify"), items: [
       command(ctx, "rename", "Rename…"),
       command(ctx, "comment", "Comment…"),
       command(ctx, "bookmark", "Bookmark"),
       command(ctx, "patch", "Patch Bytes Here…"),
       SEPARATOR,
-      { label: "Mark As", items: [
+      { label: tr("Mark As"), items: [
         command(ctx, "markCode", "Code"),
         command(ctx, "markProcedure", "Function"),
         command(ctx, "markData", "Data"),
         command(ctx, "markString", "C String"),
         command(ctx, "markUndefined", "Undefined"),
       ] },
-      { label: "Show Number As", items: [
+      { label: tr("Show Number As"), items: [
         command(ctx, "showHex", "Hexadecimal"),
         command(ctx, "showDecimal", "Decimal"),
         command(ctx, "showCharacter", "Character"),
@@ -138,7 +139,7 @@ export function menuBar(ctx: MenuContext): MenuSpec[] {
         command(ctx, "showAddress", "Address"),
       ] },
     ] },
-    { label: "View", items: [
+    { label: tr("View"), items: [
       command(ctx, "pseudo", "Pseudocode"),
       command(ctx, "graph", "Graph"),
       command(ctx, "strings", "Strings"),
@@ -150,11 +151,11 @@ export function menuBar(ctx: MenuContext): MenuSpec[] {
       command(ctx, "details", "Details"),
       command(ctx, "terminal", "Terminal"),
     ] },
-    { label: "Agent", items: [
+    { label: tr("Agent"), items: [
       command(ctx, "agent", "Agent Panel"),
       command(ctx, "stop", "Stop the Agent"),
     ] },
-    { label: "Debug", items: [
+    { label: tr("Debug"), items: [
       command(ctx, "debug", "Debug This Program"),
       SEPARATOR,
       command(ctx, "continue", "Continue"),
@@ -162,11 +163,11 @@ export function menuBar(ctx: MenuContext): MenuSpec[] {
       command(ctx, "stepIn", "Step Into"),
       command(ctx, "stepOut", "Step Out"),
     ] },
-    { label: "Window", items: [
+    { label: tr("Window"), items: [
       { role: "minimize" },
       { role: "zoom" },
     ] },
-    { label: "Help", items: [
+    { label: tr("Help"), items: [
       app("shortcuts", "Keyboard Shortcuts"),
       app("whatsNew", "What’s New in Eleven"),
       SEPARATOR,

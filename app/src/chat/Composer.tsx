@@ -5,6 +5,7 @@ import { type ReactElement, type ReactNode, useEffect, useMemo, useRef, useState
 
 import type { SessionOption } from "../agents/events";
 import type { Target } from "../engine/target";
+import { tr, trN, useLanguage } from "../i18n";
 import { MONO, useTheme } from "../theme";
 import { Chip, Icon, MenuSurface, Popover, Row, Spacer, usePopover } from "../components/ui";
 import { loadSkills, skillPrompt } from "../skills/load";
@@ -22,11 +23,14 @@ import { primaryHeld } from "../lib/platform";
 
 export type ComposerPlace = "landing" | "conversation" | "dock";
 
-const PLACEHOLDER: Readonly<Record<ComposerPlace, string>> = {
+const PLACEHOLDER_TEXT: Readonly<Record<ComposerPlace, string>> = {
   landing: "Ask anything, or drop an app, binary, shader or model here",
   conversation: "Ask a follow-up, / for skills, @ to mention",
   dock: "Ask about this code, / for skills, @ to mention",
 };
+
+/** Translated as it is read, so a language switch shows through on the next render. */
+const PLACEHOLDER = (place: ComposerPlace): string => tr(PLACEHOLDER_TEXT[place]);
 
 const NO_MENTIONS = indexMentions([]);
 
@@ -42,11 +46,12 @@ function RoundIcon({ icon, size, label, ring = false, onClick }: { readonly icon
 
 function SendButton({ stopping, ready, blocked, large = false, onClick }: { readonly stopping: boolean; readonly ready: boolean; readonly blocked: boolean; readonly large?: boolean; readonly onClick: () => void }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   const box = large ? 34 : 32;
   const lit = (ready || stopping) && !blocked;
   const look = large ? { backgroundColor: lit ? p.text : p.faint } : { backgroundColor: blocked ? p.faint : p.primary, opacity: lit ? 1 : 0.35 };
   return (
-    <div onClick={() => !blocked && onClick()} aria-label={stopping ? "Stop" : blocked ? "Can't send yet" : "Send"} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: box, height: box, borderRadius: box / 2, flexShrink: 0, ...look, cursor: blocked ? "default" : "pointer", hover: blocked ? {} : { opacity: 0.72 } }}>
+    <div onClick={() => !blocked && onClick()} aria-label={tr(stopping ? "Stop" : blocked ? "Can't send yet" : "Send")} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: box, height: box, borderRadius: box / 2, flexShrink: 0, ...look, cursor: blocked ? "default" : "pointer", hover: blocked ? {} : { opacity: 0.72 } }}>
       <Icon name={stopping ? "stop" : "send"} size={stopping ? 12 : 15} color={p.onPrimary} on={stopping} />
     </div>
   );
@@ -54,7 +59,8 @@ function SendButton({ stopping, ready, blocked, large = false, onClick }: { read
 
 function TargetPill({ target, onOpen, onRemove }: { readonly target: Target | null; readonly onOpen: () => void; readonly onRemove: () => void }): ReactElement {
   const { p } = useTheme();
-  if (!target) return <Chip label="No file" caret onClick={onOpen} />;
+  useLanguage();
+  if (!target) return <Chip label={tr("No file")} caret onClick={onOpen} />;
   return (
     <Row gap={6} style={{ height: 30, paddingLeft: 8, paddingRight: 6, fontSize: 12.5, color: p.text3 }}>
       <div onClick={onOpen} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", hover: { opacity: 0.72 } }}>
@@ -62,7 +68,7 @@ function TargetPill({ target, onOpen, onRemove }: { readonly target: Target | nu
         <div style={{ whiteSpace: "nowrap" }}>{target.name}</div>
         <div style={{ whiteSpace: "nowrap", color: p.faint }}>{target.meta}</div>
       </div>
-      <div onClick={onRemove} aria-label={`Remove ${target.name}`} style={{ display: "flex", padding: 3, cursor: "pointer", hover: { opacity: 0.72 } }}>
+      <div onClick={onRemove} aria-label={trN("Remove {name}", { name: target.name })} style={{ display: "flex", padding: 3, cursor: "pointer", hover: { opacity: 0.72 } }}>
         <Icon name="close" size={11} color={p.faint} />
       </div>
     </Row>
@@ -77,11 +83,12 @@ const RUN_CODE: Readonly<Record<PermissionLevel, { readonly word: string; readon
 
 function RunCodeRow({ level, on, onPick }: { readonly level: PermissionLevel; readonly on: boolean; readonly onPick: () => void }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   return (
     <div onClick={onPick} role="menuitemradio" aria-checked={on} style={{ display: "flex", alignItems: "center", gap: 10, height: 44, flexShrink: 0, paddingLeft: 10, paddingRight: 10, borderRadius: 7, cursor: "pointer", hover: { opacity: 0.72 }, ...(on ? { backgroundColor: p.sel } : {}) }}>
       <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, color: p.text }}>{RUN_CODE[level].word}</div>
-        <div style={{ fontSize: 11.5, color: p.muted }}>{RUN_CODE[level].said}</div>
+        <div style={{ fontSize: 13, color: p.text }}>{tr(RUN_CODE[level].word)}</div>
+        <div style={{ fontSize: 11.5, color: p.muted }}>{tr(RUN_CODE[level].said)}</div>
       </div>
       {on && <Icon name="check" size={13} color={p.text} />}
     </div>
@@ -91,6 +98,7 @@ function RunCodeRow({ level, on, onPick }: { readonly level: PermissionLevel; re
 /** Whether the agent may run code: Ask, Auto or Blocked, saved straight to Settings → Permissions. */
 function RunCodePill({ compact }: { readonly compact: boolean }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   const { settings, update } = useSettings();
   const menu = usePopover();
   const level = settings.permissions.shell;
@@ -101,16 +109,16 @@ function RunCodePill({ compact }: { readonly compact: boolean }): ReactElement {
   const ring = compact ? {} : { paddingLeft: 12, paddingRight: 12, borderWidth: 1, borderColor: p.line2 };
   return (
     <div onMouseDown={menu.onTriggerDown} style={{ display: "flex", position: "relative", flexShrink: 0 }}>
-      <div onClick={menu.onTriggerClick} role="button" aria-label={`${RUN_CODE[level].said}. Change it`} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, height: compact ? 30 : 32, minWidth: compact ? 30 : 0, borderRadius: 16, fontSize: 12.5, color: p.text3, cursor: "pointer", hover: { opacity: 0.72 }, ...ring, ...(menu.open ? { backgroundColor: p.fill2 } : {}) }}>
+      <div onClick={menu.onTriggerClick} role="button" aria-label={`${tr(RUN_CODE[level].said)}. ${tr("Change it")}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, height: compact ? 30 : 32, minWidth: compact ? 30 : 0, borderRadius: 16, fontSize: 12.5, color: p.text3, cursor: "pointer", hover: { opacity: 0.72 }, ...ring, ...(menu.open ? { backgroundColor: p.fill2 } : {}) }}>
         <Icon name="asks" size={14} color={p.text3} />
-        {!compact && <div style={{ whiteSpace: "nowrap" }}>{RUN_CODE[level].word}</div>}
+        {!compact && <div style={{ whiteSpace: "nowrap" }}>{tr(RUN_CODE[level].word)}</div>}
       </div>
       {menu.open && (
         <Popover side="top" align="start" onDismiss={menu.dismiss}>
           <MenuSurface width={240}>
-            <div style={{ paddingTop: 4, paddingLeft: 10, paddingBottom: 6, fontSize: 11.5, color: p.muted }}>Running code</div>
+            <div style={{ paddingTop: 4, paddingLeft: 10, paddingBottom: 6, fontSize: 11.5, color: p.muted }}>{tr("Running code")}</div>
             {PERMISSION_LEVELS.map((option) => <RunCodeRow key={option} level={option} on={option === level} onPick={() => pick(option)} />)}
-            <div onClick={() => { menu.close(); openSettings("permissions"); }} role="button" style={{ display: "flex", alignItems: "center", height: 32, marginTop: 4, paddingLeft: 10, fontSize: 12.5, color: p.muted, cursor: "pointer", hover: { opacity: 0.72 } }}>All permissions…</div>
+            <div onClick={() => { menu.close(); openSettings("permissions"); }} role="button" style={{ display: "flex", alignItems: "center", height: 32, marginTop: 4, paddingLeft: 10, fontSize: 12.5, color: p.muted, cursor: "pointer", hover: { opacity: 0.72 } }}>{tr("All permissions…")}</div>
           </MenuSurface>
         </Popover>
       )}
@@ -157,6 +165,7 @@ export function Composer({ place, target, agents, thread, onAttach, onDetach, on
   readonly onPickAgent: (id: string) => void;
 }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   const drop = useDropTarget();
   const [draft, setDraft] = useState(seed?.text ?? "");
   useEffect(() => {
@@ -179,7 +188,7 @@ export function Composer({ place, target, agents, thread, onAttach, onDetach, on
   const commandReturn = useSettings().settings.sendKey === "Command Return";
   const submit = (): void => {
     if (!typed || blocked) return;
-    const text = fileOnly && target ? `What does ${target.name} do when it starts?` : draft;
+    const text = fileOnly && target ? trN("What does {name} do when it starts?", { name: target.name }) : draft;
     thread.send(withMentions(about ? `@${about} ${text}` : text, picked));
     setDraft("");
     setPicked([]);
@@ -266,7 +275,7 @@ export function Composer({ place, target, agents, thread, onAttach, onDetach, on
               <Icon name={target.kind} size={16} color={p.muted} />
               <div style={{ whiteSpace: "nowrap", color: p.text }}>{target.name}</div>
               <div style={{ whiteSpace: "nowrap", fontSize: 12, color: p.muted }}>{target.meta}</div>
-              <div onClick={onDetach} role="button" aria-label={`Remove ${target.name}`} style={{ display: "flex", cursor: "pointer", hover: { opacity: 0.72 } }}>
+              <div onClick={onDetach} role="button" aria-label={trN("Remove {name}", { name: target.name })} style={{ display: "flex", cursor: "pointer", hover: { opacity: 0.72 } }}>
                 <Icon name="close" size={11} color={p.muted} />
               </div>
             </Row>
@@ -274,7 +283,7 @@ export function Composer({ place, target, agents, thread, onAttach, onDetach, on
         )}
         {about && (
           <Row gap={6} style={{ paddingTop: 10, paddingLeft: 14, paddingRight: 14 }}>
-            <div onClick={() => setDropped(about)} role="button" aria-label={`Stop asking about ${about}`} style={{ display: "flex", alignItems: "center", gap: 6, height: 24, paddingLeft: 8, paddingRight: 8, borderRadius: 6, backgroundColor: p.fill2, cursor: "pointer", hover: { opacity: 0.72 } }}>
+            <div onClick={() => setDropped(about)} role="button" aria-label={trN("Stop asking about {name}", { name: about })} style={{ display: "flex", alignItems: "center", gap: 6, height: 24, paddingLeft: 8, paddingRight: 8, borderRadius: 6, backgroundColor: p.fill2, cursor: "pointer", hover: { opacity: 0.72 } }}>
               <Icon name="function" size={12} color={p.call} />
               <div style={{ fontSize: 11.5, color: p.text3, whiteSpace: "nowrap", fontFamily: MONO }}>{about}</div>
               <Icon name="close" size={8} color={p.faint} />
@@ -285,19 +294,19 @@ export function Composer({ place, target, agents, thread, onAttach, onDetach, on
           {...drop}
           ref={box}
           autoFocus
-          aria-label="Message"
+          aria-label={tr("Message")}
           value={draft}
           minRows={place === "landing" ? 3 : 1}
           maxRows={12}
-          placeholder={thread.busy ? "Queue another message…" : about ? "Ask about this function, or tell the agent what to find" : (hint ?? PLACEHOLDER[place])}
+          placeholder={thread.busy ? tr("Queue another message…") : about ? tr("Ask about this function, or tell the agent what to find") : (hint ?? PLACEHOLDER(place))}
           onChange={(e) => onChange(e.value ?? "")}
           onKeyDown={onKeyDown}
           {...(commandReturn ? {} : { onSubmit: submit })}
           style={{ paddingTop: 14, paddingLeft: 16, paddingRight: 16, paddingBottom: 6, fontSize: place === "landing" ? 15 : 14, color: p.text, backgroundColor: p.win, borderTopLeftRadius: 19, borderTopRightRadius: 19 }}
         />
         <Row gap={landing ? 8 : 4} style={landing ? { paddingTop: 6, paddingLeft: 10, paddingRight: 10, paddingBottom: 10 } : { paddingTop: 4, paddingLeft: 8, paddingRight: 8, paddingBottom: 8 }}>
-          <RoundIcon icon="new" size={landing ? 15 : 16} label="Add a file" ring={landing} onClick={onAttach} />
-          <RoundIcon icon="slash" size={15} label="Modes, skills and files" onClick={() => setPaletteOpen(true)} />
+          <RoundIcon icon="new" size={landing ? 15 : 16} label={tr("Add a file")} ring={landing} onClick={onAttach} />
+          <RoundIcon icon="slash" size={15} label={tr("Modes, skills and files")} onClick={() => setPaletteOpen(true)} />
           {landing && !thread.state.options.some((option) => option.category === "mode") && <RunCodePill compact={false} />}
           <Settings thread={thread} pill={landing} compact={place === "dock"} />
           <Spacer />

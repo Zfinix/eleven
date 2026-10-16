@@ -9,6 +9,7 @@ import { findLldbDap } from "../debug/adapter";
 import { reaLaunch } from "../engine/rea";
 import { RECORDINGS_DIR } from "../gpu/trace";
 import { cacheDir, folderBytes, ghidraVersion, javaVersion, latestRelease, PROJECTS_DIR, projectCount, reaVersion, rizinVersion, sizeText, THREADS_DIR } from "./actions";
+import { tr, trN } from "../i18n";
 import { isNewer } from "../lib/version";
 import type { Tone } from "./model";
 import { currentSettings } from "./store";
@@ -71,10 +72,10 @@ function clock(date: Date): string {
 
 export function appUpdate(): AppUpdate {
   const version = appVersion();
-  if (latest && isNewer(latest.version, version)) return { version, line: `Eleven ${latest.version} is ready to download.`, short: `Eleven ${latest.version} is out.`, download: latest.url };
-  if (checkedAt === null) return { version, line: "Not checked yet.", short: "Not checked yet.", download: null };
-  if (offline) return { version, line: `Couldn’t reach the update server. Last tried today at ${clock(checkedAt)}.`, short: "Couldn’t check for updates.", download: null };
-  return { version, line: `You’re up to date. Last checked today at ${clock(checkedAt)}.`, short: "Up to date.", download: null };
+  if (latest && isNewer(latest.version, version)) return { version, line: trN("Eleven {v} is ready to download.", { v: latest.version }), short: trN("Eleven {v} is out.", { v: latest.version }), download: latest.url };
+  if (checkedAt === null) return { version, line: tr("Not checked yet."), short: tr("Not checked yet."), download: null };
+  if (offline) return { version, line: trN("Couldn’t reach the update server. Last tried today at {time}.", { time: clock(checkedAt) }), short: tr("Couldn’t check for updates."), download: null };
+  return { version, line: trN("You’re up to date. Last checked today at {time}.", { time: clock(checkedAt) }), short: tr("Up to date."), download: null };
 }
 
 /** Asks GitHub for Eleven's newest release on the chosen channel. */
@@ -98,9 +99,9 @@ async function gather(): Promise<Info> {
     latestRelease("Zfinix/rea"),
   ]);
   const reaStatus = (): { readonly text: string; readonly tone: Tone } => {
-    if (!rea) return { text: "Not found", tone: "warn" };
-    if (reaV && reaLatest && isNewer(reaLatest.version, reaV)) return { text: `${reaLatest.version} is out`, tone: "warn" };
-    return reaLatest ? { text: "Up to date", tone: "good" } : { text: "Installed", tone: "good" };
+    if (!rea) return { text: tr("Not found"), tone: "warn" };
+    if (reaV && reaLatest && isNewer(reaLatest.version, reaV)) return { text: trN("{v} is out", { v: reaLatest.version }), tone: "warn" };
+    return reaLatest ? { text: tr("Up to date"), tone: "good" } : { text: tr("Installed"), tone: "good" };
   };
   return {
     engines: { rizin: { path: rizinProgram, version: rizin }, ghidra: { path: ghidraDir, version: ghidraDir ? ghidraVersion(ghidraDir) : null }, hopper: hopperPath(), ida: idaPath() },

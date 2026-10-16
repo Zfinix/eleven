@@ -4,13 +4,16 @@ import { adoptLoginShell } from "./agents/detect";
 import { App } from "./App";
 import { Fonts } from "./components/Fonts";
 import { startAppBridge } from "./bridge/live";
+import { adoptLanguage } from "./i18n";
 import { dispatchShortcut } from "./lib/shortcuts";
 import { prepareTarget, type Target } from "./engine/target";
 import { adoptToolchain } from "./engine/toolchain";
 import { startTelemetry } from "./lib/telemetry";
 import { startUpdates } from "./lib/update";
+import { loadSettings } from "./settings/store";
 
 await adoptLoginShell();
+adoptLanguage(loadSettings().language);
 adoptToolchain();
 startAppBridge();
 startUpdates();

@@ -2,6 +2,7 @@ import { Tooltip as TipRoot, TooltipContent, TooltipTrigger } from "@gpuix/react
 import type { StyleDesc } from "@gpuix/react";
 import { type ReactElement, type ReactNode, useState } from "react";
 
+import { tr, trN, useLanguage } from "../i18n";
 import { dashedOutline, usePaintedSize } from "../lib/dashed";
 import { useNow } from "../lib/useNow";
 import { MONO, type Palette, SANS, useTheme } from "../theme";
@@ -46,11 +47,13 @@ export function Button({ label, tone, size = "regular", icon = null, disabled = 
   readonly onClick: () => void;
 }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
+  const text = tr(label);
   const look = disabled ? { backgroundColor: p.line2, color: p.faint } : { ...toneStyle(tone, p), cursor: "pointer" as const, hover: HOVER };
   return (
-    <div {...(disabled ? {} : { onClick })} role="button" aria-label={label} aria-disabled={disabled} style={{ display: "flex", alignItems: "center", gap: 7, height: HEIGHT[size], paddingLeft: size === "regular" ? 14 : size === "compact" ? 12 : 10, paddingRight: size === "regular" ? 14 : size === "compact" ? 12 : 10, borderRadius: size === "regular" ? 8 : 7, flexShrink: 0, fontSize: size === "small" ? 12 : 13, ...look }}>
+    <div {...(disabled ? {} : { onClick })} role="button" aria-label={text} aria-disabled={disabled} style={{ display: "flex", alignItems: "center", gap: 7, height: HEIGHT[size], paddingLeft: size === "regular" ? 14 : size === "compact" ? 12 : 10, paddingRight: size === "regular" ? 14 : size === "compact" ? 12 : 10, borderRadius: size === "regular" ? 8 : 7, flexShrink: 0, fontSize: size === "small" ? 12 : 13, ...look }}>
       {icon && <Icon name={icon} size={13} color={disabled ? p.faint : (tone === "primary" ? p.onPrimary : p.text3)} />}
-      <div style={{ whiteSpace: "nowrap" }}>{label}</div>
+      <div style={{ whiteSpace: "nowrap" }}>{text}</div>
     </div>
   );
 }
@@ -70,6 +73,7 @@ export type BadgeTone = "outline" | "ok" | "neutral" | "mono" | "mention";
 /** A small label: a format or arch, a state like Cached, an evidence id, or an @mention. */
 export function Badge({ label, tone }: { readonly label: string; readonly tone: BadgeTone }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   const base = { paddingLeft: 7, paddingRight: 7, paddingTop: 1, paddingBottom: 1, borderRadius: 6, fontSize: 11.5, flexShrink: 0, whiteSpace: "nowrap" } as const;
   const looks: Readonly<Record<BadgeTone, StyleDesc>> = {
     outline: { borderWidth: 1, borderColor: p.sel2, color: p.text4 },
@@ -78,7 +82,7 @@ export function Badge({ label, tone }: { readonly label: string; readonly tone: 
     mono: { paddingLeft: 8, paddingRight: 8, backgroundColor: p.raised2, fontFamily: MONO, color: p.text3 },
     mention: { paddingLeft: 8, paddingRight: 8, backgroundColor: p.fill2, fontFamily: MONO, color: p.text },
   };
-  return <div style={{ ...base, ...looks[tone] }}>{label}</div>;
+  return <div style={{ ...base, ...looks[tone] }}>{tr(label)}</div>;
 }
 
 export type DotTone = "ok" | "working" | "stopped" | "changed" | "idle";
@@ -105,10 +109,11 @@ export function dotColor(tone: DotTone, p: Palette): string {
 /** A colored dot and a word: Connected, Working, Stopped, Changed by agent. */
 export function StatusDot({ tone, label }: { readonly tone: DotTone; readonly label: string }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, color: p.muted }}>
       <div style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: dotColor(tone, p) }} />
-      <div style={{ whiteSpace: "nowrap" }}>{label}</div>
+      <div style={{ whiteSpace: "nowrap" }}>{tr(label)}</div>
     </div>
   );
 }
@@ -116,11 +121,12 @@ export function StatusDot({ tone, label }: { readonly tone: DotTone; readonly la
 /** The kit's tooltip: a rounded card under the thing you hover, after a short pause. A long label wraps into a few lines. */
 export function Tooltip({ label, children, side = "bottom" }: { readonly label: string; readonly children: ReactElement; readonly side?: "top" | "bottom" }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   return (
     <TipRoot delayDuration={450}>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
       <TooltipContent side={side} sideOffset={8} style={{ maxWidth: 280, paddingLeft: 13, paddingRight: 13, paddingTop: 10, paddingBottom: 10, borderRadius: 10, borderWidth: 1, borderColor: p.line2, backgroundColor: p.raised2, color: p.text, fontSize: 13, lineHeight: 19, whiteSpace: "normal", boxShadow: { offsetX: 0, offsetY: 10, blurRadius: 28, spreadRadius: 0, color: "rgba(0,0,0,0.35)" } }}>
-        {label}
+        {tr(label)}
       </TooltipContent>
     </TipRoot>
   );
@@ -129,14 +135,15 @@ export function Tooltip({ label, children, side = "bottom" }: { readonly label: 
 /** What went wrong in one plain sentence, what to do next, and the raw detail folded underneath. */
 export function ErrorCard({ title, detail, raw = null }: { readonly title: string; readonly detail: string; readonly raw?: string | null }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   const [open, setOpen] = useState(false);
   return (
     <div role="alert" style={{ display: "flex", flexDirection: "column", paddingTop: 12, paddingBottom: 12, paddingLeft: 14, paddingRight: 14, borderWidth: 1, borderColor: p.errLine, borderRadius: 10, backgroundColor: p.errBg }}>
-      <div style={{ fontWeight: 500, color: p.text }}>{title}</div>
-      <div style={{ marginTop: 2, color: p.text2, userSelect: "text" }}>{detail}</div>
+      <div style={{ fontWeight: 500, color: p.text }}>{tr(title)}</div>
+      <div style={{ marginTop: 2, color: p.text2, userSelect: "text" }}>{tr(detail)}</div>
       {raw && (
         <div onClick={() => setOpen(!open)} role="button" aria-expanded={open} style={{ alignSelf: "flex-start", marginTop: 8, fontSize: 12, color: p.muted, textDecoration: "underline", cursor: "pointer", hover: HOVER }}>
-          {open ? "Hide details" : "Show details"}
+          {open ? tr("Hide details") : tr("Show details")}
         </div>
       )}
       {raw && open && (
@@ -151,12 +158,13 @@ export function ErrorCard({ title, detail, raw = null }: { readonly title: strin
 /** Something to set up before this works, with the one place to go fix it. */
 export function WarnCard({ title, detail, action = null }: { readonly title: string; readonly detail: string; readonly action?: { readonly label: string; readonly run: () => void } | null }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   return (
     <div role="status" style={{ display: "flex", flexDirection: "column", paddingTop: 12, paddingBottom: 12, paddingLeft: 14, paddingRight: 14, borderWidth: 1, borderColor: p.warnLine, borderRadius: 10, backgroundColor: p.warnBg }}>
-      <div style={{ fontWeight: 500, color: p.text }}>{title}</div>
+      <div style={{ fontWeight: 500, color: p.text }}>{tr(title)}</div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 4, color: p.text2 }}>
-        <div>{detail}</div>
-        {action && <div onClick={action.run} role="link" style={{ color: p.link, textDecoration: "underline", cursor: "pointer", hover: HOVER }}>{action.label}</div>}
+        <div>{tr(detail)}</div>
+        {action && <div onClick={action.run} role="link" style={{ color: p.link, textDecoration: "underline", cursor: "pointer", hover: HOVER }}>{tr(action.label)}</div>}
       </div>
     </div>
   );
@@ -190,6 +198,7 @@ export type ProgressStep = { readonly label: string; readonly state: StepState }
 /** A long first open, told step by step: which step it's on, a bar, each step's state, and what happens next time. */
 export function StepProgress({ title, steps, note }: { readonly title: string; readonly steps: readonly ProgressStep[]; readonly note: string }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   const done = steps.filter((step) => step.state === "done").length;
   const current = Math.min(steps.length, done + 1);
   const fraction = steps.length === 0 ? 0 : (done + 0.5) / steps.length;
@@ -199,10 +208,10 @@ export function StepProgress({ title, steps, note }: { readonly title: string; r
     next: { glyph: "○", color: p.faint },
   };
   return (
-    <div role="status" aria-label={title} style={{ display: "flex", flexDirection: "column", padding: 14, borderWidth: 1, borderColor: p.sel, borderRadius: 10, backgroundColor: p.card }}>
+    <div role="status" aria-label={tr(title)} style={{ display: "flex", flexDirection: "column", padding: 14, borderWidth: 1, borderColor: p.sel, borderRadius: 10, backgroundColor: p.card }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
-        <div style={{ fontWeight: 500, color: p.text }}>{title}</div>
-        <div style={{ color: p.muted, whiteSpace: "nowrap" }}>{`Step ${current} of ${steps.length}`}</div>
+        <div style={{ fontWeight: 500, color: p.text }}>{tr(title)}</div>
+        <div style={{ color: p.muted, whiteSpace: "nowrap" }}>{trN("Step {n} of {m}", { n: current, m: steps.length })}</div>
       </div>
       <div style={{ display: "flex", height: 6, borderRadius: 3, backgroundColor: p.raised2, overflow: "hidden" }}>
         <div style={{ flexGrow: fraction, flexBasis: 0, backgroundColor: p.primary }} />
@@ -212,13 +221,13 @@ export function StepProgress({ title, steps, note }: { readonly title: string; r
         {steps.map((step) => step.state === "now" ? (
           <div key={step.label} style={{ display: "flex", alignItems: "center", gap: 6, color: mark.now.color, whiteSpace: "nowrap" }}>
             <Spinner />
-            <div>{step.label}</div>
+            <div>{tr(step.label)}</div>
           </div>
         ) : (
-          <div key={step.label} style={{ color: mark[step.state].color, whiteSpace: "nowrap" }}>{`${mark[step.state].glyph} ${step.label}`}</div>
+          <div key={step.label} style={{ color: mark[step.state].color, whiteSpace: "nowrap" }}>{`${mark[step.state].glyph} ${tr(step.label)}`}</div>
         ))}
       </div>
-      <div style={{ marginTop: 8, fontSize: 12, color: p.muted }}>{note}</div>
+      <div style={{ marginTop: 8, fontSize: 12, color: p.muted }}>{tr(note)}</div>
     </div>
   );
 }
@@ -226,12 +235,13 @@ export function StepProgress({ title, steps, note }: { readonly title: string; r
 /** Nothing to show: say what is empty and what to try instead, inside a dashed box. */
 export function EmptyState({ title, hint }: { readonly title: string; readonly hint: string }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   const { ref, size } = usePaintedSize();
   return (
     <div ref={ref} style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: 22, borderRadius: 10 }}>
       {size && <svg source={dashedOutline(size, 10, 1, "4 3")} style={{ position: "absolute", top: 0, left: 0, width: size.width, height: size.height, color: p.sel2 }} />}
-      <div style={{ fontWeight: 500, color: p.text, textAlign: "center" }}>{title}</div>
-      <div style={{ fontSize: 12, color: p.muted, textAlign: "center" }}>{hint}</div>
+      <div style={{ fontWeight: 500, color: p.text, textAlign: "center" }}>{tr(title)}</div>
+      <div style={{ fontSize: 12, color: p.muted, textAlign: "center" }}>{tr(hint)}</div>
     </div>
   );
 }
@@ -246,17 +256,18 @@ export function SuggestionCard({ title, reason, apply, state, onApply, onSkip }:
   readonly onSkip: () => void;
 }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   return (
     <div style={{ display: "flex", flexDirection: "column", paddingTop: 10, paddingBottom: 10, paddingLeft: 12, paddingRight: 12, borderWidth: 1, borderColor: p.line3, borderRadius: 10, backgroundColor: p.raised }}>
-      <div style={{ fontWeight: 500, color: p.text }}>{title}</div>
-      {reason && <div style={{ marginTop: 2, fontSize: 12, color: p.muted }}>{reason}</div>}
+      <div style={{ fontWeight: 500, color: p.text }}>{tr(title)}</div>
+      {reason && <div style={{ marginTop: 2, fontSize: 12, color: p.muted }}>{tr(reason)}</div>}
       {state.kind === "pending" ? (
         <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
           <Button label={apply} tone="primary" size="compact" onClick={onApply} />
-          <Button label="Skip" tone="outline" size="compact" onClick={onSkip} />
+          <Button label={tr("Skip")} tone="outline" size="compact" onClick={onSkip} />
         </div>
       ) : (
-        <div style={{ marginTop: 6, fontSize: 12, color: state.result === "Skipped." ? p.muted : p.string }}>{state.result}</div>
+        <div style={{ marginTop: 6, fontSize: 12, color: state.result === "Skipped." ? p.muted : p.string }}>{tr(state.result)}</div>
       )}
     </div>
   );
@@ -265,10 +276,12 @@ export function SuggestionCard({ title, reason, apply, state, onApply, onSkip }:
 /** The agent pointing at code: one click shows it. */
 export function JumpButton({ label, onClick }: { readonly label: string; readonly onClick: () => void }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
+  const text = tr(label);
   return (
-    <div onClick={onClick} role="button" aria-label={label} style={{ alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 8, height: 28, paddingLeft: 10, paddingRight: 10, borderWidth: 1, borderColor: p.line2, borderRadius: 8, color: p.text, cursor: "pointer", hover: HOVER }}>
+    <div onClick={onClick} role="button" aria-label={text} style={{ alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 8, height: 28, paddingLeft: 10, paddingRight: 10, borderWidth: 1, borderColor: p.line2, borderRadius: 8, color: p.text, cursor: "pointer", hover: HOVER }}>
       <Icon name="arrow-right" size={13} color={p.link} />
-      <div style={{ whiteSpace: "nowrap" }}>{label}</div>
+      <div style={{ whiteSpace: "nowrap" }}>{text}</div>
     </div>
   );
 }
@@ -276,9 +289,10 @@ export function JumpButton({ label, onClick }: { readonly label: string; readonl
 /** A field label sitting inside the field, like Filter, for inputs that need no caption above them. */
 export function FieldFrame({ label, children }: { readonly label: string; readonly children: ReactNode }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, height: 30, paddingLeft: 10, paddingRight: 10, borderWidth: 1, borderColor: p.line2, borderRadius: 8, backgroundColor: p.card }}>
-      <div style={{ color: p.muted, fontSize: 12, flexShrink: 0 }}>{label}</div>
+      <div style={{ color: p.muted, fontSize: 12, flexShrink: 0 }}>{tr(label)}</div>
       {children}
     </div>
   );

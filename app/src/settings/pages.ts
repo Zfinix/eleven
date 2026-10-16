@@ -1,3 +1,4 @@
+import { tr, trN } from "../i18n";
 import { THIS_DEVICE } from "../lib/platform";
 
 export const PAGES = ["general", "appearance", "keyboard", "chat", "agents", "permissions", "privacy", "skills", "engines", "code", "debugging", "gpu", "storage", "about"] as const;
@@ -33,9 +34,9 @@ const INTROS: Readonly<Record<Page, string>> = {
   appearance: "Theme, sizes and how code looks everywhere in Eleven.",
   keyboard: "Click a shortcut to change it. Shortcuts follow the tool your hands already know.",
   chat: "How conversations look and when Eleven gets your attention.",
-  agents: `The agents on ${THIS_DEVICE}, which one starts new projects, and how they run.`,
+  agents: "The agents on {device}, which one starts new projects, and how they run.",
   permissions: "What agents can do on their own and what they ask you about first.",
-  privacy: `What stays on ${THIS_DEVICE} and what goes to the agent you use.`,
+  privacy: "What stays on {device} and what goes to the agent you use.",
   skills: "Playbooks you can start from the composer or the palette. Any agent can follow them.",
   engines: "The tools Eleven reads apps with. One is enough. With more, Eleven picks the right one for each job.",
   code: "Pseudocode, assembly, graphs, hex and lists.",
@@ -65,11 +66,11 @@ const PATHS: Readonly<Record<Page, string>> = {
 const SPARK = "M19.5 1.2c.4 2 1.4 3 3.4 3.4-2 .4-3 1.4-3.4 3.4-.4-2-1.4-3-3.4-3.4 2-.4 3-1.4 3.4-3.4z";
 
 export function pageTitle(page: Page): string {
-  return TITLES[page];
+  return tr(TITLES[page]);
 }
 
 export function pageIntro(page: Page): string {
-  return INTROS[page];
+  return trN(INTROS[page], { device: tr(THIS_DEVICE) });
 }
 
 /** The page's icon from the design board, as SVG drawn in currentColor. */

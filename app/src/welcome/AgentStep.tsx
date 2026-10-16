@@ -4,6 +4,7 @@ import type { AgentEntry } from "../agents/registry";
 import { AgentLogo, Icon } from "../components/ui";
 import type { Chat } from "../chat/useChat";
 import { useSettings } from "../settings/store";
+import { tr, trN, useLanguage } from "../i18n";
 import { useTheme } from "../theme";
 import { agentDetail, type AgentStatus } from "./agentSetup";
 import { glass, HOVER, lineHeight } from "./look";
@@ -24,13 +25,13 @@ function Trailing({ status, agent, setup }: { readonly status: AgentStatus; read
         </div>
       );
     case "install":
-      return <OutlineButton label="Install" onClick={() => setup.install(agent)} />;
+      return <OutlineButton label={tr("Install")} onClick={() => setup.install(agent)} />;
     case "failed":
-      return <OutlineButton label="Try again" onClick={() => setup.install(agent)} />;
+      return <OutlineButton label={tr("Try again")} onClick={() => setup.install(agent)} />;
     case "installing":
       return <Percent progress={null} />;
     case "signin":
-      return <PrimaryButton label="Sign in" onClick={() => setup.signIn(agent)} />;
+      return <PrimaryButton label={tr("Sign in")} onClick={() => setup.signIn(agent)} />;
     case "unavailable":
       return null;
   }
@@ -69,13 +70,13 @@ function hint(agent: AgentEntry, status: AgentStatus): string | null {
   switch (status.kind) {
     case "install":
     case "failed":
-      return `${agent.name} isn't installed yet. Install it, or pick one that's ready.`;
+      return trN("{name} isn't installed yet. Install it, or pick one that's ready.", { name: agent.name });
     case "signin":
-      return "Sign in opens your browser, then brings you back here.";
+      return tr("Sign in opens your browser, then brings you back here.");
     case "installing":
-      return `You can keep going while ${agent.name} installs.`;
+      return trN("You can keep going while {name} installs.", { name: agent.name });
     case "unavailable":
-      return `${agent.name} can't run on ${THIS_DEVICE} yet. ${status.detail}. Pick one that's ready.`;
+      return trN("{name} can't run on {device} yet. {detail}. Pick one that's ready.", { name: agent.name, device: tr(THIS_DEVICE), detail: status.detail });
     case "ready":
       return null;
   }
@@ -84,6 +85,7 @@ function hint(agent: AgentEntry, status: AgentStatus): string | null {
 /** Every agent gets the same tools, so this only picks which one Eleven starts with. */
 export function AgentStep({ chat, setup }: { readonly chat: Chat; readonly setup: AgentSetup }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   const g = glass(p);
   const [all, setAll] = useState(false);
   const { list, selected } = chat.agents;
@@ -91,12 +93,12 @@ export function AgentStep({ chat, setup }: { readonly chat: Chat; readonly setup
   const warning = hint(selected, setup.status(selected));
   return (
     <>
-      <StepHeading title="Pick your agent" detail="It reads the code with you and can move around the window for you. Every agent gets the same tools, and you can switch any time." />
-      <Panel label="Agent">
+      <StepHeading title={tr("Pick your agent")} detail={tr("It reads the code with you and can move around the window for you. Every agent gets the same tools, and you can switch any time.")} />
+      <Panel label={tr("Agent")}>
         {shown.map((agent, index) => <Row key={agent.id} agent={agent} chat={chat} setup={setup} first={index === 0} />)}
         {list.length > FEW && (
-          <div onClick={() => setAll(!all)} role="button" aria-label={all ? "Show fewer" : "Show all agents"} style={{ display: "flex", alignItems: "center", height: 40, paddingLeft: 16, paddingRight: 16, borderTopWidth: 1, borderColor: g.line, color: p.muted, cursor: "pointer", hover: HOVER }}>
-            {all ? "Show fewer" : `All ${list.length} agents`}
+          <div onClick={() => setAll(!all)} role="button" aria-label={all ? tr("Show fewer") : tr("Show all agents")} style={{ display: "flex", alignItems: "center", height: 40, paddingLeft: 16, paddingRight: 16, borderTopWidth: 1, borderColor: g.line, color: p.muted, cursor: "pointer", hover: HOVER }}>
+            {all ? tr("Show fewer") : trN("All {n} agents", { n: list.length })}
           </div>
         )}
       </Panel>

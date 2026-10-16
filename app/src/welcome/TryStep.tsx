@@ -3,6 +3,7 @@ import { type ReactElement, useEffect, useRef, useState } from "react";
 import { Composer } from "../chat/Composer";
 import type { Chat } from "../chat/useChat";
 import { Icon } from "../components/ui";
+import { tr, trN, useLanguage } from "../i18n";
 import { useTheme } from "../theme";
 import { glass, HOVER, lineHeight, PROBLEM_WASH } from "./look";
 import { OutlineButton, Percent, PrimaryButton, Progress, StepHeading } from "./SetupParts";
@@ -49,12 +50,13 @@ function Idea({ text, on, onUse }: { readonly text: string; readonly on: boolean
 }
 
 export function tryTitle(isReady: boolean, waiting: boolean): string {
-  if (isReady) return "You're ready";
-  return waiting ? "Waiting on the install" : "Almost there";
+  if (isReady) return tr("You're ready");
+  return waiting ? tr("Waiting on the install") : tr("Almost there");
 }
 
 /** The real home composer with a sample app attached; a send waits for any install still running. */
 export function TryStep({ chat, engines, setup, onSent }: { readonly chat: Chat; readonly engines: Engines; readonly setup: AgentSetup; readonly onSent: () => void }): ReactElement {
+  useLanguage();
   const { thread, agents } = chat;
   const [waiting, setWaiting] = useState<string | null>(null);
   const [seed, setSeed] = useState<{ readonly text: string }>({ text: IDEAS[0] ?? "" });
@@ -104,7 +106,7 @@ export function TryStep({ chat, engines, setup, onSent }: { readonly chat: Chat;
   };
   return (
     <>
-      <StepHeading title={tryTitle(go, waiting !== null)} detail={`Ask your first question. ${SAMPLE_APP.name} is attached to get you started, or drop your own app on the box.`} />
+      <StepHeading title={tryTitle(go, waiting !== null)} detail={trN("Ask your first question. {app} is attached to get you started, or drop your own app on the box.", { app: SAMPLE_APP.name })} />
       <Composer place="landing" target={chat.target} agents={agents} thread={{ ...thread, send }} onAttach={chat.openFile} onDetach={chat.detach} onPickAgent={chat.pickAgent} slot={strip && <StripView strip={strip} onAct={act} />} seed={seed} queued={waiting !== null} blocked={strip?.blocks === true} />
       <div style={{ display: "grid", gridTemplateColumns: 3, gap: 10 }}>
         {IDEAS.map((text) => <Idea key={text} text={text} on={seed.text === text} onUse={() => setSeed({ text })} />)}
