@@ -13,12 +13,41 @@ import { nodeCommand } from "./toolchain";
 import { activeProvider } from "../analysis/engines";
 import type { CodeType } from "./codeTypes";
 
+const PROCEDURE_INVENTORY_PAGE_SIZE = 256;
+const STRING_INVENTORY_PAGE_SIZE = 16;
 
-/** Ghidra's first analysis of a real app takes minutes; progress notifications keep the call alive. */
-const CALL_OPTIONS = { timeout: 15 * 60_000, resetTimeoutOnProgress: true } as const;
+/** The default gives a first analysis of a large app time to finish. */
+export const GHIDRA_STARTUP_MS = 2 * 60 * 60_000;
 
-/** How long REA lets Ghidra import and analyze a file. REA's own 5.5 minutes is too short for big apps. */
-export const GHIDRA_STARTUP_MS = 30 * 60_000;
+const RESPONSE_GRACE_MS = 5 * 60_000;
+const TIME_LIMITS: Readonly<Record<Settings["ghidraTimeout"], number>> = {
+  "30 minutes": 30 * 60_000,
+  "2 hours": GHIDRA_STARTUP_MS,
+  "6 hours": 6 * 60 * 60_000,
+  "12 hours": 12 * 60 * 60_000,
+};
+
+function startupTimeout(settings: Settings): number {
+  const override = Number(process.env.REA_GHIDRA_STARTUP_TIMEOUT_MS);
+  const maximumTimerDelay = 2_147_483_647 - RESPONSE_GRACE_MS;
+
+  if (Number.isSafeInteger(override) && override > 0 && override <= maximumTimerDelay) {
+    return override;
+  }
+
+  return TIME_LIMITS[settings.ghidraTimeout];
+}
+
+/** The client waits slightly longer than Ghidra's own startup deadline. */
+export function reaCallOptions(settings: Settings = currentSettings()): {
+  readonly timeout: number;
+  readonly resetTimeoutOnProgress: true;
+} {
+  return {
+    timeout: startupTimeout(settings) + RESPONSE_GRACE_MS,
+    resetTimeoutOnProgress: true,
+  };
+}
 
 const TIMEOUT_CODES: ReadonlySet<string> = new Set(["timeout", "provider_timeout"]);
 
@@ -35,7 +64,7 @@ export type OpenProblem = { readonly raw: string; readonly advice: string };
 export function openProblem(err: unknown): OpenProblem {
   const raw = errorMessage(err);
   if (!(err instanceof ReaError)) return { raw, advice: "Check that REA and Ghidra are installed in Setup, then open it again." };
-  if (TIMEOUT_CODES.has(err.code)) return { raw, advice: "Ghidra ran out of time analyzing it. For a big Swift app, turn off Demangle Swift names in Settings, then open it again." };
+  if (TIMEOUT_CODES.has(err.code)) return { raw, advice: "Ghidra ran out of time analyzing it. Increase Analysis time limit in Settings → Analysis, restart Eleven, then open it again. For a big Swift app, turning off Demangle Swift names may also help." };
   return { raw, advice: "Ghidra couldn't finish reading it. The details below say what stopped it." };
 }
 
@@ -79,7 +108,14 @@ function plainEnv(): Record<string, string> {
   return { ...Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined)), ...reaEnv() };
 }
 
-const MAXMEM: Readonly<Record<Settings["ghidraMemory"], string | null>> = { Automatic: null, "4 GB": "4G", "8 GB": "8G", "16 GB": "16G" };
+const MAXMEM: Readonly<Record<Settings["ghidraMemory"], string | null>> = {
+  Automatic: null,
+  "4 GB": "4G",
+  "8 GB": "8G",
+  "16 GB": "16G",
+  "32 GB": "32G",
+  "64 GB": "64G",
+};
 
 /** Ghidra knobs from Settings → Analysis, as the environment REA reads when it starts Ghidra. */
 export function reaEnv(s: Settings = currentSettings()): Record<string, string> {
@@ -87,7 +123,7 @@ export function reaEnv(s: Settings = currentSettings()): Record<string, string> 
   const inherited = (process.env.REA_GHIDRA_DISABLED_ANALYZERS ?? "").split(",").map((name) => name.trim()).filter(Boolean);
   const disabled = [...new Set([...inherited, ...(s.rebuildSwitches ? [] : ["Decompiler Switch Analysis"]), ...(s.swiftNames ? [] : ["Demangler Swift"])])];
   return {
-    REA_GHIDRA_STARTUP_TIMEOUT_MS: process.env.REA_GHIDRA_STARTUP_TIMEOUT_MS ?? String(GHIDRA_STARTUP_MS),
+    REA_GHIDRA_STARTUP_TIMEOUT_MS: String(startupTimeout(s)),
     ...(memory ? { GHIDRA_MAXMEM: memory } : {}),
     ...(disabled.length > 0 ? { REA_GHIDRA_DISABLED_ANALYZERS: disabled.join(",") } : {}),
   };
@@ -106,7 +142,7 @@ function errorFacts(code: string, details: Record<string, unknown> | undefined):
 }
 
 function toolError(content: unknown): Error {
-  const text = Array.isArray(content) ? content.map((block) => stringField(block, "text") ?? "").join("") : "";
+  const text = textContent(content);
   try {
     const parsed: unknown = JSON.parse(text);
     const error = recordField(parsed, "error");
@@ -119,6 +155,68 @@ function toolError(content: unknown): Error {
   } catch {
     return new Error(text || "REA couldn't do that.");
   }
+}
+
+function textContent(content: unknown): string {
+  if (!Array.isArray(content)) return "";
+  return content.map((block) => stringField(block, "text") ?? "").join("");
+}
+
+function jsonContent(content: unknown): unknown | undefined {
+  const text = textContent(content);
+  if (!text) return undefined;
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+function structuredToolResult(result: unknown): unknown {
+  const structured = recordField(result, "structuredContent");
+  if (structured !== undefined) return structured;
+  return jsonContent(recordField(result, "content")) ?? {};
+}
+
+function envelope(reply: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(reply)) return undefined;
+  const inner = recordField(reply, "result");
+  return inner && inner.normalized_result !== undefined ? inner : reply;
+}
+
+/** The normalized rows, whether REA returned a wrapped or direct result. */
+function normalizedResult(reply: unknown): unknown {
+  return envelope(reply)?.normalized_result;
+}
+
+function inventoryCollection(name: string): "procedures" | "strings" | undefined {
+  if (name === "list_procedures") return "procedures";
+  if (name === "list_strings") return "strings";
+  return undefined;
+}
+
+function retainedInventoryFromError(
+  name: string,
+  content: unknown,
+): Record<string, unknown> | undefined {
+  if (!inventoryCollection(name)) return undefined;
+
+  const parsed = jsonContent(content);
+  const error = recordField(parsed, "error");
+  const details = recordField(error, "details");
+  const reference = recordField(details, "evidence_reference");
+  const evidenceId = stringField(reference, "evidence_id");
+
+  if (
+    stringField(error, "code") !== "resource_constraint" ||
+    details?.boundary !== "mcp-response" ||
+    !evidenceId
+  ) {
+    return undefined;
+  }
+
+  return { delivery: "retained-inventory", evidence_reference: reference };
 }
 
 function parseOpened(path: string, reply: unknown): Opened {
@@ -157,12 +255,119 @@ class Rea {
     return client;
   }
 
-  private call(name: string, args: Record<string, unknown>): Promise<unknown> {
+  private async call(name: string, args: Record<string, unknown>): Promise<unknown> {
+    const reply = await this.callOnce(name, args);
+    const result = isRecord(reply) ? (recordField(reply, "result") ?? reply) : undefined;
+
+    if (!result || result.delivery !== "retained-inventory") return reply;
+    return this.readRetainedInventory(name, result);
+  }
+
+  /** Each page is queued separately so other calls can progress between bounded reads. */
+  private callOnce(name: string, args: Record<string, unknown>): Promise<unknown> {
     return this.queue.run(async () => {
-      const result = await (await this.connect()).callTool({ name, arguments: args }, undefined, { ...CALL_OPTIONS, onprogress: ({ message }) => reportStep(message) });
-      if (result.isError) throw toolError(result.content);
-      return result.structuredContent ?? {};
+      const result = await (await this.connect()).callTool(
+        { name, arguments: args },
+        undefined,
+        {
+          ...reaCallOptions(),
+          onprogress: ({ message }) => reportStep(message),
+        },
+      );
+      if (result.isError) {
+        const recovered = retainedInventoryFromError(name, result.content);
+        if (recovered) return recovered;
+        throw toolError(result.content);
+      }
+
+      return structuredToolResult(result);
     });
+  }
+
+  /** Rebuild a full inventory from bounded pages retained by REA. */
+  private async readRetainedInventory(
+    name: string,
+    receipt: Record<string, unknown>,
+  ): Promise<unknown> {
+    const reference = recordField(receipt, "evidence_reference");
+    const evidenceId = stringField(reference, "evidence_id");
+    const collection = inventoryCollection(name);
+
+    if (!evidenceId || !collection) {
+      throw new Error("REA returned an inventory without a retained Evidence reference.");
+    }
+
+    const pageSize =
+      collection === "procedures"
+        ? PROCEDURE_INVENTORY_PAGE_SIZE
+        : STRING_INVENTORY_PAGE_SIZE;
+    const rows: unknown[] = [];
+    let offset = 0;
+
+    while (true) {
+      const page = await this.readInventoryPage(evidenceId, collection, offset, pageSize);
+      const projection = recordField(envelope(page) ?? page, "normalized_result");
+      const coverage = recordField(projection, "coverage");
+      const items = projection?.items;
+
+      if (
+        !Array.isArray(items) ||
+        !coverage ||
+        projection?.parent_evidence_id !== evidenceId ||
+        typeof coverage.total !== "number" ||
+        !Number.isInteger(coverage.total) ||
+        coverage.total < 0
+      ) {
+        throw new Error("REA returned an invalid inventory page.");
+      }
+
+      rows.push(...items);
+      if (coverage.exhausted === true) {
+        if (rows.length !== coverage.total) {
+          throw new Error("REA returned incomplete inventory coverage.");
+        }
+
+        return { ...receipt, normalized_result: rows };
+      }
+
+      const nextOffset = coverage.next_offset;
+      if (
+        typeof nextOffset !== "number" ||
+        !Number.isInteger(nextOffset) ||
+        nextOffset !== offset + items.length ||
+        nextOffset <= offset
+      ) {
+        throw new Error("REA returned an inventory page that did not advance.");
+      }
+
+      offset = nextOffset;
+    }
+  }
+
+  /** Reduce the page size if the transport rejects a large page response. */
+  private async readInventoryPage(
+    evidenceId: string,
+    collection: "procedures" | "strings",
+    offset: number,
+    limit: number,
+  ): Promise<unknown> {
+    try {
+      return await this.callOnce("inspect_analysis_view", {
+        source: { kind: "retained-evidence", evidence_id: evidenceId },
+        view: { kind: "page", collection, offset, limit },
+      });
+    } catch (error) {
+      if (!(error instanceof ReaError) || error.code !== "resource_constraint" || limit === 1) {
+        throw error;
+      }
+
+      return this.readInventoryPage(
+        evidenceId,
+        collection,
+        offset,
+        Math.max(1, Math.floor(limit / 2)),
+      );
+    }
   }
 
   /** Opens the file unless it is already open, or being opened, with the chosen engine. */
@@ -214,13 +419,13 @@ class Rea {
   async tool(path: string, name: string, args: Record<string, unknown>): Promise<unknown> {
     await this.ensureOpen(path);
     const reply = await this.call(name, args);
-    return isRecord(reply) ? reply.normalized_result : undefined;
+    return normalizedResult(reply);
   }
 
   async listProcedures(path: string): Promise<readonly unknown[]> {
     await this.ensureOpen(path);
     const reply = await this.call("list_procedures", {});
-    const normalized = isRecord(reply) ? reply.normalized_result : undefined;
+    const normalized = normalizedResult(reply);
     if (!Array.isArray(normalized)) throw new Error("REA couldn't list the functions in this file.");
     return normalized;
   }
