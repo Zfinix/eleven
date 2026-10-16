@@ -4,6 +4,7 @@ import { type ReactElement } from "react";
 
 import { Icon } from "../components/ui";
 import { ASSETS } from "../lib/assets";
+import { tr, trN, useLanguage } from "../i18n";
 import { useTheme } from "../theme";
 import { type Engine, type EngineId, engineNamed, ENGINES, engineReady, rowState, STOPPED } from "./engines";
 import { glass, HOVER, lineHeight } from "./look";
@@ -16,7 +17,7 @@ function rowDetail(engine: Engine, engines: Engines): string {
   const found = engines.found[engine.id];
   switch (rowState(found, install)) {
     case "ready":
-      return install.phase === "done" ? "Installed" : `Found on ${THIS_DEVICE}, ${found?.where ?? ""}`;
+      return install.phase === "done" ? tr("Installed") : trN("Found on {device}, {where}", { device: tr(THIS_DEVICE), where: found?.where ?? "" });
     case "missing":
       return found?.repair ?? `${engine.about}, ${engine.megabytes} MB`;
     case "failed":
@@ -50,11 +51,11 @@ function Row({ engine, engines }: { readonly engine: Engine; readonly engines: E
       </div>
       {state === "missing" && (
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-          <TextButton label="I have it" onClick={() => engines.locate(engine.id)} />
-          <OutlineButton label={engines.found[engine.id]?.repair ? "Repair" : "Install"} onClick={() => engines.install(engine.id)} />
+          <TextButton label={tr("I have it")} onClick={() => engines.locate(engine.id)} />
+          <OutlineButton label={tr(engines.found[engine.id]?.repair ? "Repair" : "Install")} onClick={() => engines.install(engine.id)} />
         </div>
       )}
-      {state === "failed" && <OutlineButton label="Try again" onClick={() => engines.install(engine.id)} />}
+      {state === "failed" && <OutlineButton label={tr("Try again")} onClick={() => engines.install(engine.id)} />}
       {running && <Percent progress={running.progress} />}
       {state === "ready" && <ReadyMark />}
     </div>
@@ -86,13 +87,13 @@ export function engineNames(ids: readonly EngineId[]): string {
 function summary(engines: Engines): string {
   if (engineReady(engines.found)) return `Ready. Eleven opens files with ${engines.found.rizin?.found ? "Rizin" : "Ghidra"}.`;
   const busy = busyEngines(engines);
-  return busy.length > 0 ? `Installing ${engineNames(busy)}` : "Install at least one engine. Rizin is the quickest to start.";
+  return busy.length > 0 ? trN("Installing {list}", { list: engineNames(busy) }) : tr("Install at least one engine. Rizin is the quickest to start.");
 }
 
 function InstallAll({ size, onClick }: { readonly size: number; readonly onClick: () => void }): ReactElement {
   const { p } = useTheme();
   return (
-    <div onClick={onClick} role="button" aria-label="Install all" style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, height: 32, paddingLeft: 14, paddingRight: 14, borderRadius: 8, backgroundColor: p.primary, color: p.onPrimary, fontWeight: 600, cursor: "pointer", hover: HOVER }}>
+    <div onClick={onClick} role="button" aria-label={tr("Install all")} style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, height: 32, paddingLeft: 14, paddingRight: 14, borderRadius: 8, backgroundColor: p.primary, color: p.onPrimary, fontWeight: 600, cursor: "pointer", hover: HOVER }}>
       <Icon name="download" size={14} color={p.onPrimary} />
       <div>Install all</div>
       <div style={{ fontWeight: 500, opacity: 0.6 }}>{`${size} MB`}</div>
@@ -103,6 +104,7 @@ function InstallAll({ size, onClick }: { readonly size: number; readonly onClick
 /** Rizin is the fast default; Ghidra is optional. Installs keep going while the next steps are open. */
 export function EngineStep({ engines }: { readonly engines: Engines }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   const installable = ENGINES.filter((engine) => {
     const state = rowState(engines.found[engine.id], engines.installs[engine.id]);
     return state === "missing" || state === "failed";
@@ -110,8 +112,8 @@ export function EngineStep({ engines }: { readonly engines: Engines }): ReactEle
   const total = installable.reduce((sum, engine) => sum + engine.megabytes, 0);
   return (
     <>
-      <StepHeading title="Welcome to Eleven" detail="First, the tools Eleven reads apps with. Install what's missing and keep going while it downloads." />
-      <Panel label="What Eleven needs">
+      <StepHeading title={tr("Welcome to Eleven")} detail={tr("First, the tools Eleven reads apps with. Install what's missing and keep going while it downloads.")} />
+      <Panel label={tr("What Eleven needs")}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 14, paddingBottom: 10, paddingLeft: 16, paddingRight: 16 }}>
           <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 600 }}>What Eleven needs</div>

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 
 import { listProjects, onProjectListChange } from "../engine/project";
+import { useLanguage } from "../i18n";
 import { isCommandBound, onCommandsChange } from "../lib/shortcuts";
 import type { Desktop } from "../lib/native";
 import { type Settings, useSettings } from "../settings/store";
@@ -34,6 +35,7 @@ function install(desktop: Desktop, settings: Settings): void {
 /** Keeps the macOS menu bar in step with the keymap and with what the screen in front can do. */
 export function useMenuBar(desktop: Desktop | null, choose: (choice: MenuChoice) => void): void {
   const { settings } = useSettings();
+  const language = useLanguage();
   const latest = useRef({ settings, choose });
   latest.current = { settings, choose };
   const { keymap, shortcuts } = settings;
@@ -54,7 +56,7 @@ export function useMenuBar(desktop: Desktop | null, choose: (choice: MenuChoice)
       for (const stop of stops) stop();
       if (timer !== null) clearTimeout(timer);
     };
-  }, [desktop, keymap, shortcuts]);
+  }, [desktop, keymap, shortcuts, language]);
 
   useEffect(() => {
     if (!desktop) return;

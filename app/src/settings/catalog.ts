@@ -11,6 +11,7 @@ import { activeEngine, chooseEngine, type EngineId } from "../analysis/engines";
 import type { Agents } from "../chat/useAgents";
 import { appIcon } from "../components/ui";
 import { adoptToolchain } from "../engine/toolchain";
+import { LANGUAGES, LANGUAGE_LABELS } from "../i18n";
 import { RECORDINGS_DIR } from "../gpu/trace";
 import { loadSkills } from "../skills/load";
 import { resetWorkbenchLayout } from "../workbench/sizes";
@@ -287,6 +288,9 @@ export function buildPages(c: Ctx): Readonly<Record<Page, readonly GroupModel[]>
   const exportDir = s.exportDir || join(homedir(), "Downloads", "Eleven");
   return {
     general: [
+      { label: null, rows: [
+        { title: "Language", desc: "The language menus and buttons speak.", control: { kind: "select", value: s.language, pick: (value) => { const next = LANGUAGES.find((known) => known === value); if (next !== undefined) c.update(patchOf("language", next)); }, options: LANGUAGES.map((value) => ({ value, label: LANGUAGE_LABELS[value] })) } },
+      ] },
       { label: "Startup", rows: [
         sel("launch", "When Eleven opens", "Start on Home, or go straight back to what you had open.", ["Home", "The last project"]),
         tg("restoreLayout", "Reopen tabs and splits", "Bring back the workbench layout of each project when you open it."),

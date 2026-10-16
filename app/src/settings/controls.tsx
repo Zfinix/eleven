@@ -2,6 +2,7 @@ import { type EventPayload, type PublicInstance, useGpuix } from "@gpuix/react";
 import { type ReactElement, type ReactNode, useRef } from "react";
 
 import { AgentLogo, Icon, MenuSurface, Popover, usePopover } from "../components/ui";
+import { tr, useLanguage } from "../i18n";
 import { TYPING } from "../lib/shortcuts";
 import { DARK, MONO, type Palette, useTheme } from "../theme";
 import type { Action, ButtonStyle, Confirm, Control, GroupModel, Lead, Option, SettingRowModel, Tone } from "./model";
@@ -20,10 +21,11 @@ export function inks(p: Palette): { readonly ok: string; readonly warn: string; 
 
 export function PageHeader({ title, intro }: { readonly title: string; readonly intro: string }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   return (
     <div style={{ display: "flex", flexDirection: "column", paddingBottom: 20 }}>
-      <div style={{ fontSize: 20, lineHeight: 28, fontWeight: 600, color: p.text }}>{title}</div>
-      <div style={{ marginTop: 2, color: p.muted }}>{intro}</div>
+      <div style={{ fontSize: 20, lineHeight: 28, fontWeight: 600, color: p.text }}>{tr(title)}</div>
+      <div style={{ marginTop: 2, color: p.muted }}>{tr(intro)}</div>
     </div>
   );
 }
@@ -39,13 +41,14 @@ export function Toggle({ on, label, onFlip }: { readonly on: boolean; readonly l
 
 export function Segmented({ label, options, value, onPick }: { readonly label: string; readonly options: readonly Option[]; readonly value: string; readonly onPick: (value: string) => void }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   return (
-    <div role="radiogroup" aria-label={label} style={{ display: "flex", padding: 2, borderRadius: 9, flexShrink: 0, backgroundColor: p.fill }}>
+    <div role="radiogroup" aria-label={tr(label)} style={{ display: "flex", padding: 2, borderRadius: 9, flexShrink: 0, backgroundColor: p.fill }}>
       {options.map((option) => {
         const on = option.value === value;
         const color = on && option.value === "Never" ? inks(p).err : on ? p.text : p.muted;
         return (
-          <div key={option.value} onClick={() => onPick(option.value)} role="radio" aria-label={option.label} aria-selected={on} style={{ display: "flex", alignItems: "center", height: 26, paddingLeft: 11, paddingRight: 11, borderRadius: 7, fontSize: 12.5, whiteSpace: "nowrap", cursor: "pointer", color, hover: { opacity: 0.72 }, ...(on ? { backgroundColor: p.card, boxShadow: SHADOW } : {}) }}>{option.label}</div>
+          <div key={option.value} onClick={() => onPick(option.value)} role="radio" aria-label={tr(option.label)} aria-selected={on} style={{ display: "flex", alignItems: "center", height: 26, paddingLeft: 11, paddingRight: 11, borderRadius: 7, fontSize: 12.5, whiteSpace: "nowrap", cursor: "pointer", color, hover: { opacity: 0.72 }, ...(on ? { backgroundColor: p.card, boxShadow: SHADOW } : {}) }}>{tr(option.label)}</div>
         );
       })}
     </div>
@@ -62,13 +65,14 @@ export function Select({ label, options, value, onPick, lead = null, minWidth = 
   readonly menuWidth?: number;
 }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   const menu = usePopover();
   const current = options.find((option) => option.value === value);
   return (
     <div style={{ display: "flex", position: "relative", flexShrink: 0 }}>
-      <div onMouseDown={menu.onTriggerDown} onClick={menu.onTriggerClick} aria-label={label} style={{ display: "flex", alignItems: "center", gap: 8, minWidth, height: 30, paddingLeft: lead ? 8 : 10, paddingRight: 10, borderWidth: 1, borderColor: p.line3, borderRadius: 8, cursor: "pointer", hover: { opacity: 0.72 } }}>
+      <div onMouseDown={menu.onTriggerDown} onClick={menu.onTriggerClick} aria-label={tr(label)} style={{ display: "flex", alignItems: "center", gap: 8, minWidth, height: 30, paddingLeft: lead ? 8 : 10, paddingRight: 10, borderWidth: 1, borderColor: p.line3, borderRadius: 8, cursor: "pointer", hover: { opacity: 0.72 } }}>
         {lead}
-        <div style={{ flexGrow: 1, whiteSpace: "nowrap", color: p.text }}>{current?.label ?? value}</div>
+        <div style={{ flexGrow: 1, whiteSpace: "nowrap", color: p.text }}>{tr(current?.label ?? value)}</div>
         <Icon name="disclosure" size={11} color={p.faint} />
       </div>
       {menu.open && (
@@ -77,11 +81,11 @@ export function Select({ label, options, value, onPick, lead = null, minWidth = 
             {options.map((option) => {
               const on = option.value === value;
               return (
-                <div key={option.value} onClick={() => { menu.close(); onPick(option.value); }} role="option" aria-label={option.label} aria-selected={on} style={{ display: "flex", alignItems: "center", gap: 9, minHeight: 32, flexShrink: 0, paddingTop: 4, paddingBottom: 4, paddingLeft: 8, paddingRight: 8, borderRadius: 8, cursor: "pointer", hover: { opacity: 0.72 }, ...(on ? { backgroundColor: p.sel } : {}) }}>
+                <div key={option.value} onClick={() => { menu.close(); onPick(option.value); }} role="option" aria-label={tr(option.label)} aria-selected={on} style={{ display: "flex", alignItems: "center", gap: 9, minHeight: 32, flexShrink: 0, paddingTop: 4, paddingBottom: 4, paddingLeft: 8, paddingRight: 8, borderRadius: 8, cursor: "pointer", hover: { opacity: 0.72 }, ...(on ? { backgroundColor: p.sel } : {}) }}>
                   {option.lead}
                   <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minWidth: 0, pointerEvents: "none" }}>
-                    <div style={{ color: p.text, whiteSpace: "nowrap" }}>{option.label}</div>
-                    {option.note && <div style={{ fontSize: 11.5, color: p.muted }}>{option.note}</div>}
+                    <div style={{ color: p.text, whiteSpace: "nowrap" }}>{tr(option.label)}</div>
+                    {option.note && <div style={{ fontSize: 11.5, color: p.muted }}>{tr(option.note)}</div>}
                   </div>
                   {on && <Icon name="check" size={13} color={p.text} />}
                 </div>
@@ -159,9 +163,11 @@ function buttonLook(style: ButtonStyle, p: Palette): { readonly border: number; 
 
 export function Button({ action }: { readonly action: Action }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   const look = buttonLook(action.style, p);
+  const label = tr(action.label);
   return (
-    <div onClick={action.act} role="button" aria-label={action.label} style={{ display: "flex", alignItems: "center", gap: 6, height: 28, paddingLeft: 11, paddingRight: 11, borderWidth: look.border, borderColor: p.line3, borderRadius: 8, fontSize: 12.5, fontWeight: look.weight, color: look.fg, whiteSpace: "nowrap", flexShrink: 0, cursor: "pointer", hover: { opacity: 0.72 }, ...(look.bg ? { backgroundColor: look.bg } : {}) }}>{action.label}</div>
+    <div onClick={action.act} role="button" aria-label={label} style={{ display: "flex", alignItems: "center", gap: 6, height: 28, paddingLeft: 11, paddingRight: 11, borderWidth: look.border, borderColor: p.line3, borderRadius: 8, fontSize: 12.5, fontWeight: look.weight, color: look.fg, whiteSpace: "nowrap", flexShrink: 0, cursor: "pointer", hover: { opacity: 0.72 }, ...(look.bg ? { backgroundColor: look.bg } : {}) }}>{label}</div>
   );
 }
 
@@ -183,8 +189,9 @@ function toneColors(tone: Tone, p: Palette): readonly [string, string] {
 
 export function StatusPill({ text, tone }: { readonly text: string; readonly tone: Tone }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   const [bg, fg] = toneColors(tone, p);
-  return <div style={{ display: "flex", alignItems: "center", height: 22, paddingLeft: 9, paddingRight: 9, borderRadius: 11, backgroundColor: bg, color: fg, fontSize: 12, whiteSpace: "nowrap", flexShrink: 0 }}>{text}</div>;
+  return <div style={{ display: "flex", alignItems: "center", height: 22, paddingLeft: 9, paddingRight: 9, borderRadius: 11, backgroundColor: bg, color: fg, fontSize: 12, whiteSpace: "nowrap", flexShrink: 0 }}>{tr(text)}</div>;
 }
 
 function LeadView({ lead }: { readonly lead: Lead }): ReactElement {
@@ -231,35 +238,38 @@ function ControlView({ control, label }: { readonly control: Control; readonly l
 
 function ConfirmBar({ confirm, onCancel }: { readonly confirm: Confirm; readonly onCancel: () => void }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   return (
     <div role="alert" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginTop: -4, marginLeft: 18, marginRight: 18, marginBottom: 14, paddingTop: 10, paddingBottom: 10, paddingLeft: 12, paddingRight: 12, borderRadius: 10, backgroundColor: washes(p).err }}>
-      <div style={{ flexGrow: 1, flexBasis: 260, color: p.text2, fontSize: 12.5 }}>{confirm.text}</div>
-      <div onClick={onCancel} role="button" aria-label="Cancel" style={{ display: "flex", alignItems: "center", height: 28, paddingLeft: 11, paddingRight: 11, borderWidth: 1, borderColor: p.line3, borderRadius: 8, fontSize: 12.5, cursor: "pointer", hover: { opacity: 0.72 } }}>Cancel</div>
-      <div onClick={confirm.act} role="button" aria-label={confirm.label} style={{ display: "flex", alignItems: "center", height: 28, paddingLeft: 11, paddingRight: 11, borderRadius: 8, backgroundColor: inks(p).err, color: "#ffffff", fontSize: 12.5, fontWeight: 600, cursor: "pointer", hover: { opacity: 0.72 } }}>{confirm.label}</div>
+      <div style={{ flexGrow: 1, flexBasis: 260, color: p.text2, fontSize: 12.5 }}>{tr(confirm.text)}</div>
+      <div onClick={onCancel} role="button" aria-label={tr("Cancel")} style={{ display: "flex", alignItems: "center", height: 28, paddingLeft: 11, paddingRight: 11, borderWidth: 1, borderColor: p.line3, borderRadius: 8, fontSize: 12.5, cursor: "pointer", hover: { opacity: 0.72 } }}>{tr("Cancel")}</div>
+      <div onClick={confirm.act} role="button" aria-label={tr(confirm.label)} style={{ display: "flex", alignItems: "center", height: 28, paddingLeft: 11, paddingRight: 11, borderRadius: 8, backgroundColor: inks(p).err, color: "#ffffff", fontSize: 12.5, fontWeight: 600, cursor: "pointer", hover: { opacity: 0.72 } }}>{tr(confirm.label)}</div>
     </div>
   );
 }
 
 export function RowView({ row, first, confirming, onCancel }: { readonly row: SettingRowModel; readonly first: boolean; readonly confirming: boolean; readonly onCancel: () => void }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
+  const title = tr(row.title);
   return (
     <div style={{ display: "flex", flexDirection: "column", opacity: row.dim ? 0.45 : 1 }}>
       {!first && <div style={{ height: 1, marginLeft: 18, marginRight: 18, backgroundColor: p.line2 }} />}
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 14, minHeight: 64, paddingTop: 12, paddingBottom: 12, paddingLeft: 18, paddingRight: 18 }}>
         {row.pick && (
-          <div onClick={row.pick.act} role="radio" aria-label={row.title} aria-selected={row.pick.on} style={{ width: 18, height: 18, borderRadius: 9, flexShrink: 0, borderWidth: row.pick.on ? 5 : 1.5, borderColor: row.pick.on ? p.text : p.line3, cursor: "pointer", hover: { opacity: 0.72 } }} />
+          <div onClick={row.pick.act} role="radio" aria-label={title} aria-selected={row.pick.on} style={{ width: 18, height: 18, borderRadius: 9, flexShrink: 0, borderWidth: row.pick.on ? 5 : 1.5, borderColor: row.pick.on ? p.text : p.line3, cursor: "pointer", hover: { opacity: 0.72 } }} />
         )}
         {row.lead && <LeadView lead={row.lead} />}
         <div style={{ display: "flex", flexDirection: "column", gap: 2, flexGrow: 1, flexShrink: 1, flexBasis: 240, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-            <div style={{ color: p.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.title}</div>
-            {row.tag && <div style={{ display: "flex", alignItems: "center", height: 18, paddingLeft: 7, paddingRight: 7, borderRadius: 9, flexShrink: 0, backgroundColor: p.fill2, color: p.text4, fontSize: 11 }}>{row.tag}</div>}
+            <div style={{ color: p.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</div>
+            {row.tag && <div style={{ display: "flex", alignItems: "center", height: 18, paddingLeft: 7, paddingRight: 7, borderRadius: 9, flexShrink: 0, backgroundColor: p.fill2, color: p.text4, fontSize: 11 }}>{tr(row.tag)}</div>}
           </div>
-          {row.desc !== "" && <div style={{ fontSize: 12.5, lineHeight: 18, color: p.muted, ...(row.mono ? { fontFamily: MONO } : {}) }}>{row.desc}</div>}
+          {row.desc !== "" && <div style={{ fontSize: 12.5, lineHeight: 18, color: p.muted, ...(row.mono ? { fontFamily: MONO } : {}) }}>{tr(row.desc)}</div>}
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
           {row.status && <StatusPill text={row.status.text} tone={row.status.tone} />}
-          <ControlView control={row.control} label={row.title} />
+          <ControlView control={row.control} label={title} />
           {(row.buttons ?? []).map((action) => <Button key={action.label} action={action} />)}
         </div>
       </div>
@@ -270,11 +280,12 @@ export function RowView({ row, first, confirming, onCancel }: { readonly row: Se
 
 export function GroupLabel({ label, note = null, link = null }: { readonly label: string; readonly note?: string | null; readonly link?: { readonly text: string; readonly go: () => void } | null }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   return (
     <div style={{ display: "flex", alignItems: "flex-end", gap: 8, paddingLeft: 4, paddingRight: 4, paddingBottom: 8 }}>
-      {label !== "" && <div style={{ fontSize: 12.5, fontWeight: 500, color: p.muted }}>{label}</div>}
-      {note && <div style={{ fontSize: 12, color: p.faint }}>{note}</div>}
-      {link && <div onClick={link.go} role="button" aria-label={link.text} style={{ fontSize: 12, color: p.link, cursor: "pointer", hover: { opacity: 0.72 } }}>{link.text}</div>}
+      {label !== "" && <div style={{ fontSize: 12.5, fontWeight: 500, color: p.muted }}>{tr(label)}</div>}
+      {note && <div style={{ fontSize: 12, color: p.faint }}>{tr(note)}</div>}
+      {link && <div onClick={link.go} role="button" aria-label={tr(link.text)} style={{ fontSize: 12, color: p.link, cursor: "pointer", hover: { opacity: 0.72 } }}>{tr(link.text)}</div>}
     </div>
   );
 }
@@ -287,8 +298,9 @@ export function GroupView({ group, confirm, onCancel, preview = null, link = nul
   readonly link?: { readonly text: string; readonly go: () => void } | null;
 }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   return (
-    <div aria-label={group.label ?? "Settings"} style={{ display: "flex", flexDirection: "column", marginBottom: 26 }}>
+    <div aria-label={tr(group.label ?? "Settings")} style={{ display: "flex", flexDirection: "column", marginBottom: 26 }}>
       {(group.label || link) && <GroupLabel label={group.label ?? ""} link={link} />}
       <div style={{ display: "flex", flexDirection: "column", borderRadius: 14, backgroundColor: p.raised2 }}>
         {group.rows.map((row, ix) => (
@@ -296,19 +308,20 @@ export function GroupView({ group, confirm, onCancel, preview = null, link = nul
         ))}
       </div>
       {preview}
-      {group.foot && !link && <div style={{ marginTop: 8, marginLeft: 4, marginRight: 4, color: p.faint, fontSize: 12 }}>{group.foot}</div>}
+      {group.foot && !link && <div style={{ marginTop: 8, marginLeft: 4, marginRight: 4, color: p.faint, fontSize: 12 }}>{tr(group.foot)}</div>}
     </div>
   );
 }
 
 export function SettingsToast({ text }: { readonly text: string }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   const shadow = { offsetX: 0, offsetY: 12, blurRadius: 30, spreadRadius: 0, color: p === DARK ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.16)" };
   return (
     <div style={{ position: "absolute", left: 0, right: 0, bottom: 24, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
       <div role="status" style={{ display: "flex", alignItems: "center", gap: 8, height: 36, paddingLeft: 14, paddingRight: 14, borderRadius: 10, backgroundColor: p.primary, color: p.onPrimary, whiteSpace: "nowrap", boxShadow: shadow }}>
         <Icon name="check" size={13} color={p.onPrimary} />
-        <div>{text}</div>
+        <div>{tr(text)}</div>
       </div>
     </div>
   );

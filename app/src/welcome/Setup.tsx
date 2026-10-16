@@ -2,6 +2,7 @@ import { type ReactElement, useState } from "react";
 
 import type { Chat } from "../chat/useChat";
 import { appIcon } from "../components/ui";
+import { tr, trN, useLanguage } from "../i18n";
 import { Shell } from "../Shell";
 import { useTheme } from "../theme";
 import { EngineStep } from "./EngineStep";
@@ -20,19 +21,22 @@ export { markWelcomeDone, needsWelcome } from "./store";
 
 function Pill({ text }: { readonly text: string }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, height: 26, paddingLeft: 10, paddingRight: 10, borderRadius: 13, backgroundColor: glass(p).tile, color: p.text4, fontSize: 12 }}>
       <div style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: p.link, pointerEvents: "none" }} />
-      <div>{text}</div>
+      <div>{tr(text)}</div>
     </div>
   );
 }
 
 function pillText(engines: Engines): string {
-  return `Installing ${busyEngines(engines).map((id) => { const install = engines.installs[id]; const name = engineNamed(id).name; return install.phase === "running" && install.progress !== null ? `${name} ${Math.round(install.progress * 100)}%` : name; }).join(", ")}`;
+  const list = busyEngines(engines).map((id) => { const install = engines.installs[id]; const name = engineNamed(id).name; return install.phase === "running" && install.progress !== null ? `${name} ${Math.round(install.progress * 100)}%` : name; }).join(", ");
+  return trN("Installing {list}", { list });
 }
 
 function Footer({ step, engines, onGo, onSkip }: { readonly step: StepId; readonly engines: Engines; readonly onGo: (id: StepId) => void; readonly onSkip: () => void }): ReactElement | null {
+  useLanguage();
   const before = previousStep(step);
   const after = nextStep(step);
   if (step === "keys") return null;
@@ -40,12 +44,12 @@ function Footer({ step, engines, onGo, onSkip }: { readonly step: StepId; readon
   const label = step === "engine" && busy && !engineReady(engines.found) ? "Continue while it installs" : "Continue";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4 }}>
-      {before && <TextButton label="Back" onClick={() => onGo(before)} />}
-      {step === "engine" && <TextButton label="Set up later" onClick={onSkip} />}
+      {before && <TextButton label={tr("Back")} onClick={() => onGo(before)} />}
+      {step === "engine" && <TextButton label={tr("Set up later")} onClick={onSkip} />}
       <div style={{ flexGrow: 1 }} />
       {step === "agent" && busy && <Pill text={pillText(engines)} />}
       {after && <PrimaryButton label={label} height={36} onClick={() => onGo(after)} />}
-      {step === "try" && <TextButton label="Skip to Home" onClick={onSkip} />}
+      {step === "try" && <TextButton label={tr("Skip to Home")} onClick={onSkip} />}
     </div>
   );
 }

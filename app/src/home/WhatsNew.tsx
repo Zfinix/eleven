@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { type ReactElement, useState } from "react";
 
 import { ASSETS } from "../lib/assets";
+import { tr, trN, useLanguage } from "../i18n";
 import { useTheme } from "../theme";
 import { Icon } from "../components/ui";
 import { NEWS, type News, type NewsArt } from "./news";
@@ -77,10 +78,11 @@ function Hero({ art, onClose }: { readonly art: NewsArt; readonly onClose: () =>
 
 function Pager({ at, count, onGo }: { readonly at: number; readonly count: number; readonly onGo: (index: number) => void }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   const step = (icon: string, label: string, to: number): ReactElement => {
     const live = to >= 0 && to < count;
     return (
-      <div onClick={() => live && onGo(to)} role="button" aria-label={label} aria-disabled={!live} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: 7, cursor: live ? "pointer" : "default", opacity: live ? 1 : 0.35, ...(live ? { hover: { opacity: 0.72 } } : {}) }}>
+      <div onClick={() => live && onGo(to)} role="button" aria-label={tr(label)} aria-disabled={!live} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: 7, cursor: live ? "pointer" : "default", opacity: live ? 1 : 0.35, ...(live ? { hover: { opacity: 0.72 } } : {}) }}>
         <Icon name={icon} size={14} color={p.muted} />
       </div>
     );
@@ -104,6 +106,7 @@ export function WhatsNew({ news, onClose }: {
   readonly onClose: () => void;
 }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   const [at, setAt] = useState(() => Math.max(0, NEWS.findIndex((item) => item.id === news.id)));
   const item = NEWS[at] ?? news;
   const last = at >= NEWS.length - 1;
@@ -121,13 +124,13 @@ export function WhatsNew({ news, onClose }: {
       }
     }
   };
-  const label = item.action.kind === "none" ? (last ? "Done" : "Next") : item.action.label;
+  const label = item.action.kind === "none" ? tr(last ? "Done" : "Next") : tr(item.action.label);
   const shadow = { offsetX: 0, offsetY: 16, blurRadius: 40, spreadRadius: 0, color: "rgba(0,0,0,0.35)" };
   return (
-    <div role="dialog" aria-label={item.title} style={{ position: "absolute", left: 10, bottom: 10, display: "flex", flexDirection: "column", width: WIDTH, borderWidth: 1, borderColor: p.line2, borderRadius: RADIUS, backgroundColor: p.raised2, overflow: "hidden", boxShadow: shadow }}>
+    <div role="dialog" aria-label={tr(item.title)} style={{ position: "absolute", left: 10, bottom: 10, display: "flex", flexDirection: "column", width: WIDTH, borderWidth: 1, borderColor: p.line2, borderRadius: RADIUS, backgroundColor: p.raised2, overflow: "hidden", boxShadow: shadow }}>
       <Hero art={item.art} onClose={onClose} />
       <div style={{ display: "flex", flexDirection: "column", paddingTop: 18, paddingLeft: 16, paddingRight: 16, paddingBottom: 12 }}>
-        <div style={{ fontSize: 12.5, color: p.muted }}>{`What's new · ${at + 1} of ${NEWS.length}`}</div>
+        <div style={{ fontSize: 12.5, color: p.muted }}>{trN("What's new · {n} of {m}", { n: at + 1, m: NEWS.length })}</div>
         <div style={{ marginTop: 2, fontSize: 18, lineHeight: 26, fontWeight: 500, color: p.text }}>{item.title}</div>
         <div style={{ marginTop: 6, minHeight: 60, color: p.text3 }}>{item.body}</div>
         <div onClick={act} role="button" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 36, marginTop: 16, borderRadius: 10, backgroundColor: p.sel2, color: p.text, cursor: "pointer", hover: { opacity: 0.72 } }}>

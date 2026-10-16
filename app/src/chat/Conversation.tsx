@@ -2,6 +2,7 @@ import { type ReactElement, type ReactNode, useState } from "react";
 
 import { toolLabel } from "../agents/describe";
 import type { PlanItem } from "../agents/events";
+import { tr, trN, useLanguage } from "../i18n";
 import { Tooltip } from "../components/kit";
 import { seconds, useNow } from "../lib/useNow";
 import { useTheme } from "../theme";
@@ -52,6 +53,7 @@ export function runningTool(messages: readonly Message[]): string | null {
 
 export function Working({ since, tool }: { readonly since: number; readonly tool: string | null }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   const now = useNow(true, 33);
   const pulse = Math.floor(now / 600) % 2 === 0;
   const verb = tool ?? VERBS[Math.floor((now - since) / VERB_MS) % VERBS.length] ?? VERBS[0];
@@ -61,7 +63,7 @@ export function Working({ since, tool }: { readonly since: number; readonly tool
         <Icon name="spark" size={14} color={p.data} />
       </div>
       <Shimmer text={`${verb}…`} color={p.text} now={now} />
-      <div style={{ fontSize: 12, color: p.faint }}>{`${seconds(now - since)} · esc to stop`}</div>
+      <div style={{ fontSize: 12, color: p.faint }}>{`${seconds(now - since)} · ${tr("esc to stop")}`}</div>
     </Row>
   );
 }
@@ -73,6 +75,7 @@ function planIcon(item: PlanItem): string {
 
 function PlanPanel({ items }: { readonly items: readonly PlanItem[] }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   const [open, setOpen] = useState(true);
   const done = items.filter((item) => item.status === "completed").length;
   return (
@@ -80,7 +83,7 @@ function PlanPanel({ items }: { readonly items: readonly PlanItem[] }): ReactEle
       <Row gap={8} style={{ cursor: "pointer", hover: { opacity: 0.72 } }}>
         <div onClick={() => setOpen(!open)} style={{ display: "flex", alignItems: "center", gap: 8, flexGrow: 1 }}>
           <Icon name="plan" size={14} color={p.text3} />
-          <div style={{ fontSize: 12.5, color: p.text3 }}>{`Plan · ${done} of ${items.length} done`}</div>
+          <div style={{ fontSize: 12.5, color: p.text3 }}>{trN("Plan · {n} of {m} done", { n: done, m: items.length })}</div>
           <Spacer />
           <Icon name={open ? "disclosure" : "forward"} size={11} color={p.faint} />
         </div>
@@ -97,16 +100,17 @@ function PlanPanel({ items }: { readonly items: readonly PlanItem[] }): ReactEle
 
 export function QueuePanel({ queue, onRemove }: { readonly queue: readonly string[]; readonly onRemove: (index: number) => void }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 8, paddingTop: 8, paddingBottom: 6, paddingLeft: 12, paddingRight: 8, borderWidth: 1, borderColor: p.line2, borderRadius: 14, backgroundColor: p.raised }}>
       <Row gap={8} style={{ fontSize: 12, color: p.muted, marginBottom: 2 }}>
         <Icon name="clock" size={13} />
-        <div>{`${queue.length} queued, sends when the agent is done`}</div>
+        <div>{trN("{n} queued, sends when the agent is done", { n: queue.length })}</div>
       </Row>
       {queue.map((text, ix) => (
         <Row key={`${ix}-${text}`} gap={8} style={{ height: 24, fontSize: 12.5 }}>
           <div style={{ flexGrow: 1, minWidth: 0, color: p.text2, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>{text}</div>
-          <div onClick={() => onRemove(ix)} aria-label="Remove from queue" style={{ display: "flex", padding: 4, cursor: "pointer", hover: { opacity: 0.72 } }}>
+          <div onClick={() => onRemove(ix)} aria-label={tr("Remove from queue")} style={{ display: "flex", padding: 4, cursor: "pointer", hover: { opacity: 0.72 } }}>
             <Icon name="close" size={11} />
           </div>
         </Row>
@@ -117,17 +121,18 @@ export function QueuePanel({ queue, onRemove }: { readonly queue: readonly strin
 
 function Header({ state, title, agentName, onWorkbench }: { readonly state: ThreadState; readonly title: string; readonly agentName: string; readonly onWorkbench: (() => void) | null }): ReactElement {
   const { p } = useTheme();
-  const status = state.agent.kind === "starting" ? `Starting ${agentName}…` : agentName;
+  useLanguage();
+  const status = state.agent.kind === "starting" ? trN("Starting {name}…", { name: agentName }) : agentName;
   return (
     <Row gap={8} style={{ height: 44, flexShrink: 0, paddingLeft: 16, paddingRight: 14, borderBottomWidth: 1, borderColor: p.fill }}>
       <div style={{ flexShrink: 1, minWidth: 0, fontWeight: 500, color: p.text, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>{title}</div>
       <div style={{ flexShrink: 0, color: p.muted, whiteSpace: "nowrap" }}>{`· ${status}`}</div>
       <Spacer />
       {onWorkbench && (
-        <Tooltip label="Back to the code view for this file">
+        <Tooltip label={tr("Back to the code view for this file")}>
           <div onClick={onWorkbench} role="button" style={{ display: "flex", alignItems: "center", gap: 6, height: 28, flexShrink: 0, paddingLeft: 10, paddingRight: 10, borderWidth: 1, borderColor: p.sel, borderRadius: 8, color: p.text3, fontSize: 12.5, cursor: "pointer", hover: { opacity: 0.72 } }}>
             <Icon name="expand" size={13} color={p.text3} />
-            <div>Workbench</div>
+            <div>{tr("Workbench")}</div>
           </div>
         </Tooltip>
       )}

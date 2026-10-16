@@ -5,6 +5,7 @@ import { KeymapIcon } from "../components/KeymapIcon";
 import { comboFor, type KeymapId, KEYMAPS } from "../keys/keymaps";
 import { customFor, type KeyTools, useKeyTools } from "../keys/useKeyTools";
 import { useSettings } from "../settings/store";
+import { tr, useLanguage } from "../i18n";
 import { useTheme } from "../theme";
 import { Icon, Keys } from "../components/ui";
 import { glass, HOVER, lineHeight } from "./look";
@@ -66,6 +67,7 @@ function Checkbox({ on }: { readonly on: boolean }): ReactElement {
 /** Step three: pick the tool whose shortcuts your hands already know, and bring your own changes from it. */
 export function KeymapStep({ onDone, onBack, pill }: { readonly onDone: () => void; readonly onBack: () => void; readonly pill: ReactNode }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   const g = glass(p);
   const tools = useKeyTools();
   const { update } = useSettings();
@@ -78,7 +80,7 @@ export function KeymapStep({ onDone, onBack, pill }: { readonly onDone: () => vo
   };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <StepHeading title="Keep the shortcuts you know" detail="Pick the tool your hands are used to. You can change any shortcut later." />
+      <StepHeading title={tr("Keep the shortcuts you know")} detail={tr("Pick the tool your hands are used to. You can change any shortcut later.")} />
       <div role="radiogroup" aria-label="Keymap" style={{ display: "grid", gridTemplateColumns: 4, gap: 10 }}>
         {KEYMAPS.map((map) => (
           <Tile key={map.id} id={map.id} tools={tools} on={map.id === keymap} onPick={() => setKeymap(map.id)} />
@@ -86,7 +88,7 @@ export function KeymapStep({ onDone, onBack, pill }: { readonly onDone: () => vo
       </div>
       <Preview keymap={keymap} />
       {custom && (
-        <div onClick={() => setBring(!bring)} role="checkbox" aria-selected={bring} aria-label="Also bring your own changes" style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 12, paddingBottom: 12, paddingLeft: 16, paddingRight: 16, borderWidth: 1, borderColor: g.edge, borderRadius: 14, backgroundColor: g.card, cursor: "pointer" }}>
+        <div onClick={() => setBring(!bring)} role="checkbox" aria-selected={bring} aria-label={tr("Also bring your own changes")} style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 12, paddingBottom: 12, paddingLeft: 16, paddingRight: 16, borderWidth: 1, borderColor: g.edge, borderRadius: 14, backgroundColor: g.card, cursor: "pointer" }}>
           <Checkbox on={bring} />
           <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 500 }}>Also bring your own changes</div>
@@ -95,10 +97,10 @@ export function KeymapStep({ onDone, onBack, pill }: { readonly onDone: () => vo
         </div>
       )}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4 }}>
-        <div onClick={onBack} role="button" aria-label="Back" style={{ color: p.muted, cursor: "pointer", hover: HOVER }}>Back</div>
+        <div onClick={onBack} role="button" aria-label={tr("Back")} style={{ color: p.muted, cursor: "pointer", hover: HOVER }}>{tr("Back")}</div>
         <div style={{ flexGrow: 1 }} />
         {pill}
-        <div onClick={finish} role="button" aria-label="Continue" style={{ display: "flex", alignItems: "center", height: 36, paddingLeft: 18, paddingRight: 18, borderRadius: 9, backgroundColor: p.primary, color: p.onPrimary, fontWeight: 600, cursor: "pointer", hover: HOVER }}>Continue</div>
+        <div onClick={finish} role="button" aria-label={tr("Continue")} style={{ display: "flex", alignItems: "center", height: 36, paddingLeft: 18, paddingRight: 18, borderRadius: 9, backgroundColor: p.primary, color: p.onPrimary, fontWeight: 600, cursor: "pointer", hover: HOVER }}>{tr("Continue")}</div>
       </div>
     </div>
   );
