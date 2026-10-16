@@ -95,7 +95,7 @@ function InstallAll({ size, onClick }: { readonly size: number; readonly onClick
   return (
     <div onClick={onClick} role="button" aria-label={tr("Install all")} style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, height: 32, paddingLeft: 14, paddingRight: 14, borderRadius: 8, backgroundColor: p.primary, color: p.onPrimary, fontWeight: 600, cursor: "pointer", hover: HOVER }}>
       <Icon name="download" size={14} color={p.onPrimary} />
-      <div>Install all</div>
+      <div>{tr("Install all")}</div>
       <div style={{ fontWeight: 500, opacity: 0.6 }}>{`${size} MB`}</div>
     </div>
   );

@@ -56,7 +56,7 @@ export function Working({ since, tool }: { readonly since: number; readonly tool
   useLanguage();
   const now = useNow(true, 33);
   const pulse = Math.floor(now / 600) % 2 === 0;
-  const verb = tool ?? VERBS[Math.floor((now - since) / VERB_MS) % VERBS.length] ?? VERBS[0];
+  const verb = tr(tool ?? VERBS[Math.floor((now - since) / VERB_MS) % VERBS.length] ?? VERBS[0]);
   return (
     <Row gap={9} style={{ height: 24 }}>
       <div style={{ display: "flex", opacity: pulse ? 1 : 0.45 }}>

@@ -149,7 +149,7 @@ export function KeyboardSection({ store }: { readonly store: SettingsHandle }): 
     setNotice(count > 0 ? trN(count === 1 ? "Brought in {n} shortcut from {app}." : "Brought in {n} shortcuts from {app}.", { n: count, app: item.from }) : trN("None of the shortcuts in {app} match Eleven's commands.", { app: item.from }));
   };
   const needle = query.trim().toLowerCase();
-  const matches = (id: CommandId, label: string): boolean => !needle || label.toLowerCase().includes(needle) || comboText(comboFor(id, keymap, overrides)).toLowerCase().includes(needle);
+  const matches = (id: CommandId, label: string): boolean => !needle || label.toLowerCase().includes(needle) || tr(label).toLowerCase().includes(needle) || comboText(comboFor(id, keymap, overrides)).toLowerCase().includes(needle);
 
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>

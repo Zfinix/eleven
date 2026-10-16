@@ -181,6 +181,7 @@ export const ZH: Readonly<Record<string, string>> = {
 
   // Sidebar — home/Sidebar.tsx
   "New chat": "新聊天",
+  "New Chat": "新建聊天",
   "Open…": "打开…",
   "Projects": "项目",
   "See all": "查看全部",

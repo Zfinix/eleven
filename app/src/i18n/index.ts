@@ -39,12 +39,14 @@ export function useLanguage(): Language {
 
 /** The Chinese for an interface string, or the string itself when English is on or no entry exists. */
 export function tr(text: string): string {
-  return language === "zh" ? ZH[text] ?? text : text;
+  if (language !== "zh") return text;
+  // Own properties only: "constructor" must fall back to English, not find Object's.
+  return Object.prototype.hasOwnProperty.call(ZH, text) ? ZH[text] ?? text : text;
 }
 
 /** The same for a sentence with values in it, like trN("Step {n} of {m}", { n: 2, m: 5 }). */
 export function trN(pattern: string, args: Readonly<Record<string, string | number>>): string {
-  return tr(pattern).replace(/\{(\w+)\}/g, (whole, key: string) => key in args ? String(args[key]) : whole);
+  return tr(pattern).replace(/\{(\w+)\}/g, (whole, key: string) => Object.prototype.hasOwnProperty.call(args, key) ? String(args[key]) : whole);
 }
 
 /** The system's language, for the Automatic setting. */

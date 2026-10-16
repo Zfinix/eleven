@@ -20,6 +20,14 @@ test("i18n: Chinese translates dictionary hits and keeps misses in English", () 
   expect(tr("nothing in the dictionary")).toBe("nothing in the dictionary");
 });
 
+test("i18n: inherited property names fall back to English, not to Object's members", () => {
+  setLanguage("zh");
+  expect(tr("constructor")).toBe("constructor");
+  expect(tr("toString")).toBe("toString");
+  expect(trN("value: {toString}", {})).toBe("value: {toString}");
+  expect(trN("value: {hasOwnProperty}", { n: 1 })).toBe("value: {hasOwnProperty}");
+});
+
 test("i18n: patterns fill their values in either language", () => {
   expect(trN("Step {n} of {m}", { n: 2, m: 5 })).toBe("Step 2 of 5");
   setLanguage("zh");

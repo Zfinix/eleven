@@ -9,7 +9,7 @@ import { findLldbDap } from "../debug/adapter";
 import { reaLaunch } from "../engine/rea";
 import { RECORDINGS_DIR } from "../gpu/trace";
 import { cacheDir, folderBytes, ghidraVersion, javaVersion, latestRelease, PROJECTS_DIR, projectCount, reaVersion, rizinVersion, sizeText, THREADS_DIR } from "./actions";
-import { tr, trN } from "../i18n";
+import { tr, trN, useLanguage } from "../i18n";
 import { isNewer } from "../lib/version";
 import type { Tone } from "./model";
 import { currentSettings } from "./store";
@@ -134,6 +134,8 @@ const EMPTY: Info = {
 export function useSettingsInfo(): { readonly info: Info; readonly refresh: () => void } {
   const [info, setInfo] = useState<Info>(EMPTY);
   const [tick, setTick] = useState(0);
+  // gather() bakes translated status lines in, so a language switch needs a fresh read.
+  const language = useLanguage();
   useEffect(() => {
     let live = true;
     const load = async (): Promise<void> => {
@@ -144,6 +146,6 @@ export function useSettingsInfo(): { readonly info: Info; readonly refresh: () =
     return () => {
       live = false;
     };
-  }, [tick]);
+  }, [tick, language]);
   return { info, refresh: () => setTick((t) => t + 1) };
 }
