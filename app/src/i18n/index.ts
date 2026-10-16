@@ -49,6 +49,8 @@ export function trN(pattern: string, args: Readonly<Record<string, string | numb
 
 /** The system's language, for the Automatic setting. */
 export function systemLanguage(): Language {
+  // Tests assert English strings, so they never flip with the machine's language.
+  if (process.env.NODE_ENV === "test") return "en";
   // macOS GUI apps can run with a LANG that ignores the user's system language, so ask it directly.
   if (process.platform === "darwin") {
     try {

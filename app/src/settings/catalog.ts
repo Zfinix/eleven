@@ -11,7 +11,7 @@ import { activeEngine, chooseEngine, type EngineId } from "../analysis/engines";
 import type { Agents } from "../chat/useAgents";
 import { appIcon } from "../components/ui";
 import { adoptToolchain } from "../engine/toolchain";
-import { LANGUAGES, LANGUAGE_LABELS } from "../i18n";
+import { LANGUAGES, LANGUAGE_LABELS, tr, trN } from "../i18n";
 import { RECORDINGS_DIR } from "../gpu/trace";
 import { loadSkills } from "../skills/load";
 import { resetWorkbenchLayout } from "../workbench/sizes";
@@ -174,15 +174,15 @@ function agentRows(c: Ctx): { readonly here: readonly SettingRowModel[]; readonl
     const found = c.installed.get(agent.id);
     const path = found?.command?.path ?? found?.cli ?? "";
     const login = signedIn(agent);
-    if (login === false) return info(agent.name, "Installed. Sign in once and Eleven remembers it.", { lead: lead(agent.id), ...(isDefault ? { tag: "Default" } : {}), status: { text: "Not signed in", tone: "warn" }, buttons: [btn("Sign in", () => { signIn(agent); c.toast(`Finish signing in to ${agent.name} in Terminal`); }, "primary")] });
-    const out = canSignOut(agent) ? [btn("Sign out", () => { signOut(agent); c.toast(`Signing out of ${agent.name} in Terminal`); })] : [];
-    return info(agent.name, `Version ${agent.version}, ${tildePath(path)}`, {
+    if (login === false) return info(agent.name, "Installed. Sign in once and Eleven remembers it.", { lead: lead(agent.id), ...(isDefault ? { tag: "Default" } : {}), status: { text: "Not signed in", tone: "warn" }, buttons: [btn("Sign in", () => { signIn(agent); c.toast(trN("Finish signing in to {name} in Terminal", { name: agent.name })); }, "primary")] });
+    const out = canSignOut(agent) ? [btn("Sign out", () => { signOut(agent); c.toast(trN("Signing out of {name} in Terminal", { name: agent.name })); })] : [];
+    return info(agent.name, agent.version === null ? tr("Installed") : trN("Version {v}, {path}", { v: agent.version, path: tildePath(path) }), {
       lead: lead(agent.id), ...(isDefault ? { tag: "Default" } : {}), status: { text: login ? "Signed in" : "Installed", tone: "good" },
       buttons: [...(isDefault ? [] : [btn("Make default", () => c.update({ defaultAgent: agent.id }))]), ...out],
     });
   });
   const others = c.agents.list.filter((agent) => !c.installed.has(agent.id));
-  const more = (c.browsing ? others : others.slice(0, 2)).map((agent) => info(agent.name, `Not on ${THIS_DEVICE}. Eleven downloads it and keeps it up to date.`, {
+  const more = (c.browsing ? others : others.slice(0, 2)).map((agent) => info(agent.name, trN("Not on {device}. Eleven downloads it and keeps it up to date.", { device: tr(THIS_DEVICE) }), {
     lead: lead(agent.id), buttons: [btn("Make default", () => c.update({ defaultAgent: agent.id })), btn("Install", () => c.install(agent.id))],
   }));
   return { here, more };
@@ -195,10 +195,11 @@ function askModelRow(c: Ctx): SettingRowModel {
   const others = Object.fromEntries(Object.entries(c.settings.askModels).filter(([id]) => id !== agent.id));
   const pick = (value: string): void => c.update({ askModels: value ? { ...others, [agent.id]: value } : others });
   const options: readonly Option[] = [
-    { value: "", label: "Same as the chat" },
+    { value: "", label: "Same as the chat" },  // label is translated where the Select draws it
+
     ...models.map((model): Option => (model.description ? { value: model.value, label: model.name, note: model.description } : { value: model.value, label: model.name })),
   ];
-  const desc = models.length > 0 ? `For ${agent.name}. A smaller model answers sooner but explains less.` : `${agent.name}’s models show here once it has started.`;
+  const desc = models.length > 0 ? trN("For {name}. A smaller model answers sooner but explains less.", { name: agent.name }) : trN("{name}’s models show here once it has started.", { name: agent.name });
   return { title: "Model", desc, keywords: "ask explain quick answer selection", control: { kind: "select", value: c.settings.askModels[agent.id] ?? "", pick, options } };
 }
 
@@ -208,7 +209,7 @@ function input(c: Ctx, key: "customAgent" | "customToolServer", title: string, d
     title, desc, control: { kind: "input", value: draft, placeholder, set: (value) => c.setDraft(key, value) },
     buttons: [btn("Add", () => {
       c.update(patchOf(key, draft.trim()));
-      c.toast(draft.trim() ? done : "Removed it");
+      c.toast(draft.trim() ? tr(done) : tr("Removed it"));
     })],
   };
 }
@@ -220,20 +221,20 @@ function engineRows(c: Ctx, h: ReturnType<typeof makeHelpers>): readonly Setting
   const e = c.info.engines;
   const row = (id: EngineRowId, name: string, desc: string, found: string | null, key: PathKey, folder: boolean): SettingRowModel => {
     const locate = async (): Promise<void> => {
-      const picked = await pickPath(folder ? "folder" : "file", `Locate ${name}`);
+      const picked = await pickPath(folder ? "folder" : "file", trN("Locate {name}", { name }));
       if (picked === null) return;
       c.update(patchOf(key, picked));
       adoptToolchain();
       c.refresh();
-      c.toast(`Using ${name} at ${tildePath(picked)}`);
+      c.toast(trN("Using {name} at {path}", { name, path: tildePath(picked) }));
     };
     if (found === null) return info(name, desc, { lead: { kind: "img", src: ENGINE_LOGO[id] }, status: { text: "Not found", tone: "quiet" }, buttons: [btn("Locate…", () => void locate())] });
     const engineId: EngineId = id;
-    const remove = h.confirmed(`remove-${id}`, `Remove ${name}? Projects keep their work, and you can install it again any time.`, "Remove", () => {
+    const remove = h.confirmed(`remove-${id}`, trN("Remove {name}? Projects keep their work, and you can install it again any time.", { name }), "Remove", () => {
       void moveToTrash(found);
       c.update(patchOf(key, ""));
       adoptToolchain();
-    }, `Moved ${name} to the Trash`);
+    }, trN("Moved {name} to the Trash", { name }));
     const update = id === "rizin" || id === "ghidra" ? [btn("Check for update", () => c.checkEngine(id))] : [];
     return info(name, desc, {
       lead: { kind: "img", src: ENGINE_LOGO[id] },
@@ -245,8 +246,8 @@ function engineRows(c: Ctx, h: ReturnType<typeof makeHelpers>): readonly Setting
     });
   };
   return [
-    row("rizin", "Rizin", `${e.rizin.version ? `Version ${e.rizin.version}. ` : ""}Fast, opens most apps in seconds.`, e.rizin.path, "rizinPath", false),
-    row("ghidra", "Ghidra", `${e.ghidra.version ? `Version ${e.ghidra.version}. ` : ""}Slower, with the clearest readable code.`, e.ghidra.path, "ghidraDir", true),
+    row("rizin", "Rizin", e.rizin.version ? trN("Version {v}. Fast, opens most apps in seconds.", { v: e.rizin.version }) : tr("Fast, opens most apps in seconds."), e.rizin.path, "rizinPath", false),
+    row("ghidra", "Ghidra", e.ghidra.version ? trN("Version {v}. Slower, with the clearest readable code.", { v: e.ghidra.version }) : tr("Slower, with the clearest readable code."), e.ghidra.path, "ghidraDir", true),
     row("hopper", "Hopper", "Uses your Hopper license through its own tools.", e.hopper, "hopperPath", false),
     row("ida", "IDA Pro", "Uses your IDA license. Needs IDA 9 with its MCP plugin.", e.ida, "idaPath", false),
   ];
@@ -261,7 +262,7 @@ function newSkill(c: Ctx, folder: string): void {
   writeFileSync(file, `---\nname: ${name}\ndescription: One line on what this skill does.\n---\n\n1. The first step the agent takes.\n2. The next step.\n`);
   showInFinder(file);
   c.refresh();
-  c.toast("Created a new skill in your skills folder");
+  c.toast(tr("Created a new skill in your skills folder"));
 }
 
 /** Every settings page as groups of rows, built from the saved settings and what Eleven found on this Mac. */
@@ -283,7 +284,7 @@ export function buildPages(c: Ctx): Readonly<Record<Page, readonly GroupModel[]>
     const text = SKILL_TEXT[name];
     return { title: text?.[0] ?? name, desc: text?.[1] ?? description, control: { kind: "toggle", on: !s.disabledSkills.includes(name), flip: () => flipSkill(name) } };
   };
-  const recordings = confirmed("clear-rec", "Delete all GPU recordings? Profiles in your chats keep their numbers but can’t be opened again.", "Delete", clearRecordings, "Deleted GPU recordings");
+  const recordings = confirmed("clear-rec", "Delete all GPU recordings? Profiles in your chats keep their numbers but can’t be opened again.", "Delete", clearRecordings, "Deleted GPU recordings");  // translated where the row draws it
   const recordings2 = { ...recordings, id: "clear-rec2" };
   const exportDir = s.exportDir || join(homedir(), "Downloads", "Eleven");
   return {
@@ -298,7 +299,7 @@ export function buildPages(c: Ctx): Readonly<Record<Page, readonly GroupModel[]>
       { label: "Updates", rows: [
         ...(OS === "mac" ? [tg("autoUpdate", "Update automatically", "Download updates in the background and install them when you quit Eleven.")] : []),
         seg("updateChannel", "Update channel", "Beta gets new features a few weeks early.", ["Stable", "Beta"]),
-        info(`Eleven ${app.version}`, app.line, { buttons: app.download ? [btn("Download", () => openLink(app.download ?? ""), "primary")] : [btn("Check now", c.checkApp)] }),
+        info(trN("Eleven {v}", { v: app.version }), tr(app.line), { buttons: app.download ? [btn("Download", () => openLink(app.download ?? ""), "primary")] : [btn("Check now", c.checkApp)] }),
       ] },
       { label: "Home", rows: [
         tg("showWhatsNew", "Show what’s new on Home", "A short note on Home after each update. Dismiss it and it stays gone."),
@@ -345,7 +346,7 @@ export function buildPages(c: Ctx): Readonly<Record<Page, readonly GroupModel[]>
       ] },
     ],
     agents: [
-      { label: `On ${THIS_DEVICE}`, foot: "Every agent gets the same tools: Eleven’s analysis engine and control of this window.", rows: [
+      { label: trN("On {device}", { device: tr(THIS_DEVICE) }), foot: "Every agent gets the same tools: Eleven’s analysis engine and control of this window.", rows: [
         ...here,
         info("Look for agents again", "After installing one from the terminal.", { buttons: [btn("Rescan", c.rescan)] }),
       ] },
@@ -375,10 +376,10 @@ export function buildPages(c: Ctx): Readonly<Record<Page, readonly GroupModel[]>
       { label: "Running things", rows: permissionRows(c, "Running things") },
       { label: "Your answers", rows: [
         tg("rememberAnswers", "Remember “Always allow” for each project", "When you pick Always allow in a chat, it sticks for that project only."),
-        info("Forget remembered answers", c.info.remembered === 0 ? "No projects have answers saved." : `${c.info.remembered} ${c.info.remembered === 1 ? "project has" : "projects have"} answers saved.`, { buttons: [btn("Forget all", () => {
+        info("Forget remembered answers", c.info.remembered === 0 ? "No projects have answers saved." : trN(c.info.remembered === 1 ? "{n} project has answers saved." : "{n} projects have answers saved.", { n: c.info.remembered }), { buttons: [btn("Forget all", () => {
           const count = forgetAnswers();
           c.refresh();
-          c.toast(count === 0 ? "No answers were saved" : `Forgot the answers saved in ${count} ${count === 1 ? "project" : "projects"}`);
+          c.toast(count === 0 ? tr("No answers were saved") : trN("Forgot the answers saved in {n} projects.", { n: count }));
         })] }),
       ] },
     ],
@@ -407,15 +408,15 @@ export function buildPages(c: Ctx): Readonly<Record<Page, readonly GroupModel[]>
       { label: "Open files with", foot: "The engine you pick opens files. Eleven still uses the others when you ask for something only they can do.", rows: engineRows(c, h) },
       { label: "Together", rows: [tg("ghidraPseudocode", "Use Ghidra for readable code", "Open files fast with Rizin, then show Ghidra’s clearer pseudocode when it’s ready.", { dim: activeEngine()?.id === "ghidra" })] },
       { label: "Ghidra", rows: [
-        sel("ghidraMemory", "Memory", `Big apps open faster with more. Automatic picks 2 to 4 GB from what ${THIS_DEVICE} has.`, ["Automatic", "4 GB", "8 GB", "16 GB"]),
+        sel("ghidraMemory", "Memory", trN("Big apps open faster with more. Automatic picks 2 to 4 GB from what {device} has.", { device: tr(THIS_DEVICE) }), ["Automatic", "4 GB", "8 GB", "16 GB"]),
         tg("findParameters", "Work out function parameters", "Better pseudocode for big apps. Makes the first open slower."),
         tg("rebuildSwitches", "Rebuild switch statements", "Turns jump tables back into switch blocks."),
         tg("hiddenCode", "Look for code no one calls", "Finds more functions in stripped apps. The slowest option."),
         tg("swiftNames", "Demangle Swift names", "Readable Swift function names. Turn off if a big Swift app takes too long to open."),
-        path("javaHome", "Java", c.info.java.path ?? "Not found", true, { status: c.info.java.version ? { text: `Java ${c.info.java.version}`, tone: "good" } : { text: "Not found", tone: "warn" } }),
+        path("javaHome", "Java", c.info.java.path ?? "Not found", true, { status: c.info.java.version ? { text: trN("Java {v}", { v: c.info.java.version }), tone: "good" } : { text: "Not found", tone: "warn" } }),
       ] },
       { label: "Analysis tools", rows: [
-        info(`REA ${c.info.rea.version ?? ""}`.trim(), "Comes with Eleven. Gives agents the tools to read apps.", { status: c.info.rea.status }),
+        info(`REA ${c.info.rea.version ?? ""}`.trim(), "Comes with Eleven. Gives agents the tools to read apps.", { status: { text: tr(c.info.rea.status.text), tone: c.info.rea.status.tone } }),
       ] },
     ],
     code: [
@@ -438,7 +439,7 @@ export function buildPages(c: Ctx): Readonly<Record<Page, readonly GroupModel[]>
       ] },
     ],
     debugging: [
-      { label: "Debugger", rows: [path("lldbDap", "Debugger", c.info.lldb ?? "Not found", false, { status: c.info.lldb ? { text: "Found", tone: "good" } : { text: "Not found", tone: "warn" } })] },
+      { label: "Debugger", rows: [path("lldbDap", "Debugger", c.info.lldb ?? "Not found", false, { status: c.info.lldb ? { text: "Found", tone: "good" } : { text: "Not found", tone: "warn" } })] },  // statuses translate at the pill
       { label: "Starting", rows: [
         tg("stopAtFunction", "Stop at the function you’re looking at", "Puts a breakpoint there before the program starts."),
         tg("stopAtEntry", "Stop at the first instruction", "Pause before any of the program’s code runs."),
@@ -457,42 +458,42 @@ export function buildPages(c: Ctx): Readonly<Record<Page, readonly GroupModel[]>
       ] },
       { label: "Keeping recordings", rows: [
         sel("keepRecordings", "Recordings to keep", "Older ones are deleted. Each can be a few hundred MB.", ["1", "3", "10", "All"]),
-        danger("GPU recordings", `${sizes.recordings} in ${tildePath(RECORDINGS_DIR)}`, "Delete all…", recordings, [btn(`Show in ${FILE_MANAGER}`, () => showInFinder(RECORDINGS_DIR))]),
+        danger("GPU recordings", trN("{size} in {path}", { size: sizes.recordings, path: tildePath(RECORDINGS_DIR) }), "Delete all…", recordings, [btn(trN("Show in {app}", { app: FILE_MANAGER }), () => showInFinder(RECORDINGS_DIR))]),
       ].map((row, ix) => (ix === 1 ? { ...row, mono: true } : row)) },
     ],
     storage: [
       { label: "Exports and patches", rows: [
         path("exportDir", "Save to", exportDir, true),
-        tg("revealExports", `Show in ${FILE_MANAGER} after saving`, "For exported code, Objective-C lists and patched copies."),
+        tg("revealExports", trN("Show in {app} after saving", { app: FILE_MANAGER }), "For exported code, Objective-C lists and patched copies."),
       ] },
       { label: "Your work", rows: [
-        info("Projects", `${sizes.projects}. Renames, notes, bookmarks and patches for ${sizes.apps} ${sizes.apps === 1 ? "app" : "apps"}.`, { buttons: [btn(`Show in ${FILE_MANAGER}`, () => showInFinder(PROJECTS_DIR))] }),
-        danger("Chats", `${sizes.chats}. Every conversation, in its project.`, "Delete all…", confirmed("clear-chats", "Delete every chat in every project? Renames, notes and patches stay. This can’t be undone.", "Delete chats", deleteAllChats, "Deleted all chats"), [btn(`Show in ${FILE_MANAGER}`, () => showInFinder(THREADS_DIR))]),
+        info("Projects", trN("{size}. Renames, notes, bookmarks and patches for {apps}.", { size: sizes.projects, apps: trN(sizes.apps === 1 ? "{n} app" : "{n} apps", { n: sizes.apps }) }), { buttons: [btn(trN("Show in {app}", { app: FILE_MANAGER }), () => showInFinder(PROJECTS_DIR))] }),
+        danger("Chats", trN("{size}. Every conversation, in its project.", { size: sizes.chats }), "Delete all…", confirmed("clear-chats", "Delete every chat in every project? Renames, notes and patches stay. This can’t be undone.", "Delete chats", deleteAllChats, "Deleted all chats"), [btn(trN("Show in {app}", { app: FILE_MANAGER }), () => showInFinder(THREADS_DIR))]),
         tg("autosave", "Save changes as you go", "Renames and notes save a moment after you make them."),
       ] },
       { label: "Space Eleven can free up", rows: [
-        danger("Analysis cache", `${sizes.cache}. Apps you opened before open instantly.`, "Clear…", confirmed("clear-cache", "Clear the analysis cache? Nothing is lost, but each app takes longer the next time you open it.", "Clear cache", () => clearFolder(cacheDir()), "Cleared the analysis cache")),
-        danger("GPU recordings", `${sizes.recordings}.`, "Clear…", recordings2),
+        danger("Analysis cache", trN("{size}. Apps you opened before open instantly.", { size: sizes.cache }), "Clear…", confirmed("clear-cache", "Clear the analysis cache? Nothing is lost, but each app takes longer the next time you open it.", "Clear cache", () => clearFolder(cacheDir()), "Cleared the analysis cache")),
+        danger("GPU recordings", trN("{size}.", { size: sizes.recordings }), "Clear…", recordings2),
       ] },
       { label: "Window", rows: [
-        info("Reset the workbench layout", "Puts panels, splits and sizes back to how they started.", { buttons: [btn("Reset", () => { resetWorkbenchLayout(); c.toast("Layout reset"); })] }),
+        info("Reset the workbench layout", "Puts panels, splits and sizes back to how they started.", { buttons: [btn("Reset", () => { resetWorkbenchLayout(); c.toast(tr("Layout reset")); })] }),
       ] },
     ],
     about: [
       { label: null, rows: [
-        info("Eleven", `Version ${app.version} (${process.arch === "arm64" ? "Apple silicon" : "Intel"}). ${app.short}`, { lead: { kind: "img", src: appIcon(c.icon) }, buttons: app.download ? [btn("Download", () => openLink(app.download ?? ""), "primary")] : [btn("Check for updates", c.checkApp)] }),
-        info("What’s new", "Notes for every release.", { buttons: [btn("Open", () => { openLink(RELEASE_NOTES); c.toast("Opened the release notes"); })] }),
+        info("Eleven", trN("Version {v} ({arch}). {line}", { v: app.version, arch: tr(process.arch === "arm64" ? "Apple silicon" : "Intel"), line: tr(app.short) }), { lead: { kind: "img", src: appIcon(c.icon) }, buttons: app.download ? [btn("Download", () => openLink(app.download ?? ""), "primary")] : [btn("Check for updates", c.checkApp)] }),
+        info("What’s new", "Notes for every release.", { buttons: [btn("Open", () => { openLink(RELEASE_NOTES); c.toast(tr("Opened the release notes")); })] }),
       ] },
       { label: "Help", rows: [
-        info("Run setup again", "Install engines and agents, and pick shortcuts.", { buttons: [btn("Start", c.setup)] }),
+        info("Run setup again", "Install engines and agents, and pick shortcuts.", { buttons: [btn("Start", c.setup)] }),  // row text translated where it draws
         info("Report a problem", "Copies Eleven’s version, engines and recent errors so you can paste them in a bug report. No file contents.", { buttons: [btn("Copy details", c.copyDetails)] }),
-        info("Settings file", tildePath(SETTINGS_FILE), { mono: true, buttons: [btn(`Show in ${FILE_MANAGER}`, () => showInFinder(SETTINGS_FILE))] }),
+        info("Settings file", tildePath(SETTINGS_FILE), { mono: true, buttons: [btn(trN("Show in {app}", { app: FILE_MANAGER }), () => showInFinder(SETTINGS_FILE))] }),
       ] },
       { label: "Made with", rows: [
-        info("REA", "Reverse engineer anything. How Eleven and its agents read every app.", { lead: { kind: "img", src: join(ENGINES_DIR, "rea.svg") }, buttons: [btn("Website", () => { openLink("https://github.com/morluto/rea"); c.toast("Opened in your browser"); })] }),
-        info("Rizin", "Fast reverse engineering framework.", { lead: { kind: "img", src: ENGINE_LOGO.rizin }, buttons: [btn("Website", () => { openLink("https://rizin.re"); c.toast("Opened in your browser"); })] }),
-        info("Ghidra", "Decompiler from the NSA.", { lead: { kind: "img", src: ENGINE_LOGO.ghidra }, buttons: [btn("Website", () => { openLink("https://ghidra-sre.org"); c.toast("Opened in your browser"); })] }),
-        info("Agent Client Protocol", "How Eleven talks to every agent.", { lead: { kind: "img", src: join(ENGINES_DIR, "acp-light.png"), darkSrc: join(ENGINES_DIR, "acp-dark.png") }, buttons: [btn("Website", () => { openLink("https://agentclientprotocol.com"); c.toast("Opened in your browser"); })] }),
+        info("REA", "Reverse engineer anything. How Eleven and its agents read every app.", { lead: { kind: "img", src: join(ENGINES_DIR, "rea.svg") }, buttons: [btn("Website", () => { openLink("https://github.com/morluto/rea"); c.toast(tr("Opened in your browser")); })] }),
+        info("Rizin", "Fast reverse engineering framework.", { lead: { kind: "img", src: ENGINE_LOGO.rizin }, buttons: [btn("Website", () => { openLink("https://rizin.re"); c.toast(tr("Opened in your browser")); })] }),
+        info("Ghidra", "Decompiler from the NSA.", { lead: { kind: "img", src: ENGINE_LOGO.ghidra }, buttons: [btn("Website", () => { openLink("https://ghidra-sre.org"); c.toast(tr("Opened in your browser")); })] }),
+        info("Agent Client Protocol", "How Eleven talks to every agent.", { lead: { kind: "img", src: join(ENGINES_DIR, "acp-light.png"), darkSrc: join(ENGINES_DIR, "acp-dark.png") }, buttons: [btn("Website", () => { openLink("https://agentclientprotocol.com"); c.toast(tr("Opened in your browser")); })] }),
       ] },
     ],
   };

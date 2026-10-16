@@ -1,6 +1,7 @@
 import type { LinearGradientBackground } from "@gpuix/react";
 import type { ReactElement } from "react";
 
+import { tr, trN, useLanguage } from "../i18n";
 import { THIS_DEVICE } from "../lib/platform";
 import { type Appearance, frostRadius, glassTint, MONO, onGlass, useTheme } from "../theme";
 import { codeFamily, formatAddress, lineHeightFor, type Syntax, syntaxFor } from "./look";
@@ -100,7 +101,7 @@ export function WindowPreview({ transparency, frost }: { readonly transparency: 
 const THEMES = [
   { value: "Dark", label: "Dark", win: ["#171717"], card: ["#0f0f0f"], line: "#3a3a3a" },
   { value: "Light", label: "Light", win: ["#f3f3f1"], card: ["#ffffff"], line: "#d4d4d1" },
-  { value: "System", label: `Match ${THIS_DEVICE}`, win: ["#171717", "#f3f3f1"], card: ["#0f0f0f", "#ffffff"], line: "#8f8f8f" },
+  { value: "System", label: "Match {device}", win: ["#171717", "#f3f3f1"], card: ["#0f0f0f", "#ffffff"], line: "#8f8f8f" },
 ] as const;
 
 function Split({ colors }: { readonly colors: readonly string[] }): ReactElement {
@@ -113,13 +114,15 @@ function Split({ colors }: { readonly colors: readonly string[] }): ReactElement
 
 export function ThemeCards({ value, onPick }: { readonly value: Appearance; readonly onPick: (next: Appearance) => void }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   const bar = (width: string, color: string): ReactElement => <div style={{ height: 5, width, borderRadius: 3, backgroundColor: color, pointerEvents: "none" }} />;
   return (
-    <div role="radiogroup" aria-label="Theme" style={{ display: "flex", gap: 12, marginBottom: 26 }}>
+    <div role="radiogroup" aria-label={tr("Theme")} style={{ display: "flex", gap: 12, marginBottom: 26 }}>
       {THEMES.map((theme) => {
         const on = theme.value === value;
+        const label = trN(theme.label, { device: tr(THIS_DEVICE) });
         return (
-          <div key={theme.value} onClick={() => onPick(theme.value)} role="radio" aria-label={theme.label} aria-selected={on} style={{ display: "flex", flexDirection: "column", gap: 10, flexGrow: 1, flexBasis: 0, minWidth: 0, paddingTop: 8, paddingLeft: 8, paddingRight: 8, paddingBottom: 10, borderWidth: 1.5, borderColor: on ? "transparent" : p.line2, borderRadius: 14, cursor: "pointer", hover: { opacity: 0.72 }, ...(on ? { backgroundColor: p.fill } : {}) }}>
+          <div key={theme.value} onClick={() => onPick(theme.value)} role="radio" aria-label={label} aria-selected={on} style={{ display: "flex", flexDirection: "column", gap: 10, flexGrow: 1, flexBasis: 0, minWidth: 0, paddingTop: 8, paddingLeft: 8, paddingRight: 8, paddingBottom: 10, borderWidth: 1.5, borderColor: on ? "transparent" : p.line2, borderRadius: 14, cursor: "pointer", hover: { opacity: 0.72 }, ...(on ? { backgroundColor: p.fill } : {}) }}>
             <div style={{ position: "relative", display: "flex", gap: 6, height: 84, padding: 8, borderRadius: 9, overflow: "hidden", pointerEvents: "none" }}>
               <Split colors={theme.win} />
               <div style={{ display: "flex", flexDirection: "column", gap: 5, width: "28%", paddingTop: 4, pointerEvents: "none" }}>
@@ -134,7 +137,7 @@ export function ThemeCards({ value, onPick }: { readonly value: Appearance; read
                 {bar("40%", "#98c379")}
               </div>
             </div>
-            <div style={{ paddingLeft: 4, paddingRight: 4, fontWeight: 500, color: p.text }}>{theme.label}</div>
+            <div style={{ paddingLeft: 4, paddingRight: 4, fontWeight: 500, color: p.text }}>{label}</div>
           </div>
         );
       })}
@@ -156,18 +159,19 @@ function sameTable(a: PermissionTable, b: PermissionTable): boolean {
 
 export function PresetCards({ table, onPick }: { readonly table: PermissionTable; readonly onPick: (next: PermissionTable) => void }): ReactElement {
   const { p } = useTheme();
+  useLanguage();
   return (
-    <div role="radiogroup" aria-label="How much agents can do" style={{ display: "flex", gap: 12, marginBottom: 26 }}>
+    <div role="radiogroup" aria-label={tr("How much agents can do")} style={{ display: "flex", gap: 12, marginBottom: 26 }}>
       {PRESETS.map((preset) => {
         const on = sameTable(table, PERMISSION_PRESETS[preset.id]);
         return (
-          <div key={preset.id} onClick={() => onPick(PERMISSION_PRESETS[preset.id])} role="radio" aria-label={preset.title} aria-selected={on} style={{ display: "flex", flexDirection: "column", gap: 6, flexGrow: 1, flexBasis: 0, minWidth: 0, padding: 14, borderWidth: 1.5, borderColor: on ? "transparent" : p.line2, borderRadius: 14, cursor: "pointer", hover: { opacity: 0.72 }, ...(on ? { backgroundColor: p.fill } : {}) }}>
+          <div key={preset.id} onClick={() => onPick(PERMISSION_PRESETS[preset.id])} role="radio" aria-label={tr(preset.title)} aria-selected={on} style={{ display: "flex", flexDirection: "column", gap: 6, flexGrow: 1, flexBasis: 0, minWidth: 0, padding: 14, borderWidth: 1.5, borderColor: on ? "transparent" : p.line2, borderRadius: 14, cursor: "pointer", hover: { opacity: 0.72 }, ...(on ? { backgroundColor: p.fill } : {}) }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, pointerEvents: "none" }}>
               <div style={{ width: 14, height: 14, borderRadius: 7, flexShrink: 0, borderWidth: on ? 4 : 1.5, borderColor: on ? p.text : p.line3 }} />
-              <div style={{ fontWeight: 600, color: p.text }}>{preset.title}</div>
+              <div style={{ fontWeight: 600, color: p.text }}>{tr(preset.title)}</div>
             </div>
-            <div style={{ color: p.muted, fontSize: 12.5, pointerEvents: "none" }}>{preset.desc}</div>
-            {preset.id === "balanced" && <div style={{ display: "flex", alignSelf: "flex-start", alignItems: "center", height: 20, paddingLeft: 8, paddingRight: 8, borderRadius: 10, backgroundColor: p.fill2, color: p.text4, fontSize: 11.5, pointerEvents: "none" }}>Recommended</div>}
+            <div style={{ color: p.muted, fontSize: 12.5, pointerEvents: "none" }}>{tr(preset.desc)}</div>
+            {preset.id === "balanced" && <div style={{ display: "flex", alignSelf: "flex-start", alignItems: "center", height: 20, paddingLeft: 8, paddingRight: 8, borderRadius: 10, backgroundColor: p.fill2, color: p.text4, fontSize: 11.5, pointerEvents: "none" }}>{tr("Recommended")}</div>}
           </div>
         );
       })}
