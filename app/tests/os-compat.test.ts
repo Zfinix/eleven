@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { hidePaths } from "../src/bridge/privacy";
 import { jdkVersion } from "../src/engine/toolchain";
 import { dataRoot } from "../src/lib/platform";
+import { launchLine } from "../src/lib/process";
 import { newestFirst } from "../src/lib/version";
 import { loadSkills } from "../src/skills/load";
 
@@ -38,4 +39,11 @@ test("playbooks saved with Windows line endings still read their name and descri
   const skill = loadSkills().find((candidate) => candidate.name === "crlf-playbook");
   expect(skill?.description).toBe("Saved on Windows");
   expect(skill?.body).toBe("Do the thing.");
+});
+
+test("Windows batch launchers start through cmd.exe with every argument escaped", () => {
+  const launch = launchLine("C:\\Program Files\\nodejs\\npx.cmd", ["-y", "a&b"], "win32");
+  expect(launch).toEqual({ file: 'C:\\Program^ Files\\nodejs\\npx.cmd ^^^"-y^^^" ^^^"a^^^&b^^^"', args: [], shell: true });
+  expect(launchLine("C:\\tools\\agent.exe", ["-y"], "win32")).toEqual({ file: "C:\\tools\\agent.exe", args: ["-y"], shell: false });
+  expect(launchLine("/usr/bin/npx", ["-y"], "darwin").shell).toBe(false);
 });
