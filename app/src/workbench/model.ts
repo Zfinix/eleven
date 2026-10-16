@@ -76,6 +76,8 @@ export type Program = {
   readonly evidence: string;
   /** What reads the file (Ghidra, Rizin, jadx), named in loading and error messages. */
   readonly engine: string;
+  /** A quick first look while the full engine is still reading the file; it is replaced when that finishes. */
+  readonly preview?: boolean;
   readonly log: () => readonly string[];
   readonly code: (addr: string, view: "pseudo" | "asm") => Promise<string>;
   readonly refs: (addr: string) => Promise<Refs>;

@@ -56,6 +56,21 @@ const store = globalThis as SessionStore;
 const sessions = (store.sessions ??= new Map());
 process.once("exit", () => sessions.forEach((p) => void p.then((s) => s.close())));
 
+const light = new Set<string>();
+
+/** Analyze this file with rizin's quick pass (symbols and calls) instead of the full one, for a first look at a large binary. */
+export function rizinLightOn(path: string): void {
+  light.add(path);
+}
+
+/** Ends the rizin session for a file once something better reads it. */
+export async function rizinClose(path: string): Promise<void> {
+  const pending = sessions.get(path);
+  sessions.delete(path);
+  light.delete(path);
+  if (pending) (await pending).close();
+}
+
 const replays = new Map<string, () => readonly (readonly [string, CodeType])[]>();
 
 /** What to mark again each time rizin analyzes the file, since it keeps nothing between runs. */
@@ -69,7 +84,7 @@ function analyzed(path: string): Promise<RizinSession> {
   if (!pending) {
     pending = (async () => {
       const session = new RizinSession(path);
-      await session.cmd("aaa");
+      await session.cmd(light.has(path) ? "aa" : "aaa");
       for (const [addr, type] of replays.get(path)?.() ?? []) {
         for (const command of rizinTypeCommands(addr, type, null)) await session.cmd(command);
       }

@@ -35,7 +35,7 @@ import { Pane } from "./Pane";
 import { Palette } from "./Palette";
 import { type Bench, BenchContext, useBench } from "./parts";
 import { MIN_PANE, PaneDivider, ResizeOverlay } from "./Resize";
-import { loadProgram } from "./program";
+import { loadProgram, openProgram } from "./program";
 import { across, type PaneTree, type TreePath } from "./paneTree";
 import { fromProject, initialPanes, useWorkbenchState, type Workbench as WorkbenchState } from "./state";
 import { StatusBar } from "./StatusBar";
@@ -80,14 +80,18 @@ function useProgram(target: Target): Opening {
     const started = Date.now();
     const slow = (): boolean => live && Date.now() - started >= READY_NOTICE_MS;
     const open = async (): Promise<void> => {
+      const { first, full } = openProgram(target);
+      let shown = pendingProgram(target);
       try {
-        const program = await loadProgram(target);
+        shown = await first;
+        if (live) setOpening({ program: shown, problem: null, since: null });
+        const program = shown.preview ? await full : shown;
         if (slow()) void tell({ kind: "opened", project: program.id, name: program.name, engine: program.engine, functions: program.functions.length }, { open: () => undefined });
         if (live) setOpening({ program, problem: null, since: null });
       } catch (err) {
         const problem = openProblem(err);
         if (slow()) void tell({ kind: "openFailed", name: target.name, advice: problem.advice }, { open: () => undefined });
-        if (live) setOpening({ program: pendingProgram(target), problem, since: null });
+        if (live) setOpening({ program: shown, problem, since: null });
       }
     };
     void open();

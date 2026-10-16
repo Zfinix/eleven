@@ -111,6 +111,7 @@ Exec=eleven %F
 Icon=eleven
 Terminal=false
 Categories=Development;
+StartupWMClass=eleven
 DESKTOP
 cat > "$out/AppRun" << 'APPRUN'
 #!/bin/sh

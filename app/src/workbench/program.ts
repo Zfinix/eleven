@@ -9,9 +9,9 @@ import { loadProject, projectId } from "../engine/project";
 import { codeUsingString, hexRows, programSegments, programStrings } from "./layout";
 import type { Fn, Program, TableRow } from "./model";
 import { forgetProcedures, loadProcedures, type Procedure } from "../engine/procedures";
-import { activeBackend } from "../analysis/engines";
+import { activeBackend, rizinInstalled } from "../analysis/engines";
 import { isAndroidCode, openJadx } from "../engine/jadx";
-import { rizinBytes, rizinDisassembly, rizinFunctions, rizinHasDecompiler, rizinPseudocode, rizinRefs, rizinReplayOn, rizinRetype, rizinSegments, rizinStrings } from "../engine/rizin";
+import { rizinBytes, rizinClose, rizinDisassembly, rizinFunctions, rizinHasDecompiler, rizinLightOn, rizinPseudocode, rizinRefs, rizinReplayOn, rizinRetype, rizinSegments, rizinStrings } from "../engine/rizin";
 
 const RIZIN_HEX_BYTES = 256;
 const CODE_USING_LIMIT = 12;
@@ -45,10 +45,14 @@ function importRow(procedure: Procedure): TableRow {
   return { a: file.replace(/\..*$/, ""), b: symbol };
 }
 
+const PREVIEW_NOTE = "// Ghidra is still reading this file. Its pseudocode replaces this view when it finishes. Until then, here is the disassembly.";
+const RIZIN_NOTE = "// This engine reads disassembly with no JVM. Right-click a line to have the agent explain or decompile it, or install rz-ghidra for a built-in pseudocode view.";
+
 /** Builds the workbench's view with the native rizin backend: no JVM, disassembly now, pseudocode when a decompiler plugin is present. */
-async function loadProgramRizin(target: Target): Promise<Program> {
+async function loadProgramRizin(target: Target, preview = false): Promise<Program> {
   const log: string[] = [];
   const sha256 = projectId(target);
+  if (preview) rizinLightOn(target.path);
   rizinReplayOn(target.path, savedTypes(sha256));
   const [functions, strings, segments, resources] = await Promise.all([
     timed(log, "functions (rizin)", () => rizinFunctions(target.path)),
@@ -56,12 +60,12 @@ async function loadProgramRizin(target: Target): Promise<Program> {
     timed(log, "segments (rizin)", () => rizinSegments(target.path)),
     timed(log, "app files", () => appFiles(target)),
   ]);
-  const hasDecompiler = await rizinHasDecompiler(target.path).catch(() => false);
+  const hasDecompiler = !preview && (await rizinHasDecompiler(target.path).catch(() => false));
   const code = async (addr: string, view: "pseudo" | "asm"): Promise<string> => {
     if (view === "asm") return timed(log, `disassembly ${addr}`, () => rizinDisassembly(target.path, addr));
     if (hasDecompiler) return timed(log, `pseudocode ${addr}`, () => rizinPseudocode(target.path, addr));
     const asm = await timed(log, `disassembly ${addr}`, () => rizinDisassembly(target.path, addr));
-    return `// This engine reads disassembly with no JVM. Right-click a line to have the agent explain or decompile it, or install rz-ghidra for a built-in pseudocode view.\n\n${asm}`;
+    return `${preview ? PREVIEW_NOTE : RIZIN_NOTE}\n\n${asm}`;
   };
   return {
     id: sha256,
@@ -76,6 +80,7 @@ async function loadProgramRizin(target: Target): Promise<Program> {
     segments,
     evidence: `${sha256.slice(0, 8)}… · Rizin`,
     engine: "Rizin",
+    ...(preview ? { preview } : {}),
     ...(resources ? { resources } : {}),
     log: () => log,
     code,
@@ -83,7 +88,7 @@ async function loadProgramRizin(target: Target): Promise<Program> {
     dossier: null,
     hex: (addr) => rizinBytes(target.path, addr, RIZIN_HEX_BYTES),
     focusLine: () => -1,
-    retype: (addr, next, previous) => rizinRetype(target.path, addr, next, previous),
+    retype: preview ? null : (addr, next, previous) => rizinRetype(target.path, addr, next, previous),
   };
 }
 
@@ -182,4 +187,30 @@ export function loadProgram(target: Target): Promise<Program> {
   const reader = READERS.find((candidate) => candidate.accepts(target));
   if (!reader) throw new Error("Eleven has no way to read this file.");
   return reader.load(target);
+}
+
+/** The first view to show, and the full one that replaces it when the first is only a quick look. */
+export type ProgramOpening = { readonly first: Promise<Program>; readonly full: Promise<Program> };
+
+function previewFits(target: Target): boolean {
+  return activeBackend() !== "rizin" && !isAndroidCode(target.path) && rizinInstalled();
+}
+
+async function settled(full: Promise<Program>, path: string): Promise<void> {
+  try {
+    await full;
+    await rizinClose(path);
+  } catch {
+    return;
+  }
+}
+
+/** Reads the file with Ghidra and, beside it, takes a quick rizin look so large binaries show their functions while Ghidra is still analyzing. */
+export function openProgram(target: Target): ProgramOpening {
+  const full = loadProgram(target);
+  if (!previewFits(target)) return { first: full, full };
+  const preview = loadProgramRizin(target, true);
+  void settled(full, target.path);
+  const first = Promise.race([full.catch(() => preview), preview.catch(() => full)]);
+  return { first, full };
 }

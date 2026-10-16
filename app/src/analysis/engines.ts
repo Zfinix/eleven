@@ -34,7 +34,7 @@ function hopperInstalled(): boolean {
   return [join(homedir(), "Applications"), "/Applications"].some((dir) => existsSync(join(dir, "Hopper Disassembler.app", "Contents", "MacOS", "hopper")));
 }
 
-function rizinInstalled(): boolean {
+export function rizinInstalled(): boolean {
   const chosen = currentSettings().rizinPath || process.env.ELEVEN_RIZIN;
   return chosen ? existsSync(chosen) : onPath("rizin");
 }

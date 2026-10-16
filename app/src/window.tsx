@@ -25,6 +25,7 @@ const initial: Target | null = initialPath ? prepareTarget(initialPath) : null;
 render(<Fonts><App initial={initial} /></Fonts>, {
   title: "Eleven",
   appName: "Eleven",
+  appId: "eleven",
   width: 1440,
   height: 900,
   minWidth: 960,
