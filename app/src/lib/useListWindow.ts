@@ -8,8 +8,11 @@ type Range = { readonly start: number; readonly end: number };
 export type ListWindow = Range & { readonly onVisibleRange: (event: EventPayload) => void };
 
 /** The slice of a `<virtual-list>` worth mounting: what's visible plus a margin, moved only near its edges. */
-export function useListWindow(count: number, overscan = OVERSCAN): ListWindow {
-  const [range, setRange] = useState<Range>({ start: 0, end: overscan * 2 });
+export function useListWindow(count: number, overscan = OVERSCAN, startAtEnd = false): ListWindow {
+  const [range, setRange] = useState<Range>(() => ({
+    start: startAtEnd ? Math.max(0, count - overscan * 2) : 0,
+    end: startAtEnd ? count : overscan * 2,
+  }));
   const onVisibleRange = (event: EventPayload): void => {
     const first = event.startIndex ?? 0;
     const last = event.endIndex ?? first;

@@ -8,7 +8,7 @@ version="$(cd "$app_dir" && bun -e 'console.log(require("./package.json").versio
 
 rm -rf "$out"
 mkdir -p "$out/Contents/MacOS" "$out/Contents/Resources"
-(cd "$app_dir" && bun build --compile src/bundled.ts --outfile "$out/Contents/MacOS/Eleven" > /dev/null)
+(cd "$app_dir" && bun build --compile --root . src/bundled.ts src/chat/historyWorker.ts --outfile "$out/Contents/MacOS/Eleven" > /dev/null)
 cp -R "$app_dir/assets" "$out/Contents/Resources/assets"
 cp -R "$app_dir/skills" "$out/Contents/Resources/skills"
 cp -R "$app_dir/vendor" "$out/Contents/Resources/vendor"

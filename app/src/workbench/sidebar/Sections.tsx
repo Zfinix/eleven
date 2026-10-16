@@ -31,7 +31,7 @@ export function Chats(): ReactElement {
     <SideSection id="threads" title="Chats" count={newest.length > 0 ? `${newest.length}` : ""}>
       {newest.length === 0 && <Faint text="Ask the agent something to start a chat." />}
       {shown.map((thread) => (thread.id === renaming
-        ? <ThreadName key={thread.id} id={thread.id} title={thread.title} height={32} onDone={() => setRenaming(null)} />
+        ? <ThreadName key={thread.id} id={thread.id} title={thread.title} height={32} onDone={() => setRenaming(null)} onError={chat.thread.note} />
         : <SideRow key={thread.id} lead={{ kind: "dot", color: thread.id === current && chat.thread.busy ? p.data : p.line3 }} label={thread.title} on={thread.id === current} onClick={() => show(thread.id)} menu={() => threadMenu(chat, thread.id, thread.title, () => setRenaming(thread.id), () => show(thread.id))} />
       ))}
       {(hidden > 0 || all) && <SideRow lead={{ kind: "none" }} label={all ? "Show fewer" : `Show ${hidden} more`} onClick={() => setAll(!all)} />}

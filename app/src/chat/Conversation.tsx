@@ -6,17 +6,36 @@ import { Tooltip } from "../components/kit";
 import { seconds, useNow } from "../lib/useNow";
 import { useTheme } from "../theme";
 import { Icon, Row, Spacer } from "../components/ui";
-import { MessageView } from "./MessageView";
+import { MessageList } from "./MessageList";
 import type { Message, ThreadState } from "./thread";
 import type { Thread } from "./useThread";
 
-const VERBS = ["Taking it apart", "Reading the code", "Tracing calls", "Following references", "Untangling", "Decompiling"] as const;
+const VERBS = [
+  "Taking it apart",
+  "Reading the code",
+  "Tracing calls",
+  "Following references",
+  "Untangling",
+  "Decompiling",
+] as const;
 const VERB_MS = 2400;
 const SHIMMER_MS = 1800;
 const SHIMMER_CHAR_PX = 7.5;
-const SHIMMER_LAYERS = [{ width: 56, opacity: 0.25 }, { width: 32, opacity: 0.35 }, { width: 14, opacity: 0.5 }] as const;
+const SHIMMER_LAYERS = [
+  { width: 56, opacity: 0.25 },
+  { width: 32, opacity: 0.35 },
+  { width: 14, opacity: 0.5 },
+] as const;
 
-export function Shimmer({ text, color, now }: { readonly text: string; readonly color: string; readonly now: number }): ReactElement {
+export function Shimmer({
+  text,
+  color,
+  now,
+}: {
+  readonly text: string;
+  readonly color: string;
+  readonly now: number;
+}): ReactElement {
   const widest = SHIMMER_LAYERS[0].width;
   const travel = text.length * SHIMMER_CHAR_PX + widest;
   const center = ((now % SHIMMER_MS) / SHIMMER_MS) * travel - widest / 2;
@@ -26,8 +45,22 @@ export function Shimmer({ text, color, now }: { readonly text: string; readonly 
       {SHIMMER_LAYERS.map((layer) => {
         const left = center - layer.width / 2;
         return (
-          <div key={layer.width} style={{ position: "absolute", top: 0, bottom: 0, left, width: layer.width, overflow: "hidden", opacity: layer.opacity, pointerEvents: "none" }}>
-            <div style={{ position: "absolute", top: 0, left: -left, whiteSpace: "nowrap" }}>{text}</div>
+          <div
+            key={layer.width}
+            style={{
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              left,
+              width: layer.width,
+              overflow: "hidden",
+              opacity: layer.opacity,
+              pointerEvents: "none",
+            }}
+          >
+            <div style={{ position: "absolute", top: 0, left: -left, whiteSpace: "nowrap" }}>
+              {text}
+            </div>
           </div>
         );
       })}
@@ -35,10 +68,30 @@ export function Shimmer({ text, color, now }: { readonly text: string; readonly 
   );
 }
 
-function Centered({ children, top = 0, bottom = 16 }: { readonly children: ReactNode; readonly top?: number; readonly bottom?: number }): ReactElement {
+function Centered({
+  children,
+  top = 0,
+  bottom = 16,
+}: {
+  readonly children: ReactNode;
+  readonly top?: number;
+  readonly bottom?: number;
+}): ReactElement {
   return (
-    <div style={{ display: "flex", justifyContent: "center", width: "100%", paddingLeft: 20, paddingRight: 20, paddingTop: top, paddingBottom: bottom }}>
-      <div style={{ display: "flex", flexDirection: "column", width: "100%", maxWidth: 680 }}>{children}</div>
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        width: "100%",
+        paddingLeft: 20,
+        paddingRight: 20,
+        paddingTop: top,
+        paddingBottom: bottom,
+      }}
+    >
+      <div style={{ display: "flex", flexDirection: "column", width: "100%", maxWidth: 680 }}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -46,11 +99,22 @@ function Centered({ children, top = 0, bottom = 16 }: { readonly children: React
 export function runningTool(messages: readonly Message[]): string | null {
   const last = messages[messages.length - 1];
   if (last?.kind !== "agent") return null;
-  const step = [...last.blocks].reverse().find((block) => block.kind === "tool" && block.step.status === "running");
-  return step?.kind === "tool" ? toolLabel(step.step.tool, step.step.input).label : null;
+  for (let index = last.blocks.length - 1; index >= 0; index--) {
+    const block = last.blocks[index];
+    if (block?.kind === "tool" && block.step.status === "running") {
+      return toolLabel(block.step.tool, block.step.input).label;
+    }
+  }
+  return null;
 }
 
-export function Working({ since, tool }: { readonly since: number; readonly tool: string | null }): ReactElement {
+export function Working({
+  since,
+  tool,
+}: {
+  readonly since: number;
+  readonly tool: string | null;
+}): ReactElement {
   const { p } = useTheme();
   const now = useNow(true, 33);
   const pulse = Math.floor(now / 600) % 2 === 0;
@@ -76,37 +140,105 @@ function PlanPanel({ items }: { readonly items: readonly PlanItem[] }): ReactEle
   const [open, setOpen] = useState(true);
   const done = items.filter((item) => item.status === "completed").length;
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8, paddingTop: 8, paddingBottom: 8, paddingLeft: 12, paddingRight: 12, borderWidth: 1, borderColor: p.line2, borderRadius: 14, backgroundColor: p.raised }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+        marginBottom: 8,
+        paddingTop: 8,
+        paddingBottom: 8,
+        paddingLeft: 12,
+        paddingRight: 12,
+        borderWidth: 1,
+        borderColor: p.line2,
+        borderRadius: 14,
+        backgroundColor: p.raised,
+      }}
+    >
       <Row gap={8} style={{ cursor: "pointer", hover: { opacity: 0.72 } }}>
-        <div onClick={() => setOpen(!open)} style={{ display: "flex", alignItems: "center", gap: 8, flexGrow: 1 }}>
+        <div
+          onClick={() => setOpen(!open)}
+          style={{ display: "flex", alignItems: "center", gap: 8, flexGrow: 1 }}
+        >
           <Icon name="plan" size={14} color={p.text3} />
-          <div style={{ fontSize: 12.5, color: p.text3 }}>{`Plan · ${done} of ${items.length} done`}</div>
+          <div
+            style={{ fontSize: 12.5, color: p.text3 }}
+          >{`Plan · ${done} of ${items.length} done`}</div>
           <Spacer />
           <Icon name={open ? "disclosure" : "forward"} size={11} color={p.faint} />
         </div>
       </Row>
-      {open && items.map((item, ix) => (
-        <Row key={`${ix}-${item.content}`} gap={8} style={{ fontSize: 12.5, paddingLeft: 2 }}>
-          <Icon name={planIcon(item)} size={13} color={item.status === "in_progress" ? p.data : p.muted} />
-          <div style={{ color: item.status === "completed" ? p.faint : p.text2, ...(item.status === "completed" ? { textDecoration: "line-through" as const } : {}) }}>{item.content}</div>
-        </Row>
-      ))}
+      {open &&
+        items.map((item, ix) => (
+          <Row key={`${ix}-${item.content}`} gap={8} style={{ fontSize: 12.5, paddingLeft: 2 }}>
+            <Icon
+              name={planIcon(item)}
+              size={13}
+              color={item.status === "in_progress" ? p.data : p.muted}
+            />
+            <div
+              style={{
+                color: item.status === "completed" ? p.faint : p.text2,
+                ...(item.status === "completed" ? { textDecoration: "line-through" as const } : {}),
+              }}
+            >
+              {item.content}
+            </div>
+          </Row>
+        ))}
     </div>
   );
 }
 
-export function QueuePanel({ queue, onRemove }: { readonly queue: readonly string[]; readonly onRemove: (index: number) => void }): ReactElement {
+export function QueuePanel({
+  queue,
+  onRemove,
+}: {
+  readonly queue: readonly string[];
+  readonly onRemove: (index: number) => void;
+}): ReactElement {
   const { p } = useTheme();
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 8, paddingTop: 8, paddingBottom: 6, paddingLeft: 12, paddingRight: 8, borderWidth: 1, borderColor: p.line2, borderRadius: 14, backgroundColor: p.raised }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 2,
+        marginBottom: 8,
+        paddingTop: 8,
+        paddingBottom: 6,
+        paddingLeft: 12,
+        paddingRight: 8,
+        borderWidth: 1,
+        borderColor: p.line2,
+        borderRadius: 14,
+        backgroundColor: p.raised,
+      }}
+    >
       <Row gap={8} style={{ fontSize: 12, color: p.muted, marginBottom: 2 }}>
         <Icon name="clock" size={13} />
         <div>{`${queue.length} queued, sends when the agent is done`}</div>
       </Row>
       {queue.map((text, ix) => (
         <Row key={`${ix}-${text}`} gap={8} style={{ height: 24, fontSize: 12.5 }}>
-          <div style={{ flexGrow: 1, minWidth: 0, color: p.text2, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>{text}</div>
-          <div onClick={() => onRemove(ix)} aria-label="Remove from queue" style={{ display: "flex", padding: 4, cursor: "pointer", hover: { opacity: 0.72 } }}>
+          <div
+            style={{
+              flexGrow: 1,
+              minWidth: 0,
+              color: p.text2,
+              whiteSpace: "nowrap",
+              textOverflow: "ellipsis",
+              overflow: "hidden",
+            }}
+          >
+            {text}
+          </div>
+          <div
+            onClick={() => onRemove(ix)}
+            aria-label="Remove from queue"
+            style={{ display: "flex", padding: 4, cursor: "pointer", hover: { opacity: 0.72 } }}
+          >
             <Icon name="close" size={11} />
           </div>
         </Row>
@@ -115,17 +247,68 @@ export function QueuePanel({ queue, onRemove }: { readonly queue: readonly strin
   );
 }
 
-function Header({ state, title, agentName, onWorkbench }: { readonly state: ThreadState; readonly title: string; readonly agentName: string; readonly onWorkbench: (() => void) | null }): ReactElement {
+function Header({
+  state,
+  title,
+  agentName,
+  onWorkbench,
+}: {
+  readonly state: ThreadState;
+  readonly title: string;
+  readonly agentName: string;
+  readonly onWorkbench: (() => void) | null;
+}): ReactElement {
   const { p } = useTheme();
   const status = state.agent.kind === "starting" ? `Starting ${agentName}…` : agentName;
   return (
-    <Row gap={8} style={{ height: 44, flexShrink: 0, paddingLeft: 16, paddingRight: 14, borderBottomWidth: 1, borderColor: p.fill }}>
-      <div style={{ flexShrink: 1, minWidth: 0, fontWeight: 500, color: p.text, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>{title}</div>
+    <Row
+      gap={8}
+      style={{
+        height: 44,
+        flexShrink: 0,
+        paddingLeft: 16,
+        paddingRight: 14,
+        borderBottomWidth: 1,
+        borderColor: p.fill,
+      }}
+    >
+      <div
+        style={{
+          flexShrink: 1,
+          minWidth: 0,
+          fontWeight: 500,
+          color: p.text,
+          whiteSpace: "nowrap",
+          textOverflow: "ellipsis",
+          overflow: "hidden",
+        }}
+      >
+        {title}
+      </div>
       <div style={{ flexShrink: 0, color: p.muted, whiteSpace: "nowrap" }}>{`· ${status}`}</div>
       <Spacer />
       {onWorkbench && (
         <Tooltip label="Back to the code view for this file">
-          <div onClick={onWorkbench} role="button" style={{ display: "flex", alignItems: "center", gap: 6, height: 28, flexShrink: 0, paddingLeft: 10, paddingRight: 10, borderWidth: 1, borderColor: p.sel, borderRadius: 8, color: p.text3, fontSize: 12.5, cursor: "pointer", hover: { opacity: 0.72 } }}>
+          <div
+            onClick={onWorkbench}
+            role="button"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              height: 28,
+              flexShrink: 0,
+              paddingLeft: 10,
+              paddingRight: 10,
+              borderWidth: 1,
+              borderColor: p.sel,
+              borderRadius: 8,
+              color: p.text3,
+              fontSize: 12.5,
+              cursor: "pointer",
+              hover: { opacity: 0.72 },
+            }}
+          >
             <Icon name="expand" size={13} color={p.text3} />
             <div>Workbench</div>
           </div>
@@ -136,7 +319,13 @@ function Header({ state, title, agentName, onWorkbench }: { readonly state: Thre
 }
 
 /** The chat column: header, the turn-by-turn timeline, and the docked composer. */
-export function Conversation({ thread, title, agentName, composer, onWorkbench }: {
+export function Conversation({
+  thread,
+  title,
+  agentName,
+  composer,
+  onWorkbench,
+}: {
   readonly thread: Thread;
   readonly title: string;
   readonly agentName: string;
@@ -144,27 +333,33 @@ export function Conversation({ thread, title, agentName, composer, onWorkbench }
   readonly onWorkbench: (() => void) | null;
 }): ReactElement {
   const { state } = thread;
-  const shownAgent = state.agent.kind === "working" || state.agent.kind === "ready" ? state.agent.name || agentName : agentName;
-  const actionsFor = (message: Message, ix: number) => ({
-    onAnswer: (choice: Parameters<Thread["answer"]>[2]) => message.kind === "permission" && thread.answer(ix, message.id, choice),
-    onRetry: thread.retry,
-    onOpen: thread.openFunction,
-  });
+  const shownAgent =
+    state.agent.kind === "working" || state.agent.kind === "ready"
+      ? state.agent.name || agentName
+      : agentName;
   return (
-    <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, flexBasis: 440, minWidth: 0 }}>
+    <div
+      style={{ display: "flex", flexDirection: "column", flexGrow: 1, flexBasis: 440, minWidth: 0 }}
+    >
       <Header state={state} title={title} agentName={shownAgent} onWorkbench={onWorkbench} />
-      <virtual-list followTail alignment="top" estimatedItemHeight={80} style={{ flexGrow: 1, minHeight: 0 }}>
-        {state.messages.map((message, ix) => (
-          <Centered key={ix} top={ix === 0 ? 22 : 0}>
-            <MessageView message={message} agentName={shownAgent} last={ix === state.messages.length - 1} actions={actionsFor(message, ix)} />
-          </Centered>
-        ))}
-        {state.agent.kind === "working" && (
-          <Centered key="working" bottom={24}>
-            <Working since={state.agent.since} tool={runningTool(state.messages)} />
-          </Centered>
-        )}
-      </virtual-list>
+      <MessageList
+        key={thread.id}
+        messages={state.messages}
+        agentName={shownAgent}
+        centered
+        onAnswer={thread.answer}
+        onRetry={thread.retry}
+        onOpen={thread.openFunction}
+        footer={
+          state.agent.kind === "working"
+            ? [
+                <Centered key="working" bottom={24}>
+                  <Working since={state.agent.since} tool={runningTool(state.messages)} />
+                </Centered>,
+              ]
+            : []
+        }
+      />
       <Centered bottom={14}>
         {state.plan.length > 0 && <PlanPanel items={state.plan} />}
         {state.queue.length > 0 && <QueuePanel queue={state.queue} onRemove={thread.unqueue} />}

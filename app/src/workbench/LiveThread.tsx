@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 
 import { QueuePanel, runningTool, Working } from "../chat/Conversation";
-import { MessageView } from "../chat/MessageView";
+import { MessageList } from "../chat/MessageList";
 import { useBench } from "./parts";
 import { Suggestions } from "./Suggestions";
 
@@ -17,34 +17,34 @@ export function LiveThread({ chatId }: { readonly chatId: string | null }): Reac
     if (addr) openFn(addr, false);
   };
   return (
-    <virtual-list followTail alignment="top" estimatedItemHeight={80} style={{ flexGrow: 1, minHeight: 0 }}>
-      {messages.map((message, ix) => (
-        <div key={ix} style={{ display: "flex", flexDirection: "column", paddingTop: ix === 0 ? 8 : 0, paddingBottom: 16, ...PAD }}>
-          <MessageView
-            message={message}
-            agentName={agents.selected.name}
-            last={ix === messages.length - 1}
-            actions={{
-              onAnswer: (choice) => message.kind === "permission" && thread.answer(ix, message.id, choice),
-              onRetry: thread.retry,
-              onOpen: open,
-            }}
-          />
-        </div>
-      ))}
-      <div key="suggestions" style={{ display: "flex", flexDirection: "column", ...PAD }}>
-        <Suggestions chatId={chatId} />
-      </div>
-      {agent.kind === "working" && (
-        <div key="working" style={{ display: "flex", flexDirection: "column", paddingBottom: 12, ...PAD }}>
-          <Working since={agent.since} tool={runningTool(messages)} />
-        </div>
-      )}
-      {queue.length > 0 && (
-        <div key="queue" style={{ display: "flex", flexDirection: "column", paddingBottom: 12, ...PAD }}>
-          <QueuePanel queue={queue} onRemove={thread.unqueue} />
-        </div>
-      )}
-    </virtual-list>
+    <MessageList
+      key={thread.id}
+      messages={messages}
+      agentName={agents.selected.name}
+      onAnswer={thread.answer}
+      onRetry={thread.retry}
+      onOpen={open}
+      footer={[
+        <div key="suggestions" style={{ display: "flex", flexDirection: "column", ...PAD }}>
+          <Suggestions chatId={chatId} />
+        </div>,
+        agent.kind === "working" && (
+          <div
+            key="working"
+            style={{ display: "flex", flexDirection: "column", paddingBottom: 12, ...PAD }}
+          >
+            <Working since={agent.since} tool={runningTool(messages)} />
+          </div>
+        ),
+        queue.length > 0 && (
+          <div
+            key="queue"
+            style={{ display: "flex", flexDirection: "column", paddingBottom: 12, ...PAD }}
+          >
+            <QueuePanel queue={queue} onRemove={thread.unqueue} />
+          </div>
+        ),
+      ].filter(Boolean)}
+    />
   );
 }

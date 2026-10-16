@@ -25,10 +25,10 @@ rizin_version="${RIZIN_VERSION:-v0.9.1}"
 
 rm -rf "$out"
 mkdir -p "$out/bin" "$res" "$cache"
-(cd "$app_dir" && bun build --compile --target=bun-windows-x64 \
+(cd "$app_dir" && bun build --compile --root . --target=bun-windows-x64 \
   --windows-icon=script/Eleven.ico --windows-hide-console \
   --windows-title=Eleven --windows-version="$version.0" \
-  src/bundled.ts --outfile "$out/bin/Eleven.exe" > /dev/null)
+  src/bundled.ts src/chat/historyWorker.ts --outfile "$out/bin/Eleven.exe" > /dev/null)
 cp -R "$app_dir/assets" "$res/assets"
 cp -R "$app_dir/skills" "$res/skills"
 cp -R "$app_dir/vendor" "$res/vendor"

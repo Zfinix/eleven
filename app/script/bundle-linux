@@ -22,7 +22,7 @@ rizin_version="${RIZIN_VERSION:-v0.9.1}"
 
 rm -rf "$out"
 mkdir -p "$out/bin" "$res" "$cache"
-(cd "$app_dir" && bun build --compile --target=bun-linux-x64 src/bundled.ts --outfile "$out/bin/eleven" > /dev/null)
+(cd "$app_dir" && bun build --compile --root . --target=bun-linux-x64 src/bundled.ts src/chat/historyWorker.ts --outfile "$out/bin/eleven" > /dev/null)
 cp -R "$app_dir/assets" "$res/assets"
 cp -R "$app_dir/skills" "$res/skills"
 cp -R "$app_dir/vendor" "$res/vendor"

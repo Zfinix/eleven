@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { dirname } from "node:path";
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import type { NativeCommand } from "../agents/detect";
 import type { AgentEvent, PermissionChoice, SessionOption } from "../agents/events";
@@ -18,10 +18,18 @@ import { rizinDisassembly, rizinEntry, rizinFunctions, rizinPseudocode } from ".
 import { androidHint, engineHint } from "../analysis/hint";
 import { activeBackend } from "../analysis/engines";
 import { prepareTarget, type Target } from "../engine/target";
-import { type SavedThread, saveThread } from "./history";
-import { agentName, EMPTY_THREAD, isBusy, type Message, threadReducer, type ThreadState } from "./thread";
+import type { SavedThread } from "./history";
+import { useThreadPersistence } from "./useThreadPersistence";
+import { useEventBuffer } from "./useEventBuffer";
+import {
+  agentName,
+  EMPTY_THREAD,
+  isBusy,
+  type Message,
+  threadReducer,
+  type ThreadState,
+} from "./thread";
 import { useChatMoments } from "../notify/useChatMoments";
-import { shownText } from "../skills/load";
 import { copyToClipboard, THIS_DEVICE } from "../lib/platform";
 
 export type Thread = {
@@ -34,7 +42,7 @@ export type Thread = {
   readonly retry: () => void;
   readonly answer: (index: number, permissionId: number, choice: PermissionChoice | null) => void;
   readonly setOption: (option: SessionOption, value: string) => void;
-  readonly reset: () => void;
+  readonly reset: (options?: { readonly startAgent?: boolean }) => void;
   readonly restore: (saved: SavedThread) => void;
   readonly selectTab: (index: number) => void;
   readonly closeCanvas: () => void;
@@ -42,7 +50,11 @@ export type Thread = {
   readonly note: (text: string) => void;
 };
 
-const PAST_MESSAGES: Readonly<Record<Settings["chatHistory"], number>> = { Short: 10, Normal: 20, Long: 50 };
+const PAST_MESSAGES: Readonly<Record<Settings["chatHistory"], number>> = {
+  Short: 10,
+  Normal: 20,
+  Long: 50,
+};
 const PAST_CHARS = 1500;
 
 function opening(target: Target | null): readonly string[] {
@@ -65,7 +77,8 @@ function opening(target: Target | null): readonly string[] {
       "It holds weights, not a program, so don't open it with open_binary. Eleven already shows its header, tensors and load risks in the model panel next to this chat. Read the file's bytes yourself only if you need more than that.",
     ];
   }
-  const slice = target.path === target.original ? "" : ` (analyze ${target.path}, the ${target.arch} slice)`;
+  const slice =
+    target.path === target.original ? "" : ` (analyze ${target.path}, the ${target.arch} slice)`;
   return [
     `You are working inside Eleven, a reverse-engineering app. The user opened ${target.original}${slice}.`,
     engineHint(target.path, target.arch),
@@ -76,10 +89,15 @@ function transcript(messages: readonly Message[]): readonly string[] {
   const lines = messages.slice(-PAST_MESSAGES[currentSettings().chatHistory]).flatMap((message) => {
     if (message.kind === "user") return [`User: ${message.text.slice(0, PAST_CHARS)}`];
     if (message.kind !== "agent") return [];
-    const said = message.blocks.flatMap((block) => (block.kind === "text" ? [block.text] : [])).join("").trim();
+    const said = message.blocks
+      .flatMap((block) => (block.kind === "text" ? [block.text] : []))
+      .join("")
+      .trim();
     return said ? [`You: ${said.slice(0, PAST_CHARS)}`] : [];
   });
-  return lines.length > 0 ? ["", "This continues an earlier conversation:", ...lines.map((line) => hidePaths(line))] : [];
+  return lines.length > 0
+    ? ["", "This continues an earlier conversation:", ...lines.map((line) => hidePaths(line))]
+    : [];
 }
 
 function firstPrompt(target: Target | null, past: readonly Message[], text: string): string {
@@ -99,7 +117,9 @@ function openedPath(event: AgentEvent, tools: Map<string, string>): string | nul
   if (event.kind !== "step") return null;
   if (event.tool) tools.set(event.id, event.tool);
   const path = stringField(event.input, "path");
-  const opens = (tools.get(event.id) ?? "").includes("open_binary") || stringField(event.input, "provider_id") !== undefined;
+  const opens =
+    (tools.get(event.id) ?? "").includes("open_binary") ||
+    stringField(event.input, "provider_id") !== undefined;
   return path && opens ? path : null;
 }
 
@@ -108,9 +128,13 @@ function openedFor(target: Target): Opened {
   return { path: target.path, sha256: projectId(target), format: "", architecture: target.arch };
 }
 
-async function entryName(target: Target, opened: { current: Opened | null }): Promise<string | null> {
+async function entryName(
+  target: Target,
+  opened: { current: Opened | null },
+): Promise<string | null> {
   if (target.arch === DALVIK) return null;
-  if (activeBackend() === "rizin") return rizinEntry(await rizinFunctions(target.path))?.name ?? null;
+  if (activeBackend() === "rizin")
+    return rizinEntry(await rizinFunctions(target.path))?.name ?? null;
   opened.current ??= openedFor(target);
   return entryProcedure(await loadProcedures(target.path, opened.current.sha256))?.name ?? null;
 }
@@ -132,7 +156,11 @@ async function jadxCode(target: Target, procedure: string): Promise<string> {
   return app.code(fn.addr, "pseudo");
 }
 
-async function loadCode(target: Target, opened: { current: Opened | null }, procedure: string): Promise<string> {
+async function loadCode(
+  target: Target,
+  opened: { current: Opened | null },
+  procedure: string,
+): Promise<string> {
   if (target.arch === DALVIK) return jadxCode(target, procedure);
   if (activeBackend() === "rizin") return rizinCode(target.path, procedure);
   opened.current ??= openedFor(target);
@@ -153,9 +181,16 @@ export function copyText(text: string): void {
 }
 
 /** One conversation with one agent about one target, plus the code canvas it drives. Only a `live` thread runs an agent. */
-export function useThread(agent: AgentEntry, native: NativeCommand | null, target: Target | null, onTarget: (target: Target) => void, live = true): Thread {
+export function useThread(
+  agent: AgentEntry,
+  native: NativeCommand | null,
+  target: Target | null,
+  onTarget: (target: Target) => void,
+  live = true,
+): Thread {
   const [state, dispatch] = useReducer(threadReducer, EMPTY_THREAD);
   const [id, setId] = useState<string>(() => randomUUID());
+  const project = useMemo(() => projectOf(target), [target?.path]);
   const session = useRef<AgentSession | null>(null);
   const opened = useRef<Opened | null>(null);
   const requested = useRef(new Set<string>());
@@ -164,36 +199,51 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
   const tools = useRef(new Map<string, string>());
   const latest = useRef({ target, onTarget });
   latest.current = { target, onTarget };
+  const events = useEventBuffer(dispatch);
 
   const adopt = (path: string): void => {
     const current = latest.current.target;
-    if (adopted.current?.from === path || current?.path === path || current?.original === path) return;
+    if (adopted.current?.from === path || current?.path === path || current?.original === path)
+      return;
     try {
       const next = prepareTarget(path);
       adopted.current = { from: path, path: next.path };
       latest.current.onTarget(next);
     } catch (err) {
-      dispatch({ type: "note", text: `Eleven couldn't show ${path}: ${errorMessage(err)}`, tone: "info" });
+      dispatch({
+        type: "note",
+        text: `Eleven couldn't show ${path}: ${errorMessage(err)}`,
+        tone: "info",
+      });
     }
   };
 
   const onEvent = (event: AgentEvent): void => {
     moments.heard(event);
-    dispatch({ type: "event", event, at: Date.now() });
+    events.push(event);
     const path = openedPath(event, tools.current);
     if (path) adopt(path);
   };
 
   const ensureSession = (): AgentSession => {
     if (session.current) return session.current;
-    const cwd = target ? dirname(target.path) : process.env.HOME ?? "/";
-    session.current = new AgentSession(agent, native, cwd, onEvent, id, projectOf(target), target?.path ?? null);
+    const cwd = target ? dirname(target.path) : (process.env.HOME ?? "/");
+    session.current = new AgentSession(
+      agent,
+      native,
+      cwd,
+      onEvent,
+      id,
+      projectOf(target),
+      target?.path ?? null,
+    );
     session.current.restore(savedPicks(agent.id));
     dispatch({ type: "starting" });
     return session.current;
   };
 
   const stopSession = (): void => {
+    events.flush();
     session.current?.stop();
     session.current = null;
     prompted.current = false;
@@ -220,11 +270,19 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
     if (live && (target === null || currentSettings().startAgentWithProject)) ensureSession();
   }, [agent.id, native?.path, target?.path]);
 
-  useEffect(() => {
-    const first = state.messages.find((message) => message.kind === "user");
-    if (!live || first?.kind !== "user") return;
-    saveThread({ id, title: shownText(first.text).split("\n")[0] ?? "", target: target?.original ?? null, project: target ? projectId(target) : null, messages: state.messages, updatedAt: Date.now() });
-  }, [id, state.messages.length, state.agent.kind, target?.original, live]);
+  useThreadPersistence({
+    id,
+    state,
+    live,
+    target: target?.original ?? null,
+    project,
+    onError: (error) =>
+      dispatch({
+        type: "note",
+        text: `Couldn't save this chat. ${errorMessage(error)}`,
+        tone: "error",
+      }),
+  });
 
   useEffect(() => {
     if (!target) return;
@@ -233,9 +291,17 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
       requested.current.add(tab.procedure);
       const fetchCode = async (): Promise<void> => {
         try {
-          dispatch({ type: "codeLoaded", procedure: tab.procedure, code: { kind: "ready", text: await loadCode(target, opened, tab.procedure) } });
+          dispatch({
+            type: "codeLoaded",
+            procedure: tab.procedure,
+            code: { kind: "ready", text: await loadCode(target, opened, tab.procedure) },
+          });
         } catch (err) {
-          dispatch({ type: "codeLoaded", procedure: tab.procedure, code: { kind: "failed", message: errorMessage(err) } });
+          dispatch({
+            type: "codeLoaded",
+            procedure: tab.procedure,
+            code: { kind: "failed", message: errorMessage(err) },
+          });
         }
       };
       void fetchCode();
@@ -247,13 +313,19 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
       const name = await entryName(opening, opened);
       if (name) dispatch({ type: "openTab", procedure: name });
     } catch (err) {
-      dispatch({ type: "note", text: `The code view couldn't open ${opening.name}: ${errorMessage(err)}`, tone: "info" });
+      dispatch({
+        type: "note",
+        text: `The code view couldn't open ${opening.name}: ${errorMessage(err)}`,
+        tone: "info",
+      });
     }
   };
 
   const deliver = (text: string): void => {
+    events.flush();
     const live = ensureSession();
-    if (target && (target.kind === "binary" || target.kind === "app") && !prompted.current) void openEntry(target);
+    if (target && (target.kind === "binary" || target.kind === "app") && !prompted.current)
+      void openEntry(target);
     const prompt = prompted.current ? text : firstPrompt(target, state.messages, text);
     prompted.current = true;
     dispatch({ type: "sent", text, at: Date.now() });
@@ -275,11 +347,18 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
   };
 
   const answer = (index: number, permissionId: number, choice: PermissionChoice | null): void => {
+    events.flush();
     session.current?.answer(permissionId, choice?.id ?? null);
     dispatch({ type: "answered", index, label: choice?.label ?? "Not allowed" });
     moments.answered(permissionId);
   };
-  const moments = useChatMoments(state, { id, live, project: target?.name ?? null, agent: agentName(state.agent) ?? agent.name, answer });
+  const moments = useChatMoments(state, {
+    id,
+    live,
+    project: target?.name ?? null,
+    agent: agentName(state.agent) ?? agent.name,
+    answer,
+  });
 
   const lastUserText = (): string | null => {
     const users = state.messages.filter((m) => m.kind === "user");
@@ -303,12 +382,12 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
       rememberPick(agent.id, option.id, value);
       void ensureSession().setOption(option, value);
     },
-    reset: () => {
+    reset: ({ startAgent = true } = {}) => {
       stopSession();
       requested.current.clear();
       setId(randomUUID());
       dispatch({ type: "reset" });
-      ensureSession();
+      if (startAgent) ensureSession();
     },
     restore: (saved) => {
       stopSession();

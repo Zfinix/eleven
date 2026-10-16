@@ -1,8 +1,26 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { dirname, join, relative } from "node:path";
 
-import { deleteThread, listThreads, loadThread, renameThread, saveThread, type SavedThread } from "../chat/history";
+import {
+  deleteThread,
+  listThreads,
+  loadThread,
+  renameThread,
+  saveThread,
+  type SavedThread,
+} from "../chat/history";
+import { prepareDocumentAsync } from "../chat/historyAsync";
 import { isRecord } from "../lib/guards";
 import { supportPath } from "../lib/support";
 import { pathSetting } from "../settings/store";
@@ -17,6 +35,16 @@ function cacheRoot(): string {
 }
 const DOCUMENTS = supportPath("documents.json");
 const EXTENSION = ".eleven";
+const revisions = new Map<string, number>();
+type PendingDocument = {
+  readonly target: Target;
+  readonly id: string;
+  readonly path: string;
+  readonly remember: boolean;
+  readonly revision: number;
+};
+type DocumentQueue = { pending: PendingDocument | null; readonly finished: Promise<void> };
+const saves = new Map<string, DocumentQueue>();
 
 /** Binaries rarely change and level 19 is slow, so each one is compressed once per run. */
 const packedBinaries = new Map<string, { readonly raw: Uint8Array; readonly packed: Uint8Array }>();
@@ -29,7 +57,11 @@ function documents(): Record<string, string> {
   try {
     const parsed: unknown = JSON.parse(readFileSync(DOCUMENTS, "utf8"));
     if (!isRecord(parsed)) return {};
-    return Object.fromEntries(Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        (entry): entry is [string, string] => typeof entry[1] === "string",
+      ),
+    );
   } catch {
     return {};
   }
@@ -54,7 +86,8 @@ function cacheFiles(id: string): Record<string, string> {
       const path = join(dir, name);
       const stat = statSync(path);
       if (stat.isDirectory()) walk(path);
-      else if (/\.(c|s|json|txt)$/.test(name)) out[relative(root, path)] = readFileSync(path, "utf8");
+      else if (/\.(c|s|json|txt)$/.test(name))
+        out[relative(root, path)] = readFileSync(path, "utf8");
     }
   };
   if (existsSync(root)) walk(root);
@@ -68,6 +101,7 @@ async function squeeze(name: string, raw: Uint8Array, level: number): Promise<Pa
 async function binaryPart(path: string, id: string): Promise<Part> {
   const known = packedBinaries.get(id);
   if (known) return { name: "binary", raw: known.raw, packed: known.packed };
+  packedBinaries.clear();
   const part = await squeeze("binary", new Uint8Array(readFileSync(path)), 19);
   if ("packed" in part) packedBinaries.set(id, { raw: part.raw, packed: part.packed });
   return part;
@@ -80,25 +114,84 @@ export function projectsFolder(): string {
 
 const text = (value: string): Uint8Array => new TextEncoder().encode(value);
 
-/** Packs the binary, your work, this project's chats and the decompiled code into one `.eleven` file. Compresses off the main thread. */
-export async function saveDocument(target: Target, id: string, path: string, remember = true): Promise<void> {
-  const chats = listThreads().filter((summary) => summary.project === id).flatMap((summary) => loadThread(summary.id) ?? []);
+/** Runs in the storage worker; parsing, encoding, hashing and compression all stay off the UI thread. */
+export async function buildDocument(
+  target: Target,
+  id: string,
+  path: string,
+  threadIds: readonly string[],
+): Promise<void> {
+  const chats = threadIds.flatMap((threadId) => loadThread(threadId) ?? []);
   const parts: readonly Part[] = await Promise.all([
     squeeze("project.json", text(projectJson(id)), 3),
     squeeze("chats.json", text(JSON.stringify(chats)), 3),
     squeeze("cache.json", text(JSON.stringify(cacheFiles(id))), 19),
     binaryPart(target.path, id),
   ]);
-  const info: Omit<Manifest, "format" | "entries"> = { name: target.name, kind: target.kind, arch: target.arch, meta: target.meta, binary: id, savedAt: Date.now(), app: appVersion() };
+  const info: Omit<Manifest, "format" | "entries"> = {
+    name: target.name,
+    kind: target.kind,
+    arch: target.arch,
+    meta: target.meta,
+    binary: id,
+    savedAt: Date.now(),
+    app: appVersion(),
+  };
   mkdirSync(dirname(path), { recursive: true });
   writeAtomic(path, pack(info, parts));
+}
+
+async function persistDocument(snapshot: PendingDocument): Promise<void> {
+  const { target, id, path, remember, revision } = snapshot;
+  if (revision !== (revisions.get(id) ?? 0)) return;
+  const temporary = `${path}.${randomUUID()}.saving`;
+  await prepareDocumentAsync(target, id, temporary);
+  if (revision !== (revisions.get(id) ?? 0)) {
+    rmSync(temporary);
+    return;
+  }
+  renameSync(temporary, path);
   if (remember) setDocumentPath(id, path);
+}
+
+async function drainDocuments(key: string, first: PendingDocument): Promise<void> {
+  let snapshot: PendingDocument | null = first;
+  try {
+    while (snapshot) {
+      await persistDocument(snapshot);
+      const queue = saves.get(key);
+      snapshot = queue?.pending ?? null;
+      if (queue) queue.pending = null;
+    }
+  } finally {
+    saves.delete(key);
+  }
+}
+
+/** Autosaves share one active write and retain only the newest pending request. */
+export async function saveDocument(
+  target: Target,
+  id: string,
+  path: string,
+  remember = true,
+): Promise<void> {
+  const snapshot = { target, id, path, remember, revision: revisions.get(id) ?? 0 };
+  const key = `${id}:${path}`;
+  const active = saves.get(key);
+  if (active) {
+    active.pending = snapshot;
+    return await active.finished;
+  }
+  const finished = drainDocuments(key, snapshot);
+  saves.set(key, { pending: null, finished });
+  await finished;
 }
 
 /** Deletes the project's `.eleven` file and every chat in it. */
 export function deleteDocument(id: string): void {
   const path = documentPath(id);
   if (path) rmSync(path, { force: true });
+  revisions.set(id, (revisions.get(id) ?? 0) + 1);
   const { [id]: _gone, ...rest } = documents();
   mkdirSync(dirname(DOCUMENTS), { recursive: true });
   writeFileSync(DOCUMENTS, `${JSON.stringify(rest, null, 2)}\n`);
@@ -114,13 +207,20 @@ export function renameDocument(id: string, name: string): string | null {
   if (to !== from) {
     if (existsSync(to)) throw new Error("A project with that name is already in that folder.");
     renameSync(from, to);
+    revisions.set(id, (revisions.get(id) ?? 0) + 1);
     setDocumentPath(id, to);
   }
   return to;
 }
 
 function isThread(value: unknown): value is SavedThread {
-  return isRecord(value) && typeof value.id === "string" && typeof value.title === "string" && Array.isArray(value.messages) && typeof value.updatedAt === "number";
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.title === "string" &&
+    Array.isArray(value.messages) &&
+    typeof value.updatedAt === "number"
+  );
 }
 
 function json(data: Uint8Array | null): unknown {
@@ -128,11 +228,15 @@ function json(data: Uint8Array | null): unknown {
 }
 
 /** Unpacks a `.eleven` file: the binary into the cache, then your work, chats and decompiled code. */
-export function openDocument(path: string): { readonly manifest: Manifest; readonly binary: string } {
+export function openDocument(path: string): {
+  readonly manifest: Manifest;
+  readonly binary: string;
+} {
   const file = openElevenFile(path);
   try {
     const { manifest } = file;
     const id = manifest.binary;
+    revisions.set(id, (revisions.get(id) ?? 0) + 1);
     const binary = join(cacheRoot(), id, "document", manifest.name.replace(/[/\\]/g, "_"));
     if (!existsSync(binary) || sha256(new Uint8Array(readFileSync(binary))) !== id) {
       const data = file.entry("binary");
@@ -144,7 +248,8 @@ export function openDocument(path: string): { readonly manifest: Manifest; reado
     if (isRecord(cache)) {
       for (const [name, body] of Object.entries(cache)) {
         const out = join(cacheRoot(), id, name);
-        if (typeof body !== "string" || !out.startsWith(join(cacheRoot(), id)) || existsSync(out)) continue;
+        if (typeof body !== "string" || !out.startsWith(join(cacheRoot(), id)) || existsSync(out))
+          continue;
         mkdirSync(dirname(out), { recursive: true });
         writeFileSync(out, body);
       }

@@ -210,7 +210,7 @@ function ClearChats({ count, visible, onClear }: { readonly count: number; reado
 /** New chat and Open, your projects, the open project's chats, and the Eleven menu. */
 const RECENT_CHATS = 12;
 
-export function Sidebar({ projects, project, chats, threads, current, running, activity, onNewThread, onOpen, onOpenProject, onSeeAll, onOpenThread, onClearChats, menu, threadMenu }: {
+export function Sidebar({ projects, project, chats, threads, current, running, activity, onNewThread, onOpen, onOpenProject, onSeeAll, onOpenThread, onClearChats, onError = (message): void => console.error(message), menu, threadMenu }: {
   readonly projects: readonly ProjectEntry[];
   readonly project: string | null;
   readonly chats: readonly ThreadSummary[];
@@ -225,6 +225,7 @@ export function Sidebar({ projects, project, chats, threads, current, running, a
   readonly onSeeAll: () => void;
   readonly onOpenThread: (id: string) => void;
   readonly onClearChats: (ids: readonly string[]) => void;
+  readonly onError?: (message: string) => void;
   readonly menu: AppMenuActions;
   readonly threadMenu: (thread: ThreadSummary, rename: () => void) => readonly MenuEntry[];
 }): ReactElement {
@@ -258,7 +259,7 @@ export function Sidebar({ projects, project, chats, threads, current, running, a
           </SectionLabel>
           {shown.length === 0 && <div style={{ paddingTop: 4, paddingBottom: 4, paddingLeft: 8, paddingRight: 8, fontSize: 12.5, color: p.faint }}>No chats yet. Ask something to start one.</div>}
           {shown.map((thread) => (thread.id === renaming
-            ? <ThreadName key={thread.id} id={thread.id} title={thread.title} height={32} onDone={() => setRenaming(null)} />
+            ? <ThreadName key={thread.id} id={thread.id} title={thread.title} height={32} onDone={() => setRenaming(null)} onError={onError} />
             : <ChatRow key={thread.id} title={thread.title} when={short(thread.updatedAt, now)} busy={running.has(thread.id)} on={thread.id === current} onClick={() => onOpenThread(thread.id)} menu={() => threadMenu(thread, () => setRenaming(thread.id))} />
           ))}
         </div>

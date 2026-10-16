@@ -43,26 +43,36 @@ const DOING: Readonly<Record<string, string>> = {
 };
 
 export type ToolLabel = { readonly label: string; readonly detail: string | null };
+const LABEL_CHARS = 240;
+
+function firstLine(text: string): string {
+  return text.slice(0, LABEL_CHARS).trim().split("\n", 1)[0] ?? "";
+}
 
 /** Tool ids read as words; anything else, like a whole shell command an agent sent as the title, stays as written. */
 function humanize(name: string): string {
-  if (!/^[\w.-]+$/.test(name)) return name.trim().split("\n")[0] ?? name;
+  name = firstLine(name);
+  if (!/^[\w.-]+$/.test(name)) return name;
   const label = name.replace(/^mcp__[^_]+__/, "").replace(/_/g, " ");
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function shortPath(value: string): string {
-  return value.includes("/") ? (value.split("/").pop() ?? value) : value;
+  const tail = value.slice(-LABEL_CHARS);
+  return tail.includes("/") ? (tail.split("/").pop() ?? tail) : tail;
 }
 
 /** Splits a raw tool call into the bold label and the grey detail people read. */
 export function toolLabel(tool: string, input: unknown): ToolLabel {
   const command = stringField(input, "command");
   if (command !== undefined) {
-    const description = stringField(input, "description")?.trim();
-    return description ? { label: description, detail: null } : { label: "Run a command", detail: command.trim().split("\n")[0] ?? null };
+    const description = firstLine(stringField(input, "description") ?? "");
+    return description
+      ? { label: description, detail: null }
+      : { label: "Run a command", detail: firstLine(command) || null };
   }
-  const name = reaToolName(tool) ?? tool;
+  const title = tool.slice(0, LABEL_CHARS);
+  const name = reaToolName(title) ?? title;
   const known = LABELS[name];
   if (!known) return { label: humanize(name), detail: null };
   const [label, key] = known;
@@ -78,6 +88,7 @@ export function describe(tool: string, input: unknown): string {
 /** What a running tool is doing right now, like "Reading assembly · FUN_100002404". */
 export function doing(tool: string, input: unknown): string {
   const { label, detail } = toolLabel(tool, input);
-  const now = DOING[reaToolName(tool) ?? tool] ?? label;
+  const title = tool.slice(0, LABEL_CHARS);
+  const now = DOING[reaToolName(title) ?? title] ?? label;
   return detail ? `${now} · ${detail}` : now;
 }
