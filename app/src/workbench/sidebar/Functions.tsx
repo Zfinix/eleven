@@ -23,6 +23,7 @@ const SHOWS: readonly { readonly id: FnShow; readonly label: string; readonly ch
 
 const SORTS: readonly { readonly id: FnSort; readonly label: string }[] = [
   { id: "files", label: "Group by package or file" },
+  { id: "modules", label: "Group by module" },
   { id: "address", label: "Sort by address" },
   { id: "name", label: "Sort by name" },
 ];
@@ -64,7 +65,15 @@ export function FunctionsHead({ view, first }: { readonly view: FnView; readonly
       {open && (
         <div style={{ display: "flex", alignItems: "center", gap: 7, height: 28, marginTop: 2, marginBottom: 6, paddingLeft: 9, paddingRight: 4, borderRadius: 7, backgroundColor: p.fill }}>
           <Icon name="search" size={12} color={p.muted} />
-          <input {...TYPING} value={wb.s.filter} placeholder="Filter" aria-label="Filter functions" onChange={(e) => wb.patch({ filter: e.value ?? "" })} onSubmit={submit} style={{ flexGrow: 1, minWidth: 0, fontSize: 12.5, color: p.text }} />
+          <input
+            {...TYPING}
+            value={wb.s.filter}
+            placeholder={view.sort === "modules" ? "Filter functions or modules" : "Filter"}
+            aria-label="Filter functions"
+            onChange={(e) => wb.patch({ filter: e.value ?? "" })}
+            onSubmit={submit}
+            style={{ flexGrow: 1, minWidth: 0, fontSize: 12.5, color: p.text }}
+          />
           {chip && (
             <div onClick={() => view.setShow("all")} role="button" aria-label="Show all functions" style={{ display: "flex", alignItems: "center", gap: 4, height: 20, flexShrink: 0, paddingLeft: 6, paddingRight: 6, borderRadius: 5, backgroundColor: p.sel2, fontSize: 11.5, color: p.text3, cursor: "pointer", hover: HOVER }}>
               <div style={{ pointerEvents: "none" }}>{`${chip} ×`}</div>
@@ -75,6 +84,11 @@ export function FunctionsHead({ view, first }: { readonly view: FnView; readonly
           </div>
         </div>
       )}
+      {open && view.sort === "modules" && (
+        <div style={{ paddingLeft: 8, paddingRight: 8, paddingBottom: 4, fontSize: 11, color: p.faint }}>
+          {"Modules · ≈ inferred · Unmapped if unknown"}
+        </div>
+      )}
     </div>
   );
 }
@@ -82,11 +96,11 @@ export function FunctionsHead({ view, first }: { readonly view: FnView; readonly
 /** Under the results while filtering: how many matched, or that ↩ asks the agent. */
 export function MatchNote({ count }: { readonly count: number }): ReactElement {
   const { p } = useTheme();
-  const text = count === 0 ? "No functions match. Press ↩ to ask the agent." : `${count.toLocaleString()} ${count === 1 ? "match" : "matches"}, your code first. ↩ opens the first.`;
+  const text = count === 0 ? "No functions match. Press ↩ to ask the agent." : `${count.toLocaleString()} ${count === 1 ? "match" : "matches"}. ↩ opens the first.`;
   return <div style={{ paddingTop: 6, paddingBottom: 6, paddingLeft: 8, paddingRight: 8, fontSize: 11.5, color: p.faint }}>{text}</div>;
 }
 
-/** An origin heading inside Functions: Your code, Libraries, Imports or Runtime, with its count. */
+/** A module or origin heading inside Functions, with its function count. */
 function GroupRow({ row, onToggle }: { readonly row: Extract<FnRow, { kind: "node" }>; readonly onToggle: () => void }): ReactElement {
   const { p } = useTheme();
   return (
@@ -173,6 +187,14 @@ function FunctionRow({ row }: { readonly row: Extract<FnRow, { kind: "fn" }> }):
     <div {...bind} role="treeitem" aria-selected={on} aria-label={`function ${row.label}`} style={{ display: "flex", alignItems: "center", gap: 8, height: 24, flexShrink: 0, paddingLeft: treeIndent(row.depth - 1) + PAST_CHEVRON, paddingRight: 8, borderRadius: 6, cursor: "pointer", hover: HOVER, ...(on ? { backgroundColor: p.sel } : {}) }}>
       <Icon name={fn.kind === "function" ? "function" : "thunk"} size={12} color={p.link} />
       <div style={{ flexGrow: 1, minWidth: 0, fontSize: 12, color: on ? p.text : p.text3, pointerEvents: "none", ...MONO_STYLE, ...ELLIPSIS }}>{row.label}</div>
+      {row.module?.evidence === "layout" && (
+        <div
+          aria-label="Module inferred from surrounding symbols"
+          style={{ flexShrink: 0, fontSize: 12, color: p.faint, pointerEvents: "none" }}
+        >
+          ≈
+        </div>
+      )}
       {renamed && <div aria-label="Renamed by you" style={{ width: 6, height: 6, flexShrink: 0, borderRadius: 3, backgroundColor: p.link }} />}
     </div>
   );
