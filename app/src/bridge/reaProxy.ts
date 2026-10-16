@@ -4,7 +4,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, type CallToolResult, CallToolResultSchema, ListToolsRequestSchema, type ListToolsResult } from "@modelcontextprotocol/sdk/types.js";
 
-import { reaEnv, reaLaunch } from "../engine/rea";
+import { reaCallOptions, reaEnv, reaLaunch } from "../engine/rea";
 import { hidePaths } from "./privacy";
 
 /** REA tools that would write names, comments and bookmarks behind Eleven's back, and the `eleven` tool to use instead. */
@@ -17,8 +17,6 @@ export const ELEVEN_OWNED: ReadonlyMap<string, string> = new Map([
   ["unset_bookmark", "bookmark"],
   ["set_code_type", "set_code_type"],
 ]);
-
-const CALL_TIMEOUT_MS = 30 * 60_000;
 
 function refusal(tool: string, instead: string): CallToolResult {
   return { isError: true, content: [{ type: "text", text: `${tool} isn't available here. Eleven keeps names, comments and bookmarks in the user's project, where they can see and undo them. Use the eleven server's ${instead} tool instead.` }] };
@@ -48,8 +46,7 @@ export async function runReaProxy(): Promise<void> {
     const token = request.params._meta?.progressToken;
     const result = await rea.callTool(request.params, undefined, {
       signal: extra.signal,
-      timeout: CALL_TIMEOUT_MS,
-      resetTimeoutOnProgress: true,
+      ...reaCallOptions(),
       onprogress: (progress) => {
         if (token !== undefined) void extra.sendNotification({ method: "notifications/progress", params: { ...progress, progressToken: token } });
       },

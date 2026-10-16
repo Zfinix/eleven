@@ -137,12 +137,18 @@ function ghidraMemory(choice: Settings["ghidraMemory"]): string | null {
   switch (choice) {
     case "Automatic":
       return null;
+    case "2 GB":
+      return "2G";
     case "4 GB":
       return "4G";
     case "8 GB":
       return "8G";
     case "16 GB":
       return "16G";
+    case "32 GB":
+      return "32G";
+    case "64 GB":
+      return "64G";
     default: {
       const unhandled: never = choice;
       return unhandled;
