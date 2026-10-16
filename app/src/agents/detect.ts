@@ -109,14 +109,20 @@ function unpinnedPackage(pkg: string): string {
   return pkg.replace(/(.)@[^@/]+$/, "$1");
 }
 
+/** The agent's standalone install, when its installer put one in its usual place under home. */
+export function standaloneAcp(id: string, home: string = homedir()): NativeCommand | null {
+  const own = AGENT_ACP_CLI[id];
+  const path = own && OS !== "windows" ? join(home, ...own.home) : null;
+  return own && path && isExecutable(path) ? { path, args: own.args } : null;
+}
+
 function findAgentTool(name: string): string | null {
   return findOnPath(name, AGENT_BIN_DIRS);
 }
 
 async function detectOne(agent: AgentEntry, roots: readonly string[]): Promise<NativeCommand | null> {
-  const own = AGENT_ACP_CLI[agent.id];
-  const ownPath = own ? findAgentTool(own.command) : null;
-  if (own && ownPath) return { path: ownPath, args: own.args };
+  const own = standaloneAcp(agent.id);
+  if (own) return own;
   const dist = agent.distribution;
   switch (dist.kind) {
     case "binary": {
