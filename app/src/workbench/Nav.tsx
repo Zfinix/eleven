@@ -13,6 +13,7 @@ import { useBench } from "./parts";
 import { ResizeHandle } from "./Resize";
 import { Footer, type FooterMenu } from "./sidebar/Footer";
 import { FnRowView, FunctionsHead, type FnView, MatchNote } from "./sidebar/Functions";
+import { hasFunctionModules, indexFunctionModules } from "./sidebar/functionModules";
 import { FolderContext, type FolderState, loadFolds, saveFolds } from "./sidebar/memory";
 import { functionRows, type FnShow, type FnSort, sourcePaths } from "./sidebar/model";
 import { Faint, useSectionOpen } from "./sidebar/parts";
@@ -25,9 +26,14 @@ import { ProjectSwitcher } from "./sidebar/Top";
 const FN_KEY = "fn:";
 
 function useFnView(): FnView {
-  const [sort, setSort] = useState<FnSort>("files");
+  const { program } = useBench();
+  const initialSort = useMemo<FnSort>(
+    () => (hasFunctionModules(program.functions) ? "modules" : "files"),
+    [program.functions],
+  );
+  const [sort, setSort] = useState<FnSort | null>(null);
   const [show, setShow] = useState<FnShow>("all");
-  return { sort, show, setSort, setShow };
+  return { sort: sort ?? initialSort, show, setSort, setShow };
 }
 
 /** Mach-O files can hold Swift types to name files after; anything else can only have the paths in its strings. */
@@ -91,11 +97,28 @@ function NavList({ view, flipped, hasSources }: { readonly view: FnView; readonl
   const noCode = chat.target?.kind === "model" || gpu;
   const fnFlipped = useMemo(() => new Set([...flipped].filter((key) => key.startsWith(FN_KEY)).map((key) => key.slice(FN_KEY.length))), [flipped]);
   const query = wb.s.filter.trim();
-  const rows = useMemo(
-    () => (open && !noCode ? functionRows(program.functions, { nameOf, renamed: new Set(wb.s.names.keys()), query: wb.s.filter, show: view.show, sort: view.sort, flipped: fnFlipped, yoursOpen: hasSources === false, bareFiles: program.bareFiles ?? [] }) : []),
-    [open, noCode, program, wb.s.names, wb.s.filter, view.show, view.sort, fnFlipped, hasSources],
+  const modules = useMemo(
+    () => (view.sort === "modules" ? indexFunctionModules(program.functions) : undefined),
+    [view.sort, program.functions],
   );
-  const searching = open && !noCode && query.length > 0 && view.sort === "files";
+  const rows = useMemo(
+    () => {
+      if (!open || noCode) return [];
+      return functionRows(program.functions, {
+        nameOf,
+        renamed: new Set(wb.s.names.keys()),
+        query: wb.s.filter,
+        show: view.show,
+        sort: view.sort,
+        ...(modules ? { modules } : {}),
+        flipped: fnFlipped,
+        yoursOpen: hasSources === false,
+        bareFiles: program.bareFiles ?? [],
+      });
+    },
+    [open, noCode, program, wb.s.names, wb.s.filter, view.show, view.sort, modules, fnFlipped, hasSources],
+  );
+  const searching = open && !noCode && query.length > 0 && (view.sort === "files" || view.sort === "modules");
   const firstMatch = rows.find((row) => row.kind === "fn");
   const fixed = noCode
     ? gpu ? [<Chats key="threads" />, <Kernels key="kernels" />] : [<Chats key="threads" />, <InThisModel key="model" />, <Blocks key="blocks" />]
