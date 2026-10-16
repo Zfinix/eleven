@@ -232,6 +232,12 @@ export function Composer({ place, target, agents, thread, onAttach, onDetach, on
     setPaletteOpen(false);
   };
   const pickMention = (item: Mention): void => {
+    if (draft.trimStart().startsWith("/")) {
+      setMentioning(false);
+      refocus();
+      return;
+    }
+
     setDraft(`${draft}@${item.label} `);
     setPicked([...picked, item]);
     setMentioning(false);

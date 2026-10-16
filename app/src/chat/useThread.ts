@@ -278,7 +278,12 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
   }, [state.queue, state.agent.kind]);
 
   const controlGoal = async (action: GoalControl): Promise<void> => {
-    const current = ensureSession();
+    const current = session.current;
+    if (!current) {
+      dispatch({ type: "note", text: "No goal is active.", tone: "info" });
+      return;
+    }
+
     try {
       await current.controlGoal(action);
       if (session.current !== current) return;

@@ -1,3 +1,4 @@
+import { Button } from "@gpuix/react/button";
 import { type ReactElement, useState } from "react";
 
 import type { Goal, GoalStatus } from "../agents/events";
@@ -63,11 +64,11 @@ export function GoalBar({ goal }: { readonly goal: Goal }): ReactElement {
         backgroundColor: p.win,
       }}
     >
-      <div
+      <Button
         role="button"
         aria-expanded={expanded}
         aria-label={`${STATUS[goal.status]}: ${goal.objective}`}
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => setExpanded((current) => !current)}
         style={{
           display: "flex",
           alignItems: "center",
@@ -105,7 +106,7 @@ export function GoalBar({ goal }: { readonly goal: Goal }): ReactElement {
         </div>
         <GoalDuration goal={goal} />
         <Icon name={expanded ? "chevron-up" : "disclosure"} size={11} color={p.faint} />
-      </div>
+      </Button>
       {expanded && (
         <div
           style={{
