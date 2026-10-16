@@ -143,6 +143,10 @@ function ghidraMemory(choice: Settings["ghidraMemory"]): string | null {
       return "8G";
     case "16 GB":
       return "16G";
+    case "32 GB":
+      return "32G";
+    case "64 GB":
+      return "64G";
     default: {
       const unhandled: never = choice;
       return unhandled;
