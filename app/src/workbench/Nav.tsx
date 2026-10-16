@@ -97,7 +97,10 @@ function NavList({ view, flipped, hasSources }: { readonly view: FnView; readonl
   const noCode = chat.target?.kind === "model" || gpu;
   const fnFlipped = useMemo(() => new Set([...flipped].filter((key) => key.startsWith(FN_KEY)).map((key) => key.slice(FN_KEY.length))), [flipped]);
   const query = wb.s.filter.trim();
-  const modules = useMemo(() => indexFunctionModules(program.functions), [program.functions]);
+  const modules = useMemo(
+    () => (view.sort === "modules" ? indexFunctionModules(program.functions) : undefined),
+    [view.sort, program.functions],
+  );
   const rows = useMemo(
     () => {
       if (!open || noCode) return [];
@@ -107,7 +110,7 @@ function NavList({ view, flipped, hasSources }: { readonly view: FnView; readonl
         query: wb.s.filter,
         show: view.show,
         sort: view.sort,
-        modules,
+        ...(modules ? { modules } : {}),
         flipped: fnFlipped,
         yoursOpen: hasSources === false,
         bareFiles: program.bareFiles ?? [],
