@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 
 import { QueuePanel, runningTool, Working } from "../chat/Conversation";
-import { MessageView } from "../chat/MessageView";
+import { MessageRow, useRowActions } from "../chat/MessageRow";
 import { useBench } from "./parts";
 import { Suggestions } from "./Suggestions";
 
@@ -16,20 +16,12 @@ export function LiveThread({ chatId }: { readonly chatId: string | null }): Reac
     const addr = addrOf(procedure);
     if (addr) openFn(addr, false);
   };
+  const actions = useRowActions({ onAnswer: thread.answer, onRetry: thread.retry, onOpen: open });
   return (
     <virtual-list followTail alignment="top" estimatedItemHeight={80} style={{ flexGrow: 1, minHeight: 0 }}>
       {messages.map((message, ix) => (
         <div key={ix} style={{ display: "flex", flexDirection: "column", paddingTop: ix === 0 ? 8 : 0, paddingBottom: 16, ...PAD }}>
-          <MessageView
-            message={message}
-            agentName={agents.selected.name}
-            last={ix === messages.length - 1}
-            actions={{
-              onAnswer: (choice) => message.kind === "permission" && thread.answer(ix, message.id, choice),
-              onRetry: thread.retry,
-              onOpen: open,
-            }}
-          />
+          <MessageRow message={message} index={ix} agentName={agents.selected.name} last={ix === messages.length - 1} actions={actions} />
         </div>
       ))}
       <div key="suggestions" style={{ display: "flex", flexDirection: "column", ...PAD }}>

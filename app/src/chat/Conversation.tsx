@@ -6,7 +6,7 @@ import { Tooltip } from "../components/kit";
 import { seconds, useNow } from "../lib/useNow";
 import { useTheme } from "../theme";
 import { Icon, Row, Spacer } from "../components/ui";
-import { MessageView } from "./MessageView";
+import { MessageRow, useRowActions } from "./MessageRow";
 import type { Message, ThreadState } from "./thread";
 import type { Thread } from "./useThread";
 
@@ -145,18 +145,14 @@ export function Conversation({ thread, title, agentName, composer, onWorkbench }
 }): ReactElement {
   const { state } = thread;
   const shownAgent = state.agent.kind === "working" || state.agent.kind === "ready" ? state.agent.name || agentName : agentName;
-  const actionsFor = (message: Message, ix: number) => ({
-    onAnswer: (choice: Parameters<Thread["answer"]>[2]) => message.kind === "permission" && thread.answer(ix, message.id, choice),
-    onRetry: thread.retry,
-    onOpen: thread.openFunction,
-  });
+  const actions = useRowActions({ onAnswer: thread.answer, onRetry: thread.retry, onOpen: thread.openFunction });
   return (
     <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, flexBasis: 440, minWidth: 0 }}>
       <Header state={state} title={title} agentName={shownAgent} onWorkbench={onWorkbench} />
       <virtual-list followTail alignment="top" estimatedItemHeight={80} style={{ flexGrow: 1, minHeight: 0 }}>
         {state.messages.map((message, ix) => (
           <Centered key={ix} top={ix === 0 ? 22 : 0}>
-            <MessageView message={message} agentName={shownAgent} last={ix === state.messages.length - 1} actions={actionsFor(message, ix)} />
+            <MessageRow message={message} index={ix} agentName={shownAgent} last={ix === state.messages.length - 1} actions={actions} />
           </Centered>
         ))}
         {state.agent.kind === "working" && (
