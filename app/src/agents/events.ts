@@ -23,6 +23,16 @@ export type SessionOption = {
 
 export type Usage = { readonly used: number; readonly size: number; readonly cost: string | null };
 
+export type GoalStatus = "active" | "paused" | "blocked" | "complete" | "limited";
+
+export type Goal = {
+  readonly objective: string;
+  readonly status: GoalStatus;
+  readonly timeUsedSeconds: number;
+  readonly createdAt: number;
+  readonly updatedAt: number;
+};
+
 export type AgentEvent =
   | { readonly kind: "connected"; readonly agent: string }
   | { readonly kind: "text"; readonly text: string }
@@ -40,6 +50,7 @@ export type AgentEvent =
   | { readonly kind: "commands"; readonly commands: readonly SlashCommand[] }
   | { readonly kind: "options"; readonly options: readonly SessionOption[] }
   | { readonly kind: "usage"; readonly usage: Usage }
+  | { readonly kind: "goal"; readonly goal: Goal | null }
   | { readonly kind: "notice"; readonly text: string }
   | { readonly kind: "turnEnded"; readonly cancelled: boolean }
   | { readonly kind: "failed"; readonly reason: string };

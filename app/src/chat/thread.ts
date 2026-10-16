@@ -1,4 +1,4 @@
-import type { AgentEvent, PermissionChoice, PlanItem, SessionOption, SlashCommand, StepStatus, Usage } from "../agents/events";
+import type { AgentEvent, Goal, PermissionChoice, PlanItem, SessionOption, SlashCommand, StepStatus, Usage } from "../agents/events";
 import { stringField } from "../lib/guards";
 
 export type Step = {
@@ -57,6 +57,7 @@ export type ThreadState = {
   readonly commands: readonly SlashCommand[];
   readonly options: readonly SessionOption[];
   readonly usage: Usage | null;
+  readonly goal: Goal | null;
   readonly queue: readonly string[];
   /** Bumps on every open, so screens follow the agent even back to a tab that is already open. */
   readonly opened: number;
@@ -92,6 +93,7 @@ export const EMPTY_THREAD: ThreadState = {
   commands: [],
   options: [],
   usage: null,
+  goal: null,
   queue: [],
   opened: 0,
 };
@@ -188,13 +190,15 @@ function onEvent(state: ThreadState, event: AgentEvent, at: number): ThreadState
       return { ...state, options: event.options };
     case "usage":
       return { ...state, usage: event.usage };
+    case "goal":
+      return state.goal === event.goal ? state : { ...state, goal: event.goal };
     case "notice":
       return { ...state, messages: [...state.messages, { kind: "note", text: event.text, tone: "info" }] };
     case "turnEnded":
       return finishTurn(state, event.cancelled ? "cancelled" : "done", at);
     case "failed": {
       const ended = finishTurn(state, "failed", at);
-      return { ...ended, agent: { kind: "idle" }, messages: [...ended.messages, { kind: "note", text: event.reason, tone: "error" }] };
+      return { ...ended, agent: { kind: "idle" }, goal: null, messages: [...ended.messages, { kind: "note", text: event.reason, tone: "error" }] };
     }
     default: {
       const unhandled: never = event;
@@ -238,7 +242,7 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
     case "retarget":
       return { ...state, tabs: [], active: 0, canvasOpen: true };
     case "switchAgent":
-      return { ...state, agent: { kind: "idle" }, options: [], commands: [], usage: null };
+      return { ...state, agent: { kind: "idle" }, options: [], commands: [], usage: null, goal: null };
     case "codeLoaded":
       return { ...state, tabs: state.tabs.map((tab) => (tab.procedure === action.procedure ? { ...tab, code: action.code } : tab)) };
     case "openTab":

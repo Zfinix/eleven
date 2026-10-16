@@ -11,6 +11,7 @@ import { currentSettings, loadSettings, pathSetting } from "../settings/store";
 import { reaEnv } from "../engine/rea";
 import type { NativeCommand } from "./detect";
 import type { AgentEvent, PermissionChoice, SessionOption } from "./events";
+import { CODEX_CLIENT_META, codexSessionMeta, type GoalControl } from "./codex";
 import { type Launch, resolveLaunch } from "./launch";
 import { chimeForAnswer } from "./notify";
 import { isRemembered, rememberAnswer } from "./remembered";
@@ -174,6 +175,7 @@ export class AgentSession {
     private readonly file: string | null = null,
     /** Off for a quick answer that already has its context, so no tool servers have to start first. */
     private readonly tools: boolean = true,
+    private readonly instructions: string | null = null,
   ) {
     this.ready = this.start();
     this.ready.catch(async (err: unknown) => {
@@ -201,8 +203,20 @@ export class AgentSession {
 
   private async start(): Promise<void> {
     this.connection = this.connect(await resolveLaunch(this.agent, this.native));
-    const init = await this.connection.initialize({ protocolVersion: acp.PROTOCOL_VERSION, clientCapabilities: { session: { notices: {} } } });
-    const session = await this.connection.newSession({ cwd: this.cwd, mcpServers: this.tools ? toolServers(shortName(this.agent.name), this.chat) : [] });
+    const init = await this.connection.initialize({
+      protocolVersion: acp.PROTOCOL_VERSION,
+      clientCapabilities: {
+        session: { notices: {} },
+        ...(this.agent.id === "codex-acp" ? { _meta: CODEX_CLIENT_META } : {}),
+      },
+    });
+    const session = await this.connection.newSession({
+      cwd: this.cwd,
+      mcpServers: this.tools ? toolServers(shortName(this.agent.name), this.chat) : [],
+      ...(this.agent.id === "codex-acp" && this.instructions !== null
+        ? { _meta: codexSessionMeta(this.instructions) }
+        : {}),
+    });
     this.sessionId = session.sessionId;
     this.emit({ kind: "connected", agent: shortName(init.agentInfo?.title ?? init.agentInfo?.name ?? this.agent.name) });
     this.publish(mergeOptions(configOptions(session.configOptions), legacyModes(session.modes)));
@@ -215,6 +229,7 @@ export class AgentSession {
     });
     child.on("error", (err) => this.fail(`Couldn't start ${this.agent.name}: ${err.message}`));
     child.on("exit", (code) => {
+      this.emit({ kind: "goal", goal: null });
       if (code) this.fail(`${this.agent.name} stopped. ${this.lastError()}`);
     });
     this.child = child;
@@ -290,6 +305,12 @@ export class AgentSession {
     await connection.cancel({ sessionId });
   }
 
+  async controlGoal(action: GoalControl): Promise<void> {
+    const { connection, sessionId } = await this.session();
+    if (this.stopped) return;
+    await connection.request("_session/goal", { sessionId, action });
+  }
+
   async setOption(option: SessionOption, value: string): Promise<void> {
     const { connection, sessionId } = await this.session();
     if (option.legacyMode) {
@@ -307,6 +328,7 @@ export class AgentSession {
   }
 
   stop(): void {
+    this.emit({ kind: "goal", goal: null });
     this.stopped = true;
     if (this.child) stop(this.child);
   }
