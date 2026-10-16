@@ -5,10 +5,11 @@ import { doing } from "../agents/describe";
 import type { AgentEvent, SessionOption } from "../agents/events";
 import { isReadOnly } from "../agents/permissions";
 import { AgentSession } from "../agents/session";
+import { currentSettings } from "../settings/store";
 import type { QuietAsk, RewriteProgress } from "./rewrite";
 
 /** A started agent with no tool servers, waiting for its one question; dropped after this long unused. Model and fast mode are set when the question comes. */
-const IDLE_MS = 10 * 60_000;
+const IDLE_MS = 2 * 60_000;
 
 type Spare = {
   readonly session: AgentSession;
@@ -91,7 +92,7 @@ function spawn(req: QuickAsk, key: string): Spare {
 
 /** Starts an agent ahead of time, so the next question skips launching it. Tests turn this off. */
 export function warmAsk(req: QuickAsk): void {
-  if (process.env.ELEVEN_NO_PREWARM) return;
+  if (process.env.ELEVEN_NO_PREWARM || !currentSettings().keepAgentsRunning) return;
   const key = keyOf(req);
   if (spares.get(key)?.route.dead === false) return;
   spares.set(key, spawn(req, key));
