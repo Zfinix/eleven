@@ -4,7 +4,7 @@ import { basename, delimiter, join } from "node:path";
 
 import { isRecord, stringField } from "../lib/guards";
 import { OS } from "../lib/platform";
-import { AGENT_CLI } from "./clis";
+import { AGENT_ACP_CLI, AGENT_CLI } from "./clis";
 import type { AgentEntry } from "./registry";
 import { run } from "../lib/process";
 
@@ -46,9 +46,12 @@ function isExecutable(path: string): boolean {
   }
 }
 
+/** Where agent installers put their tools, for when Eleven starts without the login shell's PATH. */
+const AGENT_BIN_DIRS = OS === "windows" ? [] : [join(homedir(), ".grok", "bin"), join(homedir(), ".local", "bin"), join(homedir(), ".bun", "bin"), join(homedir(), ".cargo", "bin"), "/opt/homebrew/bin", "/usr/local/bin"];
+
 /** Looks a command up on PATH directly, so shell functions and aliases never match. */
-export function findOnPath(name: string): string | null {
-  const dirs = (process.env.PATH ?? "").split(delimiter).filter(Boolean);
+export function findOnPath(name: string, extra: readonly string[] = []): string | null {
+  const dirs = [...new Set([...(process.env.PATH ?? "").split(delimiter).filter(Boolean), ...extra])];
   const names = OS === "windows" && !/\.[a-z]+$/i.test(name) ? (process.env.PATHEXT ?? ".EXE;.CMD;.BAT").split(";").filter(Boolean).map((ext) => `${name}${ext.toLowerCase()}`) : [name];
   return dirs.flatMap((dir) => names.map((file) => join(dir, file))).find(OS === "windows" ? existsSync : isExecutable) ?? null;
 }
@@ -74,7 +77,7 @@ function globalPackageBin(pkg: string, roots: readonly string[]): string | null 
   for (const root of roots) {
     try {
       const manifest: unknown = JSON.parse(readFileSync(join(root, pkg, "package.json"), "utf8"));
-      const found = binNames(manifest, pkg).map(findOnPath).find((path) => path !== null);
+      const found = binNames(manifest, pkg).map((name) => findOnPath(name)).find((path) => path !== null);
       if (found) return found;
     } catch {
       continue;
@@ -106,11 +109,24 @@ function unpinnedPackage(pkg: string): string {
   return pkg.replace(/(.)@[^@/]+$/, "$1");
 }
 
+/** The agent's standalone install, when its installer put one in its usual place under home. */
+export function standaloneAcp(id: string, home: string = homedir()): NativeCommand | null {
+  const own = AGENT_ACP_CLI[id];
+  const path = own && OS !== "windows" ? join(home, ...own.home) : null;
+  return own && path && isExecutable(path) ? { path, args: own.args } : null;
+}
+
+function findAgentTool(name: string): string | null {
+  return findOnPath(name, AGENT_BIN_DIRS);
+}
+
 async function detectOne(agent: AgentEntry, roots: readonly string[]): Promise<NativeCommand | null> {
+  const own = standaloneAcp(agent.id);
+  if (own) return own;
   const dist = agent.distribution;
   switch (dist.kind) {
     case "binary": {
-      const path = findOnPath(basename(dist.build.cmd));
+      const path = findAgentTool(basename(dist.build.cmd));
       return path && (await looksLike(agent, path)) ? { path, args: dist.build.args } : null;
     }
     case "npx": {
@@ -118,11 +134,11 @@ async function detectOne(agent: AgentEntry, roots: readonly string[]): Promise<N
       return path ? { path, args: dist.run.args } : null;
     }
     case "uvx": {
-      const path = findOnPath(unpinnedPackage(dist.run.package).replace(/[=<>].*$/, ""));
+      const path = findAgentTool(unpinnedPackage(dist.run.package).replace(/[=<>].*$/, ""));
       return path ? { path, args: dist.run.args } : null;
     }
     case "command": {
-      const path = findOnPath(dist.command);
+      const path = findAgentTool(dist.command);
       return path ? { path, args: dist.args } : null;
     }
     default: {
@@ -142,7 +158,7 @@ export type Presence = {
 /** The agent's own CLI on PATH, such as `claude` for Claude, or null when it has none or isn't installed. */
 function ownCli(agent: AgentEntry): string | null {
   const name = AGENT_CLI[agent.id];
-  return name ? findOnPath(name) : null;
+  return name ? findAgentTool(name) : null;
 }
 
 /** Agents on this Mac, keyed by registry id: their ACP command, their own CLI, or both. */
