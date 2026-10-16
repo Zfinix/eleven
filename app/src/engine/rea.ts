@@ -13,6 +13,8 @@ import { nodeCommand } from "./toolchain";
 import { activeProvider } from "../analysis/engines";
 import type { CodeType } from "./codeTypes";
 
+const PROCEDURE_INVENTORY_PAGE_SIZE = 256;
+const STRING_INVENTORY_PAGE_SIZE = 16;
 
 /** The default gives a first analysis of a large app time to finish. */
 export const GHIDRA_STARTUP_MS = 2 * 60 * 60_000;
@@ -140,7 +142,7 @@ function errorFacts(code: string, details: Record<string, unknown> | undefined):
 }
 
 function toolError(content: unknown): Error {
-  const text = Array.isArray(content) ? content.map((block) => stringField(block, "text") ?? "").join("") : "";
+  const text = textContent(content);
   try {
     const parsed: unknown = JSON.parse(text);
     const error = recordField(parsed, "error");
@@ -153,6 +155,68 @@ function toolError(content: unknown): Error {
   } catch {
     return new Error(text || "REA couldn't do that.");
   }
+}
+
+function textContent(content: unknown): string {
+  if (!Array.isArray(content)) return "";
+  return content.map((block) => stringField(block, "text") ?? "").join("");
+}
+
+function jsonContent(content: unknown): unknown | undefined {
+  const text = textContent(content);
+  if (!text) return undefined;
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+function structuredToolResult(result: unknown): unknown {
+  const structured = recordField(result, "structuredContent");
+  if (structured !== undefined) return structured;
+  return jsonContent(recordField(result, "content")) ?? {};
+}
+
+function envelope(reply: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(reply)) return undefined;
+  const inner = recordField(reply, "result");
+  return inner && inner.normalized_result !== undefined ? inner : reply;
+}
+
+/** The normalized rows, whether REA returned a wrapped or direct result. */
+function normalizedResult(reply: unknown): unknown {
+  return envelope(reply)?.normalized_result;
+}
+
+function inventoryCollection(name: string): "procedures" | "strings" | undefined {
+  if (name === "list_procedures") return "procedures";
+  if (name === "list_strings") return "strings";
+  return undefined;
+}
+
+function retainedInventoryFromError(
+  name: string,
+  content: unknown,
+): Record<string, unknown> | undefined {
+  if (!inventoryCollection(name)) return undefined;
+
+  const parsed = jsonContent(content);
+  const error = recordField(parsed, "error");
+  const details = recordField(error, "details");
+  const reference = recordField(details, "evidence_reference");
+  const evidenceId = stringField(reference, "evidence_id");
+
+  if (
+    stringField(error, "code") !== "resource_constraint" ||
+    details?.boundary !== "mcp-response" ||
+    !evidenceId
+  ) {
+    return undefined;
+  }
+
+  return { delivery: "retained-inventory", evidence_reference: reference };
 }
 
 function parseOpened(path: string, reply: unknown): Opened {
@@ -191,7 +255,16 @@ class Rea {
     return client;
   }
 
-  private call(name: string, args: Record<string, unknown>): Promise<unknown> {
+  private async call(name: string, args: Record<string, unknown>): Promise<unknown> {
+    const reply = await this.callOnce(name, args);
+    const result = isRecord(reply) ? (recordField(reply, "result") ?? reply) : undefined;
+
+    if (!result || result.delivery !== "retained-inventory") return reply;
+    return this.readRetainedInventory(name, result);
+  }
+
+  /** Each page is queued separately so other calls can progress between bounded reads. */
+  private callOnce(name: string, args: Record<string, unknown>): Promise<unknown> {
     return this.queue.run(async () => {
       const result = await (await this.connect()).callTool(
         { name, arguments: args },
@@ -201,9 +274,100 @@ class Rea {
           onprogress: ({ message }) => reportStep(message),
         },
       );
-      if (result.isError) throw toolError(result.content);
-      return result.structuredContent ?? {};
+      if (result.isError) {
+        const recovered = retainedInventoryFromError(name, result.content);
+        if (recovered) return recovered;
+        throw toolError(result.content);
+      }
+
+      return structuredToolResult(result);
     });
+  }
+
+  /** Rebuild a full inventory from bounded pages retained by REA. */
+  private async readRetainedInventory(
+    name: string,
+    receipt: Record<string, unknown>,
+  ): Promise<unknown> {
+    const reference = recordField(receipt, "evidence_reference");
+    const evidenceId = stringField(reference, "evidence_id");
+    const collection = inventoryCollection(name);
+
+    if (!evidenceId || !collection) {
+      throw new Error("REA returned an inventory without a retained Evidence reference.");
+    }
+
+    const pageSize =
+      collection === "procedures"
+        ? PROCEDURE_INVENTORY_PAGE_SIZE
+        : STRING_INVENTORY_PAGE_SIZE;
+    const rows: unknown[] = [];
+    let offset = 0;
+
+    while (true) {
+      const page = await this.readInventoryPage(evidenceId, collection, offset, pageSize);
+      const projection = recordField(envelope(page) ?? page, "normalized_result");
+      const coverage = recordField(projection, "coverage");
+      const items = projection?.items;
+
+      if (
+        !Array.isArray(items) ||
+        !coverage ||
+        projection?.parent_evidence_id !== evidenceId ||
+        typeof coverage.total !== "number" ||
+        !Number.isInteger(coverage.total) ||
+        coverage.total < 0
+      ) {
+        throw new Error("REA returned an invalid inventory page.");
+      }
+
+      rows.push(...items);
+      if (coverage.exhausted === true) {
+        if (rows.length !== coverage.total) {
+          throw new Error("REA returned incomplete inventory coverage.");
+        }
+
+        return { ...receipt, normalized_result: rows };
+      }
+
+      const nextOffset = coverage.next_offset;
+      if (
+        typeof nextOffset !== "number" ||
+        !Number.isInteger(nextOffset) ||
+        nextOffset !== offset + items.length ||
+        nextOffset <= offset
+      ) {
+        throw new Error("REA returned an inventory page that did not advance.");
+      }
+
+      offset = nextOffset;
+    }
+  }
+
+  /** Reduce the page size if the transport rejects a large page response. */
+  private async readInventoryPage(
+    evidenceId: string,
+    collection: "procedures" | "strings",
+    offset: number,
+    limit: number,
+  ): Promise<unknown> {
+    try {
+      return await this.callOnce("inspect_analysis_view", {
+        source: { kind: "retained-evidence", evidence_id: evidenceId },
+        view: { kind: "page", collection, offset, limit },
+      });
+    } catch (error) {
+      if (!(error instanceof ReaError) || error.code !== "resource_constraint" || limit === 1) {
+        throw error;
+      }
+
+      return this.readInventoryPage(
+        evidenceId,
+        collection,
+        offset,
+        Math.max(1, Math.floor(limit / 2)),
+      );
+    }
   }
 
   /** Opens the file unless it is already open, or being opened, with the chosen engine. */
@@ -255,13 +419,13 @@ class Rea {
   async tool(path: string, name: string, args: Record<string, unknown>): Promise<unknown> {
     await this.ensureOpen(path);
     const reply = await this.call(name, args);
-    return isRecord(reply) ? reply.normalized_result : undefined;
+    return normalizedResult(reply);
   }
 
   async listProcedures(path: string): Promise<readonly unknown[]> {
     await this.ensureOpen(path);
     const reply = await this.call("list_procedures", {});
-    const normalized = isRecord(reply) ? reply.normalized_result : undefined;
+    const normalized = normalizedResult(reply);
     if (!Array.isArray(normalized)) throw new Error("REA couldn't list the functions in this file.");
     return normalized;
   }
