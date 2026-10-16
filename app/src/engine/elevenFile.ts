@@ -26,7 +26,16 @@ export type Manifest = {
   readonly entries: readonly Entry[];
 };
 
-export type Part = { readonly name: string; readonly data: Uint8Array; readonly level: number } | { readonly name: string; readonly packed: Uint8Array; readonly raw: Uint8Array };
+export type PackedPart = {
+  readonly name: string;
+  readonly packed: Uint8Array;
+  readonly raw: number;
+  readonly sha256: string;
+};
+
+export type Part =
+  | { readonly name: string; readonly data: Uint8Array; readonly level: number }
+  | PackedPart;
 
 export function sha256(data: Uint8Array): string {
   return createHash("sha256").update(data).digest("hex");
@@ -36,23 +45,42 @@ export function compress(data: Uint8Array, level: number): Uint8Array {
   return Bun.zstdCompressSync(data, { level });
 }
 
+function packedPart(part: Part): PackedPart {
+  if (!("data" in part)) return part;
+
+  return {
+    name: part.name,
+    packed: compress(part.data, part.level),
+    raw: part.data.length,
+    sha256: sha256(part.data),
+  };
+}
+
 /** One file: magic, the manifest's length, the manifest as JSON, then each entry compressed on its own. */
 export function pack(info: Omit<Manifest, "format" | "entries">, parts: readonly Part[]): Uint8Array {
   let offset = 0;
   const entries: Entry[] = [];
   const blobs: Uint8Array[] = [];
   for (const part of parts) {
-    const raw = "data" in part ? part.data : part.raw;
-    const packed = "data" in part ? compress(part.data, part.level) : part.packed;
-    entries.push({ name: part.name, codec: "zstd", offset, size: packed.length, raw: raw.length, sha256: sha256(raw) });
-    blobs.push(packed);
-    offset += packed.length;
+    const prepared = packedPart(part);
+    entries.push({
+      name: prepared.name,
+      codec: "zstd",
+      offset,
+      size: prepared.packed.length,
+      raw: prepared.raw,
+      sha256: prepared.sha256,
+    });
+    blobs.push(prepared.packed);
+    offset += prepared.packed.length;
   }
+
   const manifest = new TextEncoder().encode(JSON.stringify({ ...info, format: FORMAT, entries }));
   const out = new Uint8Array(HEADER + manifest.length + offset);
   out.set(MAGIC, 0);
   new DataView(out.buffer).setUint32(MAGIC.length, manifest.length, true);
   out.set(manifest, HEADER);
+
   let at = HEADER + manifest.length;
   for (const blob of blobs) {
     out.set(blob, at);

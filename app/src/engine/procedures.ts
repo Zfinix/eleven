@@ -12,15 +12,17 @@ export type Procedure = { readonly address: string; readonly name: string; reado
 
 export const CACHE = cacheRoot();
 
+const pendingLoads = new Map<string, Promise<readonly Procedure[]>>();
+
 function kindOf(value: unknown): ProcedureKind | null {
   return value === "Function" || value === "Thunk" || value === "External" ? value : null;
 }
 
-function cachedEntry(entry: unknown): readonly Procedure[] {
+function isCachedEntry(entry: unknown): entry is Procedure {
   const address = stringField(entry, "address");
   const name = stringField(entry, "name");
   const kind = isRecord(entry) ? kindOf(entry.kind) : null;
-  return address && name && kind ? [{ address, name, kind }] : [];
+  return Boolean(address && name && kind);
 }
 
 function listedEntry(entry: unknown): readonly Procedure[] {
@@ -37,17 +39,31 @@ async function listFromRea(path: string): Promise<readonly Procedure[]> {
 }
 
 /** The binary's procedures, from Eleven's shared cache or, on a first open, from REA. */
-export async function loadProcedures(path: string, sha256: string): Promise<readonly Procedure[]> {
-  const file = join(CACHE, sha256, "ghidra", "procedures.json");
+async function readProcedures(path: string, file: string): Promise<readonly Procedure[]> {
   const cached = await readCachedText(file);
   if (cached !== null) {
     const parsed: unknown = JSON.parse(cached);
-    return Array.isArray(parsed) ? parsed.flatMap(cachedEntry) : [];
+    return Array.isArray(parsed) ? parsed.filter(isCachedEntry) : [];
   }
   const listed = await listFromRea(path);
   await mkdir(dirname(file), { recursive: true });
   await writeFile(file, JSON.stringify(listed));
   return listed;
+}
+
+/** Share concurrent workbench and chat loads, without retaining the inventory after delivery. */
+export async function loadProcedures(path: string, sha256: string): Promise<readonly Procedure[]> {
+  const file = join(CACHE, sha256, "ghidra", "procedures.json");
+  const pending = pendingLoads.get(file);
+  if (pending) return pending;
+
+  const loading = readProcedures(path, file);
+  pendingLoads.set(file, loading);
+  try {
+    return await loading;
+  } finally {
+    if (pendingLoads.get(file) === loading) pendingLoads.delete(file);
+  }
 }
 
 /** Drops the cached function list, so the next open lists functions you added or undefined. */

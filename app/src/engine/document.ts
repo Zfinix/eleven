@@ -1,16 +1,29 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  createReadStream,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, relative } from "node:path";
 
-import { deleteThread, listThreads, loadThread, renameThread, saveThread, type SavedThread } from "../chat/history";
+import { deleteThread, listThreads, renameThread, saveThread, type SavedThread } from "../chat/history";
 import { isRecord } from "../lib/guards";
+import { cacheRoot as platformCache, chooseSavePath } from "../lib/platform";
+import { SerialQueue } from "../lib/serial";
 import { supportPath } from "../lib/support";
 import { pathSetting } from "../settings/store";
 import { appVersion } from "../settings/system";
-import { type Manifest, openElevenFile, pack, type Part, sha256, writeAtomic } from "./elevenFile";
+import { compressPart } from "./compressedPart";
+import { documentChats } from "./documentChats";
+import { type Manifest, openElevenFile, pack, type PackedPart, sha256, writeAtomic } from "./elevenFile";
 import { projectJson, restoreProjectJson } from "./project";
 import type { Target } from "./target";
-import { cacheRoot as platformCache, chooseSavePath } from "../lib/platform";
 
 function cacheRoot(): string {
   return pathSetting("cacheDir", "ELEVEN_CACHE") ?? platformCache();
@@ -18,8 +31,11 @@ function cacheRoot(): string {
 const DOCUMENTS = supportPath("documents.json");
 const EXTENSION = ".eleven";
 
-/** Binaries rarely change and level 19 is slow, so each one is compressed once per run. */
-const packedBinaries = new Map<string, { readonly raw: Uint8Array; readonly packed: Uint8Array }>();
+const saves = new SerialQueue();
+const COMPRESSION_LEVEL = 3;
+
+/** Retain only the most recent compressed binary, never its uncompressed bytes. */
+let packedBinary: { readonly id: string; readonly part: PackedPart } | null = null;
 
 export function isElevenFile(path: string): boolean {
   return path.toLowerCase().endsWith(EXTENSION);
@@ -61,15 +77,19 @@ function cacheFiles(id: string): Record<string, string> {
   return out;
 }
 
-async function squeeze(name: string, raw: Uint8Array, level: number): Promise<Part> {
-  return { name, raw, packed: new Uint8Array(await Bun.zstdCompress(raw, { level })) };
+async function compressBufferPart(name: string, raw: Uint8Array): Promise<PackedPart> {
+  const size = raw.length;
+  const checksum = sha256(raw);
+  const packed = await Bun.zstdCompress(raw, { level: COMPRESSION_LEVEL });
+
+  return { name, packed, raw: size, sha256: checksum };
 }
 
-async function binaryPart(path: string, id: string): Promise<Part> {
-  const known = packedBinaries.get(id);
-  if (known) return { name: "binary", raw: known.raw, packed: known.packed };
-  const part = await squeeze("binary", new Uint8Array(readFileSync(path)), 19);
-  if ("packed" in part) packedBinaries.set(id, { raw: part.raw, packed: part.packed });
+async function binaryPart(path: string, id: string): Promise<PackedPart> {
+  if (packedBinary?.id === id) return packedBinary.part;
+
+  const part = await compressPart("binary", createReadStream(path));
+  packedBinary = { id, part };
   return part;
 }
 
@@ -80,19 +100,36 @@ export function projectsFolder(): string {
 
 const text = (value: string): Uint8Array => new TextEncoder().encode(value);
 
-/** Packs the binary, your work, this project's chats and the decompiled code into one `.eleven` file. Compresses off the main thread. */
-export async function saveDocument(target: Target, id: string, path: string, remember = true): Promise<void> {
-  const chats = listThreads().filter((summary) => summary.project === id).flatMap((summary) => loadThread(summary.id) ?? []);
-  const parts: readonly Part[] = await Promise.all([
-    squeeze("project.json", text(projectJson(id)), 3),
-    squeeze("chats.json", text(JSON.stringify(chats)), 3),
-    squeeze("cache.json", text(JSON.stringify(cacheFiles(id))), 19),
-    binaryPart(target.path, id),
-  ]);
-  const info: Omit<Manifest, "format" | "entries"> = { name: target.name, kind: target.kind, arch: target.arch, meta: target.meta, binary: id, savedAt: Date.now(), app: appVersion() };
+/** Compress one section at a time so large raw buffers and compressor workspaces do not overlap. */
+async function documentParts(target: Target, id: string): Promise<readonly PackedPart[]> {
+  return [
+    await compressBufferPart("project.json", text(projectJson(id))),
+    await compressPart("chats.json", documentChats(id)),
+    await compressBufferPart("cache.json", text(JSON.stringify(cacheFiles(id)))),
+    await binaryPart(target.path, id),
+  ];
+}
+
+async function writeDocument(target: Target, id: string, path: string, remember: boolean): Promise<void> {
+  const parts = await documentParts(target, id);
+  const info: Omit<Manifest, "format" | "entries"> = {
+    name: target.name,
+    kind: target.kind,
+    arch: target.arch,
+    meta: target.meta,
+    binary: id,
+    savedAt: Date.now(),
+    app: appVersion(),
+  };
+
   mkdirSync(dirname(path), { recursive: true });
   writeAtomic(path, pack(info, parts));
   if (remember) setDocumentPath(id, path);
+}
+
+/** Serialize manual and automatic saves, including their preparation and atomic file replacement. */
+export function saveDocument(target: Target, id: string, path: string, remember = true): Promise<void> {
+  return saves.run(() => writeDocument(target, id, path, remember));
 }
 
 /** Deletes the project's `.eleven` file and every chat in it. */

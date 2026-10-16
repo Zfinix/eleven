@@ -16,6 +16,8 @@
     "@xterm/headless": "^6.0.0",
     "react": "19.3.0",
     "semver": "^7.7",
+    "stream-chain": "4.2.6",
+    "stream-json": "3.7.0",
     "zod": "4.6.6"
   },
   "devDependencies": {

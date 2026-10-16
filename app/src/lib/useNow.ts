@@ -1,14 +1,20 @@
 import { useEffect, useState } from "react";
 
-/** The current time, refreshed every `everyMs` while `active`. */
+import { useWindowActivity } from "./windowActivity";
+
+/** The current time, refreshed while the animation and its window are active. */
 export function useNow(active: boolean, everyMs = 1000): number {
+  const windowActive = useWindowActivity();
   const [now, setNow] = useState(Date.now());
+
   useEffect(() => {
-    if (!active) return;
+    if (!active || !windowActive) return;
+
     setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), everyMs);
     return () => clearInterval(timer);
-  }, [active, everyMs]);
+  }, [active, everyMs, windowActive]);
+
   return now;
 }
 
