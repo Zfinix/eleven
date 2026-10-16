@@ -3,7 +3,7 @@ import { afterEach, expect, test } from "bun:test";
 import { ghidraStartupMs, openProblem, ReaError, reaCallOptions, reaEnv } from "../src/engine/rea";
 import { currentSettings } from "../src/settings/store";
 
-const inherited = { timeout: process.env.REA_GHIDRA_STARTUP_TIMEOUT_MS, java: process.env._JAVA_OPTIONS };
+const inherited = { timeout: process.env.REA_GHIDRA_STARTUP_TIMEOUT_MS };
 
 function restore(name: string, value: string | undefined): void {
   if (value === undefined) delete process.env[name];
@@ -12,7 +12,6 @@ function restore(name: string, value: string | undefined): void {
 
 afterEach(() => {
   restore("REA_GHIDRA_STARTUP_TIMEOUT_MS", inherited.timeout);
-  restore("_JAVA_OPTIONS", inherited.java);
 });
 
 test("the analysis time limit sets ghidra's deadline and every caller waits a little longer", () => {
@@ -35,14 +34,7 @@ test("a valid REA_GHIDRA_STARTUP_TIMEOUT_MS wins and a broken one is ignored", (
   }
 });
 
-test("ghidra hands idle memory back without touching java options for other tools", () => {
-  delete process.env._JAVA_OPTIONS;
-  expect(reaEnv()._JAVA_OPTIONS).toBe("-XX:+UseG1GC -XX:MinHeapFreeRatio=20 -XX:MaxHeapFreeRatio=40 -XX:G1PeriodicGCInterval=10000");
-  expect(process.env._JAVA_OPTIONS).toBeUndefined();
-  process.env._JAVA_OPTIONS = "-Xss4m";
-  expect(reaEnv()._JAVA_OPTIONS).toStartWith("-Xss4m -XX:+UseG1GC");
-  process.env._JAVA_OPTIONS = "-XX:+UseG1GC -Xss4m";
-  expect(reaEnv()._JAVA_OPTIONS).toBe("-XX:+UseG1GC -Xss4m");
+test("ghidra can be given 2 GB", () => {
   expect(reaEnv({ ...currentSettings(), ghidraMemory: "2 GB" }).GHIDRA_MAXMEM).toBe("2G");
 });
 

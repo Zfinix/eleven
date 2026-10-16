@@ -90,15 +90,6 @@ function plainEnv(): Record<string, string> {
 
 const MAXMEM: Readonly<Record<Settings["ghidraMemory"], string | null>> = { Automatic: null, "2 GB": "2G", "4 GB": "4G", "8 GB": "8G", "16 GB": "16G", "32 GB": "32G", "64 GB": "64G" };
 
-const RETURN_IDLE_MEMORY = "-XX:+UseG1GC -XX:MinHeapFreeRatio=20 -XX:MaxHeapFreeRatio=40 -XX:G1PeriodicGCInterval=10000";
-
-/** Only REA's Ghidra gets these: every JVM echoes _JAVA_OPTIONS to stderr, which would garble jadx and apktool output. */
-function javaOptions(): string {
-  const inherited = (process.env._JAVA_OPTIONS ?? "").trim();
-  if (inherited.includes("UseG1GC")) return inherited;
-  return inherited ? `${inherited} ${RETURN_IDLE_MEMORY}` : RETURN_IDLE_MEMORY;
-}
-
 /** Ghidra knobs from Settings → Analysis, as the environment REA reads when it starts Ghidra. */
 export function reaEnv(s: Settings = currentSettings()): Record<string, string> {
   const memory = MAXMEM[s.ghidraMemory];
@@ -107,7 +98,6 @@ export function reaEnv(s: Settings = currentSettings()): Record<string, string> 
   return {
     REA_GHIDRA_STARTUP_TIMEOUT_MS: String(ghidraStartupMs(s)),
     ...(memory ? { GHIDRA_MAXMEM: memory } : {}),
-    _JAVA_OPTIONS: javaOptions(),
     ...(disabled.length > 0 ? { REA_GHIDRA_DISABLED_ANALYZERS: disabled.join(",") } : {}),
   };
 }
