@@ -5,6 +5,7 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import type { NativeCommand } from "../agents/detect";
 import type { AgentEvent, PermissionChoice, SessionOption } from "../agents/events";
 import type { AgentEntry } from "../agents/registry";
+import { goalControl, type GoalControl } from "../agents/codex";
 import { rememberPick, savedPicks } from "../agents/picks";
 import { AgentSession } from "../agents/session";
 import { hidePaths } from "../bridge/privacy";
@@ -82,15 +83,13 @@ function transcript(messages: readonly Message[]): readonly string[] {
   return lines.length > 0 ? ["", "This continues an earlier conversation:", ...lines.map((line) => hidePaths(line))] : [];
 }
 
-function firstPrompt(target: Target | null, past: readonly Message[], text: string): string {
+function promptContext(target: Target | null, past: readonly Message[]): string {
   return [
     ...opening(target),
     `Only use Eleven's tools (eleven and eleven-rea). Never use your own built-in reverse-engineering tools or other disassemblers such as Hopper, IDA or a separate Ghidra, even if one is installed. eleven-rea runs Ghidra on ${THIS_DEVICE}.`,
     "When you study a function, read it with procedure_pseudo_code so it appears in Eleven's code panel.",
     "Answer plainly and briefly, in markdown. Put any code, disassembly, addresses or symbol names in fenced code blocks or inline `code` so they read in the code font.",
     ...transcript(past),
-    "",
-    text,
   ].join("\n");
 }
 
@@ -156,6 +155,7 @@ export function copyText(text: string): void {
 export function useThread(agent: AgentEntry, native: NativeCommand | null, target: Target | null, onTarget: (target: Target) => void, live = true): Thread {
   const [state, dispatch] = useReducer(threadReducer, EMPTY_THREAD);
   const [id, setId] = useState<string>(() => randomUUID());
+  const codex = agent.id === "codex-acp";
   const session = useRef<AgentSession | null>(null);
   const opened = useRef<Opened | null>(null);
   const requested = useRef(new Set<string>());
@@ -184,10 +184,20 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
     if (path) adopt(path);
   };
 
-  const ensureSession = (): AgentSession => {
+  const ensureSession = (past: readonly Message[] = state.messages): AgentSession => {
     if (session.current) return session.current;
     const cwd = target ? dirname(target.path) : process.env.HOME ?? "/";
-    session.current = new AgentSession(agent, native, cwd, onEvent, id, projectOf(target), target?.path ?? null);
+    session.current = new AgentSession(
+      agent,
+      native,
+      cwd,
+      onEvent,
+      id,
+      projectOf(target),
+      target?.path ?? null,
+      true,
+      codex ? promptContext(target, past) : null,
+    );
     session.current.restore(savedPicks(agent.id));
     dispatch({ type: "starting" });
     return session.current;
@@ -254,7 +264,7 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
   const deliver = (text: string): void => {
     const live = ensureSession();
     if (target && (target.kind === "binary" || target.kind === "app") && !prompted.current) void openEntry(target);
-    const prompt = prompted.current ? text : firstPrompt(target, state.messages, text);
+    const prompt = prompted.current || codex ? text : `${promptContext(target, state.messages)}\n\n${text}`;
     prompted.current = true;
     dispatch({ type: "sent", text, at: Date.now() });
     void live.prompt(prompt);
@@ -267,9 +277,31 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
     deliver(next);
   }, [state.queue, state.agent.kind]);
 
+  const controlGoal = async (action: GoalControl): Promise<void> => {
+    const current = session.current;
+    if (!current) {
+      dispatch({ type: "note", text: "No goal is active.", tone: "info" });
+      return;
+    }
+
+    try {
+      await current.controlGoal(action);
+      if (session.current !== current) return;
+      dispatch({ type: "note", text: action === "pause" ? "Goal paused." : "Goal cleared.", tone: "info" });
+    } catch (error) {
+      if (session.current !== current) return;
+      dispatch({ type: "note", text: `Couldn't ${action} the goal. ${errorMessage(error)}`, tone: "error" });
+    }
+  };
+
   const send = (text: string): void => {
     const clean = text.trim();
     if (!clean) return;
+    const control = codex ? goalControl(clean) : null;
+    if (control) {
+      void controlGoal(control);
+      return;
+    }
     if (isBusy(state)) return dispatch({ type: "queued", text: clean });
     deliver(clean);
   };
@@ -308,14 +340,14 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
       requested.current.clear();
       setId(randomUUID());
       dispatch({ type: "reset" });
-      ensureSession();
+      ensureSession([]);
     },
     restore: (saved) => {
       stopSession();
       requested.current.clear();
       setId(saved.id);
       dispatch({ type: "restore", messages: saved.messages });
-      ensureSession();
+      ensureSession(saved.messages);
     },
     selectTab: (index) => dispatch({ type: "selectTab", index }),
     closeCanvas: () => dispatch({ type: "closeCanvas" }),

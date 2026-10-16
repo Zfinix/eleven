@@ -11,6 +11,7 @@ import { loadSkills, skillPrompt } from "../skills/load";
 import { AgentPicker } from "./AgentPicker";
 import { CommandPalette, type PaletteItem } from "./CommandPalette";
 import { ContextRing } from "./ContextRing";
+import { GoalBar } from "./GoalBar";
 import { MentionPicker } from "./MentionPicker";
 import { indexMentions, type Mention, type MentionIndex, startedMention, withMentions } from "./mentions";
 import { flipped, isSwitch, ModelChip, OptionChip } from "./OptionMenu";
@@ -180,7 +181,8 @@ export function Composer({ place, target, agents, thread, onAttach, onDetach, on
   const submit = (): void => {
     if (!typed || blocked) return;
     const text = fileOnly && target ? `What does ${target.name} do when it starts?` : draft;
-    thread.send(withMentions(about ? `@${about} ${text}` : text, picked));
+    const command = text.trimStart().startsWith("/");
+    thread.send(withMentions(about && !command ? `@${about} ${text}` : text, picked));
     setDraft("");
     setPicked([]);
   };
@@ -230,6 +232,12 @@ export function Composer({ place, target, agents, thread, onAttach, onDetach, on
     setPaletteOpen(false);
   };
   const pickMention = (item: Mention): void => {
+    if (draft.trimStart().startsWith("/")) {
+      setMentioning(false);
+      refocus();
+      return;
+    }
+
     setDraft(`${draft}@${item.label} `);
     setPicked([...picked, item]);
     setMentioning(false);
@@ -258,6 +266,7 @@ export function Composer({ place, target, agents, thread, onAttach, onDetach, on
       )}
       {place !== "landing" && palette}
       {place !== "landing" && picker}
+      {thread.state.goal && <GoalBar key={thread.state.goal.createdAt} goal={thread.state.goal} />}
       <div {...drop} style={{ display: "flex", flexDirection: "column", borderWidth: 1, borderColor: queued ? p.link : thread.busy || (landing && target) ? p.line3 : p.sel, borderRadius: 20, backgroundColor: p.win }}>
         {slot}
         {landing && target && (
