@@ -403,7 +403,8 @@ export function buildPages(c: Ctx): Readonly<Record<Page, readonly GroupModel[]>
       { label: "Open files with", foot: "The engine you pick opens files. Eleven still uses the others when you ask for something only they can do.", rows: engineRows(c, h) },
       { label: "Together", rows: [tg("ghidraPseudocode", "Use Ghidra for readable code", "Open files fast with Rizin, then show Ghidra’s clearer pseudocode when it’s ready.", { dim: activeEngine()?.id === "ghidra" })] },
       { label: "Ghidra", rows: [
-        sel("ghidraMemory", "Memory", `Big apps open faster with more. Automatic picks 2 to 4 GB from what ${THIS_DEVICE} has.`, ["Automatic", "4 GB", "8 GB", "16 GB"]),
+        sel("ghidraMemory", "Memory", `Big apps open faster with more. Automatic picks 2 to 4 GB from what ${THIS_DEVICE} has.`, ["Automatic", "2 GB", "4 GB", "8 GB", "16 GB", "32 GB", "64 GB"]),
+        sel("ghidraTimeout", "Analysis time limit", "How long Ghidra may spend on a file before it gives up. Big apps can need hours. Restart Eleven after changing it.", ["30 minutes", "2 hours", "6 hours", "12 hours"]),
         tg("findParameters", "Work out function parameters", "Better pseudocode for big apps. Makes the first open slower."),
         tg("rebuildSwitches", "Rebuild switch statements", "Turns jump tables back into switch blocks."),
         tg("hiddenCode", "Look for code no one calls", "Finds more functions in stripped apps. The slowest option."),
