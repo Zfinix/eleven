@@ -14,11 +14,38 @@ import { activeProvider } from "../analysis/engines";
 import type { CodeType } from "./codeTypes";
 
 
-/** Ghidra's first analysis of a real app takes minutes; progress notifications keep the call alive. */
-const CALL_OPTIONS = { timeout: 15 * 60_000, resetTimeoutOnProgress: true } as const;
+/** The default gives a first analysis of a large app time to finish. */
+export const GHIDRA_STARTUP_MS = 2 * 60 * 60_000;
 
-/** How long REA lets Ghidra import and analyze a file. REA's own 5.5 minutes is too short for big apps. */
-export const GHIDRA_STARTUP_MS = 30 * 60_000;
+const RESPONSE_GRACE_MS = 5 * 60_000;
+const TIME_LIMITS: Readonly<Record<Settings["ghidraTimeout"], number>> = {
+  "30 minutes": 30 * 60_000,
+  "2 hours": GHIDRA_STARTUP_MS,
+  "6 hours": 6 * 60 * 60_000,
+  "12 hours": 12 * 60 * 60_000,
+};
+
+function startupTimeout(settings: Settings): number {
+  const override = Number(process.env.REA_GHIDRA_STARTUP_TIMEOUT_MS);
+  const maximumTimerDelay = 2_147_483_647 - RESPONSE_GRACE_MS;
+
+  if (Number.isSafeInteger(override) && override > 0 && override <= maximumTimerDelay) {
+    return override;
+  }
+
+  return TIME_LIMITS[settings.ghidraTimeout];
+}
+
+/** The client waits slightly longer than Ghidra's own startup deadline. */
+export function reaCallOptions(settings: Settings = currentSettings()): {
+  readonly timeout: number;
+  readonly resetTimeoutOnProgress: true;
+} {
+  return {
+    timeout: startupTimeout(settings) + RESPONSE_GRACE_MS,
+    resetTimeoutOnProgress: true,
+  };
+}
 
 const TIMEOUT_CODES: ReadonlySet<string> = new Set(["timeout", "provider_timeout"]);
 
@@ -35,7 +62,7 @@ export type OpenProblem = { readonly raw: string; readonly advice: string };
 export function openProblem(err: unknown): OpenProblem {
   const raw = errorMessage(err);
   if (!(err instanceof ReaError)) return { raw, advice: "Check that REA and Ghidra are installed in Setup, then open it again." };
-  if (TIMEOUT_CODES.has(err.code)) return { raw, advice: "Ghidra ran out of time analyzing it. For a big Swift app, turn off Demangle Swift names in Settings, then open it again." };
+  if (TIMEOUT_CODES.has(err.code)) return { raw, advice: "Ghidra ran out of time analyzing it. Increase Analysis time limit in Settings → Analysis, restart Eleven, then open it again. For a big Swift app, turning off Demangle Swift names may also help." };
   return { raw, advice: "Ghidra couldn't finish reading it. The details below say what stopped it." };
 }
 
@@ -79,7 +106,14 @@ function plainEnv(): Record<string, string> {
   return { ...Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined)), ...reaEnv() };
 }
 
-const MAXMEM: Readonly<Record<Settings["ghidraMemory"], string | null>> = { Automatic: null, "4 GB": "4G", "8 GB": "8G", "16 GB": "16G" };
+const MAXMEM: Readonly<Record<Settings["ghidraMemory"], string | null>> = {
+  Automatic: null,
+  "4 GB": "4G",
+  "8 GB": "8G",
+  "16 GB": "16G",
+  "32 GB": "32G",
+  "64 GB": "64G",
+};
 
 /** Ghidra knobs from Settings → Analysis, as the environment REA reads when it starts Ghidra. */
 export function reaEnv(s: Settings = currentSettings()): Record<string, string> {
@@ -87,7 +121,7 @@ export function reaEnv(s: Settings = currentSettings()): Record<string, string> 
   const inherited = (process.env.REA_GHIDRA_DISABLED_ANALYZERS ?? "").split(",").map((name) => name.trim()).filter(Boolean);
   const disabled = [...new Set([...inherited, ...(s.rebuildSwitches ? [] : ["Decompiler Switch Analysis"]), ...(s.swiftNames ? [] : ["Demangler Swift"])])];
   return {
-    REA_GHIDRA_STARTUP_TIMEOUT_MS: process.env.REA_GHIDRA_STARTUP_TIMEOUT_MS ?? String(GHIDRA_STARTUP_MS),
+    REA_GHIDRA_STARTUP_TIMEOUT_MS: String(startupTimeout(s)),
     ...(memory ? { GHIDRA_MAXMEM: memory } : {}),
     ...(disabled.length > 0 ? { REA_GHIDRA_DISABLED_ANALYZERS: disabled.join(",") } : {}),
   };
@@ -159,7 +193,14 @@ class Rea {
 
   private call(name: string, args: Record<string, unknown>): Promise<unknown> {
     return this.queue.run(async () => {
-      const result = await (await this.connect()).callTool({ name, arguments: args }, undefined, { ...CALL_OPTIONS, onprogress: ({ message }) => reportStep(message) });
+      const result = await (await this.connect()).callTool(
+        { name, arguments: args },
+        undefined,
+        {
+          ...reaCallOptions(),
+          onprogress: ({ message }) => reportStep(message),
+        },
+      );
       if (result.isError) throw toolError(result.content);
       return result.structuredContent ?? {};
     });
