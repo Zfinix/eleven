@@ -60,7 +60,7 @@ const LOCAL_AGENTS: readonly AgentEntry[] = [
 export const DEFAULT_AGENT_ID = "claude-acp";
 
 /** The order agents appear in the picker; everything else follows alphabetically. */
-const FEATURED = ["claude-acp", "codex-acp", "gemini", "github-copilot-cli", "cursor", "goose", "opencode", "aster"] as const;
+const FEATURED = ["claude-acp", "codex-acp", "grok-build", "antigravity-acp", "gemini", "github-copilot-cli", "cursor", "goose", "opencode", "aster"] as const;
 
 export function platformKey(): string {
   const os = process.platform === "darwin" ? "darwin" : process.platform === "win32" ? "windows" : "linux";
