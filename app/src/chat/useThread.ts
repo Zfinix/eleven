@@ -20,6 +20,7 @@ import { activeBackend } from "../analysis/engines";
 import { prepareTarget, type Target } from "../engine/target";
 import { type SavedThread, saveThread } from "./history";
 import { agentName, EMPTY_THREAD, isBusy, type Message, threadReducer, type ThreadState } from "./thread";
+import { useStreamBuffer } from "./streamBuffer";
 import { useChatMoments } from "../notify/useChatMoments";
 import { shownText } from "../skills/load";
 import { copyToClipboard, THIS_DEVICE } from "../lib/platform";
@@ -177,9 +178,11 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
     }
   };
 
+  const stream = useStreamBuffer((event, at) => dispatch({ type: "event", event, at }));
+
   const onEvent = (event: AgentEvent): void => {
     moments.heard(event);
-    dispatch({ type: "event", event, at: Date.now() });
+    stream.push(event);
     const path = openedPath(event, tools.current);
     if (path) adopt(path);
   };
@@ -194,6 +197,7 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
   };
 
   const stopSession = (): void => {
+    stream.flush();
     session.current?.stop();
     session.current = null;
     prompted.current = false;
