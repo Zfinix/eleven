@@ -12,6 +12,8 @@ export type Procedure = { readonly address: string; readonly name: string; reado
 
 export const CACHE = cacheRoot();
 
+const loading = new Map<string, Promise<readonly Procedure[]>>();
+
 function kindOf(value: unknown): ProcedureKind | null {
   return value === "Function" || value === "Thunk" || value === "External" ? value : null;
 }
@@ -36,9 +38,7 @@ async function listFromRea(path: string): Promise<readonly Procedure[]> {
   return (await rea.listProcedures(path)).flatMap(listedEntry);
 }
 
-/** The binary's procedures, from Eleven's shared cache or, on a first open, from REA. */
-export async function loadProcedures(path: string, sha256: string): Promise<readonly Procedure[]> {
-  const file = join(CACHE, sha256, "ghidra", "procedures.json");
+async function readProcedures(path: string, file: string): Promise<readonly Procedure[]> {
   const cached = await readCachedText(file);
   if (cached !== null) {
     const parsed: unknown = JSON.parse(cached);
@@ -50,8 +50,22 @@ export async function loadProcedures(path: string, sha256: string): Promise<read
   return listed;
 }
 
+/** The binary's procedures, from Eleven's shared cache or, on a first open, from REA. Loads at the same time share one read. */
+export async function loadProcedures(path: string, sha256: string): Promise<readonly Procedure[]> {
+  const pending = loading.get(sha256);
+  if (pending) return pending;
+  const load = readProcedures(path, join(CACHE, sha256, "ghidra", "procedures.json"));
+  loading.set(sha256, load);
+  try {
+    return await load;
+  } finally {
+    if (loading.get(sha256) === load) loading.delete(sha256);
+  }
+}
+
 /** Drops the cached function list, so the next open lists functions you added or undefined. */
 export async function forgetProcedures(sha256: string): Promise<void> {
+  loading.delete(sha256);
   await rm(join(CACHE, sha256, "ghidra", "procedures.json"), { force: true });
 }
 
