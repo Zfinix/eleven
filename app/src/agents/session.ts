@@ -11,6 +11,7 @@ import { currentSettings, loadSettings, pathSetting } from "../settings/store";
 import { reaEnv } from "../engine/rea";
 import type { NativeCommand } from "./detect";
 import type { AgentEvent, PermissionChoice, SessionOption } from "./events";
+import type { GoalControl } from "./goals";
 import { type Launch, resolveLaunch } from "./launch";
 import { chimeForAnswer } from "./notify";
 import { isRemembered, rememberAnswer } from "./remembered";
@@ -281,6 +282,11 @@ export class AgentSession {
       await delay(EXIT_GRACE_MS);
       this.fail(`${this.agent.name} stopped: ${errorMessage(err)}`);
     }
+  }
+
+  async controlGoal(action: GoalControl): Promise<void> {
+    const { connection, sessionId } = await this.session();
+    await connection.extMethod("_session/goal", { sessionId, action });
   }
 
   async cancel(): Promise<void> {

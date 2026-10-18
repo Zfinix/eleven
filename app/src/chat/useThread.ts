@@ -4,6 +4,7 @@ import { useEffect, useReducer, useRef, useState } from "react";
 
 import type { NativeCommand } from "../agents/detect";
 import type { AgentEvent, PermissionChoice, SessionOption } from "../agents/events";
+import { type GoalControl, goalControl } from "../agents/goals";
 import type { AgentEntry } from "../agents/registry";
 import { rememberPick, savedPicks } from "../agents/picks";
 import { AgentSession } from "../agents/session";
@@ -267,9 +268,20 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
     deliver(next);
   }, [state.queue, state.agent.kind]);
 
+  const controlGoal = async (live: AgentSession, action: GoalControl): Promise<void> => {
+    try {
+      await live.controlGoal(action);
+      dispatch({ type: "note", text: action === "pause" ? "Goal paused." : "Goal cleared.", tone: "info" });
+    } catch (err) {
+      dispatch({ type: "note", text: `Couldn't ${action} the goal: ${errorMessage(err)}`, tone: "error" });
+    }
+  };
+
   const send = (text: string): void => {
     const clean = text.trim();
     if (!clean) return;
+    const control = goalControl(agent.id, clean);
+    if (control && session.current && isBusy(state)) return void controlGoal(session.current, control);
     if (isBusy(state)) return dispatch({ type: "queued", text: clean });
     deliver(clean);
   };
