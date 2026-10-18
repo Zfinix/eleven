@@ -13,6 +13,7 @@ import { useBench } from "./parts";
 import { ResizeHandle } from "./Resize";
 import { Footer, type FooterMenu } from "./sidebar/Footer";
 import { FnRowView, FunctionsHead, type FnView, MatchNote } from "./sidebar/Functions";
+import { hasFunctionModules, indexFunctionModules } from "./sidebar/functionModules";
 import { FolderContext, type FolderState, loadFolds, saveFolds } from "./sidebar/memory";
 import { functionRows, type FnShow, type FnSort, sourcePaths } from "./sidebar/model";
 import { Faint, useSectionOpen } from "./sidebar/parts";
@@ -24,10 +25,15 @@ import { ProjectSwitcher } from "./sidebar/Top";
 
 const FN_KEY = "fn:";
 
+/** Binaries that register modules start grouped by module; the rest by package or file. */
 function useFnView(): FnView {
-  const [sort, setSort] = useState<FnSort>("files");
+  const { program } = useBench();
+  const modules = useMemo(() => (hasFunctionModules(program.functions) ? indexFunctionModules(program.functions) : null), [program.functions]);
+  const byDefault: FnSort = modules ? "modules" : "files";
+  const [picked, setSort] = useState<FnSort | null>(null);
   const [show, setShow] = useState<FnShow>("all");
-  return { sort, show, setSort, setShow };
+  const sort = picked === "modules" && !modules ? byDefault : (picked ?? byDefault);
+  return { sort, show, byDefault, modules, setSort, setShow };
 }
 
 /** Mach-O files can hold Swift types to name files after; anything else can only have the paths in its strings. */
@@ -92,16 +98,16 @@ function NavList({ view, flipped, hasSources }: { readonly view: FnView; readonl
   const fnFlipped = useMemo(() => new Set([...flipped].filter((key) => key.startsWith(FN_KEY)).map((key) => key.slice(FN_KEY.length))), [flipped]);
   const query = wb.s.filter.trim();
   const rows = useMemo(
-    () => (open && !noCode ? functionRows(program.functions, { nameOf, renamed: new Set(wb.s.names.keys()), query: wb.s.filter, show: view.show, sort: view.sort, flipped: fnFlipped, yoursOpen: hasSources === false, bareFiles: program.bareFiles ?? [] }) : []),
-    [open, noCode, program, wb.s.names, wb.s.filter, view.show, view.sort, fnFlipped, hasSources],
+    () => (open && !noCode ? functionRows(program.functions, { nameOf, renamed: new Set(wb.s.names.keys()), query: wb.s.filter, show: view.show, sort: view.sort, ...(view.modules ? { modules: view.modules } : {}), flipped: fnFlipped, yoursOpen: hasSources === false, bareFiles: program.bareFiles ?? [] }) : []),
+    [open, noCode, program, wb.s.names, wb.s.filter, view.show, view.sort, view.modules, fnFlipped, hasSources],
   );
-  const searching = open && !noCode && query.length > 0 && view.sort === "files";
+  const searching = open && !noCode && query.length > 0 && (view.sort === "files" || view.sort === "modules");
   const firstMatch = rows.find((row) => row.kind === "fn");
   const fixed = noCode
     ? gpu ? [<Chats key="threads" />, <Kernels key="kernels" />] : [<Chats key="threads" />, <InThisModel key="model" />, <Blocks key="blocks" />]
     : [<Chats key="threads" />, <YourWork key="work" />, <FileViews key="views" />, <SourceFiles key="source" />, <Resources key="resources" />, <FunctionsHead key="functions" view={view} first={firstMatch?.kind === "fn" ? firstMatch.fn.addr : null} />];
   const after = searching
-    ? [<MatchNote key="note" count={rows.length} />]
+    ? [<MatchNote key="note" count={rows.length} yoursFirst={view.sort === "files"} />]
     : open && !noCode && rows.length === 0 ? [program.functions.length === 0 ? <Faint key="none" text="Loading functions…" /> : (
       <div key="none" style={{ display: "flex", flexDirection: "column", paddingTop: 4, paddingBottom: 8 }}>
         <EmptyState title="Nothing to show here" hint="Try another filter in the menu at the end of the field, or ask the agent to search." />

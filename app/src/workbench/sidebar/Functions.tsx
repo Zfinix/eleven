@@ -9,6 +9,7 @@ import { TYPING } from "../../lib/shortcuts";
 import { useTheme } from "../../theme";
 import { ask, subjectMenu } from "../actions";
 import { ELLIPSIS, HOVER, MONO_STYLE, useBench } from "../parts";
+import type { FunctionModules } from "./functionModules";
 import { useFolders } from "./memory";
 import { type FnRow, type FnShow, type FnSort, logoFor, rowFile } from "./model";
 import { Heading, useSectionOpen } from "./parts";
@@ -23,6 +24,7 @@ const SHOWS: readonly { readonly id: FnShow; readonly label: string; readonly ch
 
 const SORTS: readonly { readonly id: FnSort; readonly label: string }[] = [
   { id: "files", label: "Group by package or file" },
+  { id: "modules", label: "Group by module" },
   { id: "address", label: "Sort by address" },
   { id: "name", label: "Sort by name" },
 ];
@@ -33,13 +35,17 @@ function filterMenu(view: FnView): readonly MenuEntry[] {
   return [
     ...SHOWS.map((show) => pick(show.label, view.show === show.id, () => view.setShow(show.id))),
     { kind: "separator" },
-    ...SORTS.map((sort) => pick(sort.label, view.sort === sort.id, () => view.setSort(sort.id))),
+    ...SORTS.filter((sort) => sort.id !== "modules" || view.modules).map((sort) => pick(sort.label, view.sort === sort.id, () => view.setSort(sort.id))),
   ];
 }
 
 export type FnView = {
   readonly sort: FnSort;
   readonly show: FnShow;
+  /** How the list starts: by module when the binary registers modules. */
+  readonly byDefault: FnSort;
+  /** Which module each function belongs to, or null when the binary names no modules. */
+  readonly modules: FunctionModules | null;
   readonly setSort: (sort: FnSort) => void;
   readonly setShow: (show: FnShow) => void;
 };
@@ -51,7 +57,7 @@ export function FunctionsHead({ view, first }: { readonly view: FnView; readonly
   const { program, wb, openFn } = bench;
   const { open } = useSectionOpen("functions");
   const chip = SHOWS.find((show) => show.id === view.show)?.chip ?? "";
-  const filtered = view.show !== "all" || view.sort !== "files";
+  const filtered = view.show !== "all" || view.sort !== view.byDefault;
   const submit = (): void => {
     const query = wb.s.filter.trim();
     if (!query) return;
@@ -75,18 +81,19 @@ export function FunctionsHead({ view, first }: { readonly view: FnView; readonly
           </div>
         </div>
       )}
+      {open && view.sort === "modules" && <div style={{ paddingLeft: 8, paddingRight: 8, paddingBottom: 4, fontSize: 11, color: p.faint }}>{"≈ means the module is guessed from the functions around it."}</div>}
     </div>
   );
 }
 
 /** Under the results while filtering: how many matched, or that ↩ asks the agent. */
-export function MatchNote({ count }: { readonly count: number }): ReactElement {
+export function MatchNote({ count, yoursFirst }: { readonly count: number; readonly yoursFirst: boolean }): ReactElement {
   const { p } = useTheme();
-  const text = count === 0 ? "No functions match. Press ↩ to ask the agent." : `${count.toLocaleString()} ${count === 1 ? "match" : "matches"}, your code first. ↩ opens the first.`;
+  const text = count === 0 ? "No functions match. Press ↩ to ask the agent." : `${count.toLocaleString()} ${count === 1 ? "match" : "matches"}${yoursFirst ? ", your code first" : ", by module"}. ↩ opens the first.`;
   return <div style={{ paddingTop: 6, paddingBottom: 6, paddingLeft: 8, paddingRight: 8, fontSize: 11.5, color: p.faint }}>{text}</div>;
 }
 
-/** An origin heading inside Functions: Your code, Libraries, Imports or Runtime, with its count. */
+/** An origin or module heading inside Functions, with its count. */
 function GroupRow({ row, onToggle }: { readonly row: Extract<FnRow, { kind: "node" }>; readonly onToggle: () => void }): ReactElement {
   const { p } = useTheme();
   return (
@@ -173,6 +180,7 @@ function FunctionRow({ row }: { readonly row: Extract<FnRow, { kind: "fn" }> }):
     <div {...bind} role="treeitem" aria-selected={on} aria-label={`function ${row.label}`} style={{ display: "flex", alignItems: "center", gap: 8, height: 24, flexShrink: 0, paddingLeft: treeIndent(row.depth - 1) + PAST_CHEVRON, paddingRight: 8, borderRadius: 6, cursor: "pointer", hover: HOVER, ...(on ? { backgroundColor: p.sel } : {}) }}>
       <Icon name={fn.kind === "function" ? "function" : "thunk"} size={12} color={p.link} />
       <div style={{ flexGrow: 1, minWidth: 0, fontSize: 12, color: on ? p.text : p.text3, pointerEvents: "none", ...MONO_STYLE, ...ELLIPSIS }}>{row.label}</div>
+      {row.module?.evidence === "layout" && <div aria-label="Module guessed from the functions around it" style={{ flexShrink: 0, fontSize: 12, color: p.faint, pointerEvents: "none" }}>{"≈"}</div>}
       {renamed && <div aria-label="Renamed by you" style={{ width: 6, height: 6, flexShrink: 0, borderRadius: 3, backgroundColor: p.link }} />}
     </div>
   );
