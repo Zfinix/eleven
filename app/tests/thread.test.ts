@@ -49,4 +49,7 @@ test("slash commands: only text that starts with / is a command", () => {
   expect(isCommand("  /compact")).toBe(true);
   expect(isCommand("what does /usr/lib hold?")).toBe(false);
   expect(isCommand("@main /goal")).toBe(false);
+  expect(isCommand("/usr/lib/libswiftCore.dylib, what does this do?")).toBe(false);
+  expect(isCommand("/ what")).toBe(false);
+  expect(isCommand("/goal")).toBe(true);
 });
