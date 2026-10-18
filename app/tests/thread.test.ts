@@ -3,7 +3,7 @@ import { expect, test } from "bun:test";
 import type { SessionOption } from "../src/agents/events";
 import { translate } from "../src/agents/translate";
 import { sourcesOf } from "../src/chat/Sources";
-import { type Block, EMPTY_THREAD, threadReducer } from "../src/chat/thread";
+import { type Block, EMPTY_THREAD, isCommand, threadReducer } from "../src/chat/thread";
 
 const text = (value: string): Block => ({ kind: "text", text: value });
 
@@ -42,4 +42,11 @@ test("thread: an agent notice shows as a note, never inside the reply", () => {
   if (!event) return;
   const state = threadReducer(EMPTY_THREAD, { type: "event", event, at: 0 });
   expect(state.messages).toEqual([{ kind: "note", text: "Fast mode turned off. Requires extra usage to be enabled for this account.", tone: "info" }]);
+});
+
+test("slash commands: only text that starts with / is a command", () => {
+  expect(isCommand("/goal find the license check")).toBe(true);
+  expect(isCommand("  /compact")).toBe(true);
+  expect(isCommand("what does /usr/lib hold?")).toBe(false);
+  expect(isCommand("@main /goal")).toBe(false);
 });

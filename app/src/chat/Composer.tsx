@@ -14,6 +14,7 @@ import { ContextRing } from "./ContextRing";
 import { MentionPicker } from "./MentionPicker";
 import { indexMentions, type Mention, type MentionIndex, startedMention, withMentions } from "./mentions";
 import { flipped, isSwitch, ModelChip, OptionChip } from "./OptionMenu";
+import { isCommand } from "./thread";
 import type { Agents } from "./useAgents";
 import type { Thread } from "./useThread";
 import { noteTyping } from "../lib/shortcuts";
@@ -180,7 +181,7 @@ export function Composer({ place, target, agents, thread, onAttach, onDetach, on
   const submit = (): void => {
     if (!typed || blocked) return;
     const text = fileOnly && target ? `What does ${target.name} do when it starts?` : draft;
-    thread.send(withMentions(about ? `@${about} ${text}` : text, picked));
+    thread.send(withMentions(about && !isCommand(text) ? `@${about} ${text}` : text, picked));
     setDraft("");
     setPicked([]);
   };

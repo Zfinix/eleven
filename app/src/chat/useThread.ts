@@ -20,7 +20,7 @@ import { androidHint, engineHint } from "../analysis/hint";
 import { activeBackend } from "../analysis/engines";
 import { prepareTarget, type Target } from "../engine/target";
 import { type SavedThread, saveThread } from "./history";
-import { agentName, EMPTY_THREAD, isBusy, type Message, threadReducer, type ThreadState } from "./thread";
+import { agentName, EMPTY_THREAD, isBusy, isCommand, type Message, threadReducer, type ThreadState } from "./thread";
 import { useStreamBuffer } from "./streamBuffer";
 import { useChatMoments } from "../notify/useChatMoments";
 import { shownText } from "../skills/load";
@@ -259,8 +259,9 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
   const deliver = (text: string): void => {
     const live = ensureSession();
     if (target && (target.kind === "binary" || target.kind === "app") && !prompted.current) void openEntry(target);
-    const prompt = prompted.current ? text : firstPrompt(target, state.messages, text);
-    prompted.current = true;
+    const command = isCommand(text);
+    const prompt = prompted.current || command ? text : firstPrompt(target, state.messages, text);
+    if (!command) prompted.current = true;
     dispatch({ type: "sent", text, at: Date.now() });
     void live.prompt(prompt);
   };
