@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -9,8 +9,8 @@ process.env.ELEVEN_CACHE = join(root, "cache");
 process.env.ELEVEN_PROJECTS_DIR = join(root, "Projects");
 
 const { saveDocument, openDocument, documentPath } = await import("../src/engine/document");
-const { openElevenFile, sha256 } = await import("../src/engine/elevenFile");
-const { loadProject, saveProject, EMPTY_PROJECT } = await import("../src/engine/project");
+const { openElevenFile, pack, sha256, writeAtomic } = await import("../src/engine/elevenFile");
+const { loadProject, projectJson, saveProject, EMPTY_PROJECT } = await import("../src/engine/project");
 const { loadThread, saveThread } = await import("../src/chat/history");
 const { prepareTarget } = await import("../src/engine/target");
 
@@ -65,4 +65,69 @@ test("a damaged or foreign file is refused in plain words", () => {
   const foreign = join(root, "notes.eleven");
   writeFileSync(foreign, "hello");
   expect(() => openElevenFile(foreign)).toThrow(/isn't an Eleven project file|cut short/);
+});
+
+const info = { name: "echo", kind: "binary", arch: "arm64e", meta: "Mach-O · arm64e", binary: id, savedAt: 1, app: "0.1.9" };
+
+test("a file written the old way (every part compressed whole, binary at level 19) still opens", () => {
+  saveProject(id, { ...EMPTY_PROJECT, names: new Map([["0x100000960", "old_main"]]) });
+  const old = join(root, "old.eleven");
+  const bytes = new Uint8Array(readFileSync(binary));
+  writeAtomic(old, pack(info, [
+    { name: "project.json", data: new TextEncoder().encode(projectJson(id)), level: 3 },
+    { name: "chats.json", data: new TextEncoder().encode(JSON.stringify([{ id: "old1", title: "Old chat", target: binary, project: id, messages: [], updatedAt: 2 }])), level: 3 },
+    { name: "cache.json", data: new TextEncoder().encode("{}"), level: 19 },
+    { name: "binary", data: bytes, level: 19 },
+  ]));
+  rmSync(process.env.ELEVEN_SUPPORT ?? "", { recursive: true, force: true });
+  const opened = openDocument(old);
+  expect(sha256(new Uint8Array(readFileSync(opened.binary)))).toBe(id);
+  expect(loadProject(id).names.get("0x100000960")).toBe("old_main");
+  expect(loadThread("old1")?.title).toBe("Old chat");
+});
+
+test("a saved file is plain format 1: each entry decodes with stock zstd to its recorded size and hash", async () => {
+  await saveDocument(target, id, out);
+  const bytes = new Uint8Array(readFileSync(out));
+  const length = new DataView(bytes.buffer).getUint32(8, true);
+  const manifest: unknown = JSON.parse(new TextDecoder().decode(bytes.subarray(12, 12 + length)));
+  const file = openElevenFile(out);
+  expect(file.manifest.format).toBe(1);
+  expect(manifest).toEqual(file.manifest);
+  for (const entry of file.manifest.entries) {
+    const start = 12 + length + entry.offset;
+    const raw = Bun.zstdDecompressSync(bytes.subarray(start, start + entry.size));
+    expect(raw.length).toBe(entry.raw);
+    expect(sha256(raw)).toBe(entry.sha256);
+  }
+  expect(file.entry("binary")?.length).toBe(statSync(binary).size);
+  file.close();
+});
+
+test("saves at the same time run one after another and leave one whole file", async () => {
+  await Promise.all([saveDocument(target, id, out), saveDocument(target, id, out), saveDocument(target, id, out)]);
+  const file = openElevenFile(out);
+  expect(sha256(file.entry("binary") ?? new Uint8Array())).toBe(id);
+  file.close();
+  expect(existsSync(`${out}.saving`)).toBe(false);
+});
+
+test("a save that fails leaves the last good file as it was", async () => {
+  const before = readFileSync(out);
+  const missing = { ...target, path: join(root, "gone"), name: "gone" };
+  await expect(saveDocument(missing, "gone-id", out, false)).rejects.toThrow();
+  expect(readFileSync(out).equals(before)).toBe(true);
+
+  const locked = join(root, "locked");
+  mkdirSync(locked);
+  const kept = join(locked, "echo.eleven");
+  copyFileSync(out, kept);
+  chmodSync(locked, 0o555);
+  try {
+    await expect(saveDocument(target, id, kept, false)).rejects.toThrow();
+    expect(readFileSync(kept).equals(before)).toBe(true);
+    expect(existsSync(`${kept}.saving`)).toBe(false);
+  } finally {
+    chmodSync(locked, 0o755);
+  }
 });

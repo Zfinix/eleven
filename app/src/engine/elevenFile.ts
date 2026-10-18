@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
-import { closeSync, openSync, readSync, renameSync, writeFileSync } from "node:fs";
+import { closeSync, createReadStream, openSync, readSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { Readable, Writable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import { constants, createZstdCompress } from "node:zlib";
 
 import { isRecord } from "../lib/guards";
 
@@ -26,7 +29,9 @@ export type Manifest = {
   readonly entries: readonly Entry[];
 };
 
-export type Part = { readonly name: string; readonly data: Uint8Array; readonly level: number } | { readonly name: string; readonly packed: Uint8Array; readonly raw: Uint8Array };
+export type Packed = { readonly name: string; readonly packed: Uint8Array; readonly raw: number; readonly sha256: string };
+
+export type Part = { readonly name: string; readonly data: Uint8Array; readonly level: number } | Packed;
 
 export function sha256(data: Uint8Array): string {
   return createHash("sha256").update(data).digest("hex");
@@ -36,17 +41,46 @@ export function compress(data: Uint8Array, level: number): Uint8Array {
   return Bun.zstdCompressSync(data, { level });
 }
 
+/** Compresses as it reads, keeping only the compressed bytes, so a large input is never held whole. */
+export async function compressStream(name: string, input: AsyncIterable<Uint8Array>, level: number): Promise<Packed> {
+  const hash = createHash("sha256");
+  const out: Uint8Array[] = [];
+  let raw = 0;
+  async function* measured(): AsyncGenerator<Uint8Array> {
+    for await (const chunk of input) {
+      hash.update(chunk);
+      raw += chunk.length;
+      yield chunk;
+    }
+  }
+  const collect = new Writable({
+    write(chunk: Uint8Array, _encoding: BufferEncoding, done: (error?: Error | null) => void): void {
+      out.push(chunk);
+      done();
+    },
+  });
+  await pipeline(Readable.from(measured(), { objectMode: false }), createZstdCompress({ params: { [constants.ZSTD_c_compressionLevel]: level } }), collect);
+  return { name, packed: Buffer.concat(out), raw, sha256: hash.digest("hex") };
+}
+
+export function compressFile(name: string, path: string, level: number): Promise<Packed> {
+  return compressStream(name, createReadStream(path), level);
+}
+
+function packed(part: Part): Packed {
+  return "data" in part ? { name: part.name, packed: compress(part.data, part.level), raw: part.data.length, sha256: sha256(part.data) } : part;
+}
+
 /** One file: magic, the manifest's length, the manifest as JSON, then each entry compressed on its own. */
 export function pack(info: Omit<Manifest, "format" | "entries">, parts: readonly Part[]): Uint8Array {
   let offset = 0;
   const entries: Entry[] = [];
   const blobs: Uint8Array[] = [];
   for (const part of parts) {
-    const raw = "data" in part ? part.data : part.raw;
-    const packed = "data" in part ? compress(part.data, part.level) : part.packed;
-    entries.push({ name: part.name, codec: "zstd", offset, size: packed.length, raw: raw.length, sha256: sha256(raw) });
-    blobs.push(packed);
-    offset += packed.length;
+    const ready = packed(part);
+    entries.push({ name: ready.name, codec: "zstd", offset, size: ready.packed.length, raw: ready.raw, sha256: ready.sha256 });
+    blobs.push(ready.packed);
+    offset += ready.packed.length;
   }
   const manifest = new TextEncoder().encode(JSON.stringify({ ...info, format: FORMAT, entries }));
   const out = new Uint8Array(HEADER + manifest.length + offset);
@@ -61,11 +95,16 @@ export function pack(info: Omit<Manifest, "format" | "entries">, parts: readonly
   return out;
 }
 
-/** Writes beside the target, then renames over it, so a crash mid-save never leaves half a project. */
+/** Writes beside the target, then renames over it, so a crash or a failed write never leaves half a project. */
 export function writeAtomic(path: string, data: Uint8Array): void {
   const temp = `${path}.saving`;
-  writeFileSync(temp, data);
-  renameSync(temp, path);
+  try {
+    writeFileSync(temp, data);
+    renameSync(temp, path);
+  } catch (error) {
+    rmSync(temp, { force: true });
+    throw error;
+  }
 }
 
 function readAt(fd: number, offset: number, length: number): Uint8Array {

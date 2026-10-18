@@ -7,7 +7,8 @@ import { isRecord } from "../lib/guards";
 import { supportPath } from "../lib/support";
 import { pathSetting } from "../settings/store";
 import { appVersion } from "../settings/system";
-import { type Manifest, openElevenFile, pack, type Part, sha256, writeAtomic } from "./elevenFile";
+import { SerialQueue } from "../lib/serial";
+import { compressFile, compressStream, type Manifest, openElevenFile, pack, type Packed, sha256, writeAtomic } from "./elevenFile";
 import { projectJson, restoreProjectJson } from "./project";
 import type { Target } from "./target";
 import { cacheRoot as platformCache, chooseSavePath } from "../lib/platform";
@@ -18,8 +19,13 @@ function cacheRoot(): string {
 const DOCUMENTS = supportPath("documents.json");
 const EXTENSION = ".eleven";
 
-/** Binaries rarely change and level 19 is slow, so each one is compressed once per run. */
-const packedBinaries = new Map<string, { readonly raw: Uint8Array; readonly packed: Uint8Array }>();
+/** Level 19 took tens of seconds and GiBs on large binaries; 3 is fast and streams in little memory. */
+const LEVEL = 3;
+
+/** Binaries rarely change, so the last one compressed is kept for the next save, compressed only. */
+let packedBinary: { readonly id: string; readonly part: Packed } | null = null;
+
+const saves = new SerialQueue();
 
 export function isElevenFile(path: string): boolean {
   return path.toLowerCase().endsWith(EXTENSION);
@@ -61,15 +67,18 @@ function cacheFiles(id: string): Record<string, string> {
   return out;
 }
 
-async function squeeze(name: string, raw: Uint8Array, level: number): Promise<Part> {
-  return { name, raw, packed: new Uint8Array(await Bun.zstdCompress(raw, { level })) };
+async function* chunk(data: Uint8Array): AsyncGenerator<Uint8Array> {
+  yield data;
 }
 
-async function binaryPart(path: string, id: string): Promise<Part> {
-  const known = packedBinaries.get(id);
-  if (known) return { name: "binary", raw: known.raw, packed: known.packed };
-  const part = await squeeze("binary", new Uint8Array(readFileSync(path)), 19);
-  if ("packed" in part) packedBinaries.set(id, { raw: part.raw, packed: part.packed });
+function squeeze(name: string, raw: Uint8Array): Promise<Packed> {
+  return compressStream(name, chunk(raw), LEVEL);
+}
+
+async function binaryPart(path: string, id: string): Promise<Packed> {
+  if (packedBinary?.id === id) return packedBinary.part;
+  const part = await compressFile("binary", path, LEVEL);
+  packedBinary = { id, part };
   return part;
 }
 
@@ -80,19 +89,22 @@ export function projectsFolder(): string {
 
 const text = (value: string): Uint8Array => new TextEncoder().encode(value);
 
-/** Packs the binary, your work, this project's chats and the decompiled code into one `.eleven` file. Compresses off the main thread. */
-export async function saveDocument(target: Target, id: string, path: string, remember = true): Promise<void> {
-  const chats = listThreads().filter((summary) => summary.project === id).flatMap((summary) => loadThread(summary.id) ?? []);
-  const parts: readonly Part[] = await Promise.all([
-    squeeze("project.json", text(projectJson(id)), 3),
-    squeeze("chats.json", text(JSON.stringify(chats)), 3),
-    squeeze("cache.json", text(JSON.stringify(cacheFiles(id))), 19),
-    binaryPart(target.path, id),
-  ]);
+async function writeDocument(target: Target, id: string, path: string, remember: boolean): Promise<void> {
+  const parts: readonly Packed[] = [
+    await squeeze("project.json", text(projectJson(id))),
+    await squeeze("chats.json", text(JSON.stringify(listThreads().filter((summary) => summary.project === id).flatMap((summary) => loadThread(summary.id) ?? [])))),
+    await squeeze("cache.json", text(JSON.stringify(cacheFiles(id)))),
+    await binaryPart(target.path, id),
+  ];
   const info: Omit<Manifest, "format" | "entries"> = { name: target.name, kind: target.kind, arch: target.arch, meta: target.meta, binary: id, savedAt: Date.now(), app: appVersion() };
   mkdirSync(dirname(path), { recursive: true });
   writeAtomic(path, pack(info, parts));
   if (remember) setDocumentPath(id, path);
+}
+
+/** Packs the binary, your work, this project's chats and the decompiled code into one `.eleven` file. One part at a time, one save at a time, so large buffers never pile up. */
+export function saveDocument(target: Target, id: string, path: string, remember = true): Promise<void> {
+  return saves.run(() => writeDocument(target, id, path, remember));
 }
 
 /** Deletes the project's `.eleven` file and every chat in it. */
