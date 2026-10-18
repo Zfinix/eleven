@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
 
-/** The current time, refreshed every `everyMs` while `active`. */
+import { useWindowActive } from "./windowActivity";
+
+/** The current time, refreshed every `everyMs` while `active` and the window is in front. */
 export function useNow(active: boolean, everyMs = 1000): number {
+  const inFront = useWindowActive();
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    if (!active) return;
+    if (!active || !inFront) return;
     setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), everyMs);
     return () => clearInterval(timer);
-  }, [active, everyMs]);
+  }, [active, everyMs, inFront]);
   return now;
 }
 
