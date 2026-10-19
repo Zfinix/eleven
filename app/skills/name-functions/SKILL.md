@@ -5,7 +5,7 @@ description: Make a stripped binary readable. Rename the functions worth naming,
 
 # Name the functions worth naming
 
-A fresh binary is a wall of `FUN_` names. Do not rename all of them, that wastes effort on boilerplate. Spend it where it pays.
+A fresh binary is a wall of `FUN_` names. Do not rename all of them; that wastes effort on boilerplate. Spend it where it pays.
 
 1. Use `list_procedures` and `current_view` (eleven) to see the function list and the total.
 2. Pick the ones worth naming first:
