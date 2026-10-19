@@ -18,7 +18,7 @@ Any ACP agent works through REA (Ghidra headless) and Eleven's own tools.
   - `components/`: shared UI (kit, ui, code, ContextMenu, MenuRows, Toast, ErrorBoundary, KeymapIcon). Feature-only components stay in their feature folder.
   - `engine/`: `rea.ts`, `procedures.ts`, `dossier.ts`, `toolchain.ts`, `project.ts`, `target.ts`: one shared REA client, function lists, per-function dossiers (blocks/refs), Ghidra/Java/REA discovery, project file, opened target.
   - `bridge/`: Eleven's own MCP server (the `eleven` tools: open_function, set_view, rename_function, add_note, set_code_type, set_number_format, gpu_profile), served to every agent so it can drive the window.
-  - `skills/` (and src/skills/load.ts): Eleven's built-in reverse-engineering playbooks, shown in the composer / palette; they send to any agent.
+  - `skills/` (and src/skills/load.ts): Eleven's built-in reverse-engineering playbooks, shown in the composer / palette; they are sent to any agent.
 
 ## Commands (run in `app/`)
 
