@@ -13,7 +13,7 @@ A decompiler plugin is optional here. You reconstruct the C yourself from what t
 
 Then write it out:
 
-- Clean C for the function: real parameter and local names, a struct or enum where the code clearly implies one, and the control flow a person would actually write. Stay faithful to the instructions, do not invent behavior.
+- Clean C for the function: real parameter and local names, a struct or enum where the code clearly implies one, and the control flow a person would actually write. Stay faithful to the instructions and do not invent behavior.
 - Put a `/* ? */` comment on anything you are unsure of.
 - `rename_function` (eleven) it and any `FUN_` callees you now understand, and `add_note` one sentence on what it does.
 
