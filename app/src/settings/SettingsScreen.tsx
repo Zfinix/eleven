@@ -137,7 +137,7 @@ export function SettingsScreen({ initial = "general", onBack, onSetup }: { reado
     const rows = group.rows.filter((row) => rowMatches(row, group, pageTitle(id), needle));
     return rows.length > 0 ? [{ page: id, group: { ...group, rows } }] : [];
   }));
-  const shown = (id: Page): boolean => needle === "" || hits.some((hit) => hit.page === id) || (id === "keyboard" ? KEYBOARD_WORDS.includes(needle) : pageTitle(id).toLowerCase().includes(needle));
+  const shown = (id: Page): boolean => needle === "" || hits.some((hit) => hit.page === id) || pageTitle(id).toLowerCase().includes(needle) || (id === "keyboard" && KEYBOARD_WORDS.includes(needle));
   const badges = new Set<Page>([...(activeEngine() === null ? ["engines" as const] : []), ...(installed.size === 0 || agents.list.some((agent) => installed.has(agent.id) && signedIn(agent) === false) ? ["agents" as const] : [])]);
   const open = (next: Page): void => {
     setPage(next);

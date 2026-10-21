@@ -53,7 +53,7 @@ test("i18n: Chinese comes from the locale file, values still filled in", () => {
   expect(t("settings.language")).toBe("语言");
   expect(t("kit.skip")).toBe("跳过");
   expect(t("kit.step", { current: 2, count: 5 })).toBe("第 2 步，共 5 步");
-  expect(t("device.mac")).toBe("这台 Mac");
+  expect(t("device.mac")).toBe("这台 Mac 电脑");
 });
 
 test("i18n: a message a translation lacks falls back to English", () => {

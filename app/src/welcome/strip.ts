@@ -33,8 +33,6 @@ function chosenPath(r: Readiness): readonly EngineId[] {
   return ["rizin"];
 }
 
-
-
 function average(values: readonly (number | null)[]): number | null {
   return values.some((value) => value === null) ? null : values.reduce<number>((sum, value) => sum + (value ?? 0), 0) / values.length;
 }

@@ -25,8 +25,6 @@ const GROUP_LABELS: Readonly<Record<CommandGroup, PlainId>> = {
   Debugger: "keyboard.group.debugger",
 };
 
-
-
 const BOARD_KEYMAPS: readonly KeymapId[] = ["eleven", "hopper", "ghidra", "vscode", "zed", "xcode"];
 
 function keymapOptions(tools: KeyTools, current: KeymapId): readonly (Option & { readonly lead: ReactElement })[] {
