@@ -11,6 +11,7 @@ mkdir -p "$out/Contents/MacOS" "$out/Contents/Resources"
 (cd "$app_dir" && bun build --compile --define process.env.NODE_ENV='"production"' src/bundled.ts --outfile "$out/Contents/MacOS/Eleven" > /dev/null)
 cp -R "$app_dir/assets" "$out/Contents/Resources/assets"
 cp -R "$app_dir/skills" "$out/Contents/Resources/skills"
+cp -R "$app_dir/locales" "$out/Contents/Resources/locales"
 cp -R "$app_dir/vendor" "$out/Contents/Resources/vendor"
 cp -R "$app_dir/assets/fonts" "$out/Contents/Resources/fonts"
 cp "$app_dir"/node_modules/@gpuix/native-darwin-*/gpuix-native.*.node "$out/Contents/Resources/gpuix-native.node"

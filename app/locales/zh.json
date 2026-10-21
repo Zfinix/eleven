@@ -1,0 +1,11 @@
+{
+  "device.mac": "这台 Mac",
+  "device.computer": "这台电脑",
+  "settings.language": "语言",
+  "settings.language.desc": "菜单和按钮使用的语言。",
+  "settings.language.auto": "跟随系统",
+  "kit.showDetails": "显示详情",
+  "kit.hideDetails": "隐藏详情",
+  "kit.step": "第 {current} 步，共 {count} 步",
+  "kit.skip": "跳过"
+}

@@ -31,6 +31,7 @@ mkdir -p "$out/bin" "$res" "$cache"
   src/bundled.ts --outfile "$out/bin/Eleven.exe" > /dev/null)
 cp -R "$app_dir/assets" "$res/assets"
 cp -R "$app_dir/skills" "$res/skills"
+cp -R "$app_dir/locales" "$res/locales"
 cp -R "$app_dir/vendor" "$res/vendor"
 cp -R "$app_dir/assets/fonts" "$res/fonts"
 

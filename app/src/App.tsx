@@ -5,6 +5,7 @@ import { useLiveChat } from "./bridge/live";
 import { claimWorkbenchOpen } from "./debug/live";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Home } from "./home/Home";
+import { adoptLanguage, useLanguage } from "./i18n";
 import { type Chat, useChat } from "./chat/useChat";
 import { type AppItem, type MenuChoice } from "./keys/menus";
 import { runMenuAction } from "./keys/menuActions";
@@ -105,8 +106,11 @@ export function App({ initial }: { readonly initial: Target | null }): ReactElem
   const here = useRef<Screen>(screen);
   here.current = screen;
   const chatting = chat.thread.state.messages.some((message) => message.kind === "user");
-  const { openWorkbench, frost } = useSettings().settings;
+  const { openWorkbench, frost, language } = useSettings().settings;
+  /** Read here so a language switch redraws every screen below. */
+  useLanguage();
   const { renderer } = useGpuix();
+  useEffect(() => adoptLanguage(language), [language]);
   useEffect(() => {
     if (renderer && "setWindowBlurRadius" in renderer && typeof renderer.setWindowBlurRadius === "function") renderer.setWindowBlurRadius(frostRadius(frost));
   }, [renderer, frost]);

@@ -2,6 +2,7 @@ import { Tooltip as TipRoot, TooltipContent, TooltipTrigger } from "@gpuix/react
 import type { StyleDesc } from "@gpuix/react";
 import { type ReactElement, type ReactNode, useState } from "react";
 
+import { t } from "../i18n";
 import { dashedOutline, usePaintedSize } from "../lib/dashed";
 import { useNow } from "../lib/useNow";
 import { MONO, type Palette, SANS, useTheme } from "../theme";
@@ -136,7 +137,7 @@ export function ErrorCard({ title, detail, raw = null }: { readonly title: strin
       <div style={{ marginTop: 2, color: p.text2, userSelect: "text" }}>{detail}</div>
       {raw && (
         <div onClick={() => setOpen(!open)} role="button" aria-expanded={open} style={{ alignSelf: "flex-start", marginTop: 8, fontSize: 12, color: p.muted, textDecoration: "underline", cursor: "pointer", hover: HOVER }}>
-          {open ? "Hide details" : "Show details"}
+          {open ? t("kit.hideDetails") : t("kit.showDetails")}
         </div>
       )}
       {raw && open && (
@@ -202,7 +203,7 @@ export function StepProgress({ title, steps, note }: { readonly title: string; r
     <div role="status" aria-label={title} style={{ display: "flex", flexDirection: "column", padding: 14, borderWidth: 1, borderColor: p.sel, borderRadius: 10, backgroundColor: p.card }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
         <div style={{ fontWeight: 500, color: p.text }}>{title}</div>
-        <div style={{ color: p.muted, whiteSpace: "nowrap" }}>{`Step ${current} of ${steps.length}`}</div>
+        <div style={{ color: p.muted, whiteSpace: "nowrap" }}>{t("kit.step", { current, count: steps.length })}</div>
       </div>
       <div style={{ display: "flex", height: 6, borderRadius: 3, backgroundColor: p.raised2, overflow: "hidden" }}>
         <div style={{ flexGrow: fraction, flexBasis: 0, backgroundColor: p.primary }} />
@@ -253,7 +254,7 @@ export function SuggestionCard({ title, reason, apply, state, onApply, onSkip }:
       {state.kind === "pending" ? (
         <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
           <Button label={apply} tone="primary" size="compact" onClick={onApply} />
-          <Button label="Skip" tone="outline" size="compact" onClick={onSkip} />
+          <Button label={t("kit.skip")} tone="outline" size="compact" onClick={onSkip} />
         </div>
       ) : (
         <div style={{ marginTop: 6, fontSize: 12, color: state.result === "Skipped." ? p.muted : p.string }}>{state.result}</div>

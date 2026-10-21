@@ -4,6 +4,7 @@ import { useSyncExternalStore } from "react";
 
 import { z } from "zod";
 
+import { LANGUAGE_SETTINGS, type LanguageSetting } from "../i18n";
 import { COMMAND_IDS } from "../keys/commands";
 import { KEYMAP_IDS, type KeymapId, type Overrides } from "../keys/keymaps";
 import { errorMessage, isRecord } from "../lib/guards";
@@ -50,6 +51,7 @@ export type PathKey = (typeof PATH_KEYS)[number];
 
 export type Settings = {
   readonly defaultAgent: string | null;
+  readonly language: LanguageSetting;
   readonly askBeforeChanges: boolean;
   readonly readWithoutAsking: boolean;
   /** Agent renames, notes, comments and bookmarks wait for review too, not just patches. */
@@ -142,6 +144,7 @@ export type Settings = {
 
 export const DEFAULT_SETTINGS: Settings = {
   defaultAgent: null,
+  language: "auto",
   askBeforeChanges: true,
   readWithoutAsking: true,
   reviewAgentEdits: false,
@@ -250,6 +253,7 @@ const PERMISSIONS: z.ZodType<PermissionTable> = z.object({
 /** Each setting falls back to its default on its own, so one bad value never resets the rest. */
 const SETTINGS: z.ZodType<Settings> = z.object({
   defaultAgent: z.string().nullable().catch(D.defaultAgent),
+  language: z.enum(LANGUAGE_SETTINGS).catch(D.language),
   askBeforeChanges: z.boolean().catch(D.askBeforeChanges),
   readWithoutAsking: z.boolean().catch(D.readWithoutAsking),
   reviewAgentEdits: z.boolean().catch(D.reviewAgentEdits),
