@@ -9,12 +9,21 @@ import { findLldbDap } from "../debug/adapter";
 import { reaLaunch } from "../engine/rea";
 import { RECORDINGS_DIR } from "../gpu/trace";
 import { cacheDir, folderBytes, ghidraVersion, javaVersion, latestRelease, PROJECTS_DIR, projectCount, reaVersion, rizinVersion, sizeText, THREADS_DIR } from "./actions";
+import { t } from "../i18n";
 import { isNewer } from "../lib/version";
 import type { Tone } from "./model";
 import { currentSettings } from "./store";
 import { appVersion } from "./system";
 
-export type AppUpdate = { readonly version: string; readonly line: string; readonly short: string; readonly download: string | null };
+export type UpdateState =
+  | { readonly kind: "unchecked" }
+  | { readonly kind: "available"; readonly latest: string }
+  | { readonly kind: "offline"; readonly at: string }
+  | { readonly kind: "current"; readonly at: string };
+
+export type AppUpdate = { readonly version: string; readonly state: UpdateState; readonly download: string | null };
+
+export type ReaState = { readonly kind: "checking" | "missing" | "current" | "installed" } | { readonly kind: "outdated"; readonly latest: string };
 
 export type Info = {
   readonly engines: {
@@ -24,9 +33,9 @@ export type Info = {
     readonly ida: string | null;
   };
   readonly java: { readonly path: string | null; readonly version: string | null };
-  readonly rea: { readonly version: string | null; readonly status: { readonly text: string; readonly tone: Tone } };
+  readonly rea: { readonly version: string | null; readonly state: ReaState };
   readonly lldb: string | null;
-  readonly sizes: { readonly projects: string; readonly apps: number; readonly chats: string; readonly cache: string; readonly recordings: string };
+  readonly sizes: { readonly projects: string | null; readonly apps: number; readonly chats: string | null; readonly cache: string | null; readonly recordings: string | null };
   readonly app: AppUpdate;
   readonly remembered: number;
 };
@@ -71,10 +80,71 @@ function clock(date: Date): string {
 
 export function appUpdate(): AppUpdate {
   const version = appVersion();
-  if (latest && isNewer(latest.version, version)) return { version, line: `Eleven ${latest.version} is ready to download.`, short: `Eleven ${latest.version} is out.`, download: latest.url };
-  if (checkedAt === null) return { version, line: "Not checked yet.", short: "Not checked yet.", download: null };
-  if (offline) return { version, line: `Couldn’t reach the update server. Last tried today at ${clock(checkedAt)}.`, short: "Couldn’t check for updates.", download: null };
-  return { version, line: `You’re up to date. Last checked today at ${clock(checkedAt)}.`, short: "Up to date.", download: null };
+  if (latest && isNewer(latest.version, version)) return { version, state: { kind: "available", latest: latest.version }, download: latest.url };
+  if (checkedAt === null) return { version, state: { kind: "unchecked" }, download: null };
+  return { version, state: offline ? { kind: "offline", at: clock(checkedAt) } : { kind: "current", at: clock(checkedAt) }, download: null };
+}
+
+/** The update status under the version in Settings. */
+export function updateLine(app: AppUpdate): string {
+  const { state } = app;
+  switch (state.kind) {
+    case "available":
+      return t("update.ready", { version: state.latest });
+    case "unchecked":
+      return t("update.unchecked");
+    case "offline":
+      return t("update.offline", { time: state.at });
+    case "current":
+      return t("update.current", { time: state.at });
+    default: {
+      const unhandled: never = state;
+      return unhandled;
+    }
+  }
+}
+
+/** The same status in a few words, for the About page and the toast after a check. */
+export function updateShort(app: AppUpdate): string {
+  const { state } = app;
+  switch (state.kind) {
+    case "available":
+      return t("update.out", { version: state.latest });
+    case "unchecked":
+      return t("update.unchecked");
+    case "offline":
+      return t("update.failed");
+    case "current":
+      return t("update.upToDate");
+    default: {
+      const unhandled: never = state;
+      return unhandled;
+    }
+  }
+}
+
+export function reaStatus(state: ReaState): { readonly text: string; readonly tone: Tone } {
+  switch (state.kind) {
+    case "checking":
+      return { text: t("settings.checking"), tone: "quiet" };
+    case "missing":
+      return { text: t("settings.notFound"), tone: "warn" };
+    case "outdated":
+      return { text: t("settings.rea.out", { version: state.latest }), tone: "warn" };
+    case "current":
+      return { text: t("settings.upToDate"), tone: "good" };
+    case "installed":
+      return { text: t("settings.installed"), tone: "good" };
+    default: {
+      const unhandled: never = state;
+      return unhandled;
+    }
+  }
+}
+
+/** A folder size, or a word saying it is still being measured. */
+export function measured(size: string | null): string {
+  return size ?? t("settings.measuring");
 }
 
 /** Asks GitHub for Eleven's newest release on the chosen channel. */
@@ -97,15 +167,15 @@ async function gather(): Promise<Info> {
     rea ? reaVersion(rea) : Promise.resolve(null),
     latestRelease("Zfinix/rea"),
   ]);
-  const reaStatus = (): { readonly text: string; readonly tone: Tone } => {
-    if (!rea) return { text: "Not found", tone: "warn" };
-    if (reaV && reaLatest && isNewer(reaLatest.version, reaV)) return { text: `${reaLatest.version} is out`, tone: "warn" };
-    return reaLatest ? { text: "Up to date", tone: "good" } : { text: "Installed", tone: "good" };
+  const reaState = (): ReaState => {
+    if (!rea) return { kind: "missing" };
+    if (reaV && reaLatest && isNewer(reaLatest.version, reaV)) return { kind: "outdated", latest: reaLatest.version };
+    return { kind: reaLatest ? "current" : "installed" };
   };
   return {
     engines: { rizin: { path: rizinProgram, version: rizin }, ghidra: { path: ghidraDir, version: ghidraDir ? ghidraVersion(ghidraDir) : null }, hopper: hopperPath(), ida: idaPath() },
     java: { path: javaHome, version: java },
-    rea: { version: reaV, status: reaStatus() },
+    rea: { version: reaV, state: reaState() },
     lldb: findLldbDap(),
     sizes: {
       projects: sizeText(folderBytes(PROJECTS_DIR)),
@@ -122,9 +192,9 @@ async function gather(): Promise<Info> {
 const EMPTY: Info = {
   engines: { rizin: { path: null, version: null }, ghidra: { path: null, version: null }, hopper: null, ida: null },
   java: { path: null, version: null },
-  rea: { version: null, status: { text: "Checking", tone: "quiet" } },
+  rea: { version: null, state: { kind: "checking" } },
   lldb: null,
-  sizes: { projects: "Measuring", apps: 0, chats: "Measuring", cache: "Measuring", recordings: "Measuring" },
+  sizes: { projects: null, apps: 0, chats: null, cache: null, recordings: null },
   app: appUpdate(),
   remembered: 0,
 };

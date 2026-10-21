@@ -2,6 +2,7 @@ import { type EventPayload, type PublicInstance, useGpuix } from "@gpuix/react";
 import { type ReactElement, type ReactNode, useRef } from "react";
 
 import { AgentLogo, Icon, MenuSurface, Popover, usePopover } from "../components/ui";
+import { t } from "../i18n";
 import { TYPING } from "../lib/shortcuts";
 import { DARK, MONO, type Palette, useTheme } from "../theme";
 import type { Action, ButtonStyle, Confirm, Control, GroupModel, Lead, Option, SettingRowModel, Tone } from "./model";
@@ -234,7 +235,7 @@ function ConfirmBar({ confirm, onCancel }: { readonly confirm: Confirm; readonly
   return (
     <div role="alert" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginTop: -4, marginLeft: 18, marginRight: 18, marginBottom: 14, paddingTop: 10, paddingBottom: 10, paddingLeft: 12, paddingRight: 12, borderRadius: 10, backgroundColor: washes(p).err }}>
       <div style={{ flexGrow: 1, flexBasis: 260, color: p.text2, fontSize: 12.5 }}>{confirm.text}</div>
-      <div onClick={onCancel} role="button" aria-label="Cancel" style={{ display: "flex", alignItems: "center", height: 28, paddingLeft: 11, paddingRight: 11, borderWidth: 1, borderColor: p.line3, borderRadius: 8, fontSize: 12.5, cursor: "pointer", hover: { opacity: 0.72 } }}>Cancel</div>
+      <div onClick={onCancel} role="button" aria-label={t("settings.cancel")} style={{ display: "flex", alignItems: "center", height: 28, paddingLeft: 11, paddingRight: 11, borderWidth: 1, borderColor: p.line3, borderRadius: 8, fontSize: 12.5, cursor: "pointer", hover: { opacity: 0.72 } }}>{t("settings.cancel")}</div>
       <div onClick={confirm.act} role="button" aria-label={confirm.label} style={{ display: "flex", alignItems: "center", height: 28, paddingLeft: 11, paddingRight: 11, borderRadius: 8, backgroundColor: inks(p).err, color: "#ffffff", fontSize: 12.5, fontWeight: 600, cursor: "pointer", hover: { opacity: 0.72 } }}>{confirm.label}</div>
     </div>
   );
@@ -288,7 +289,7 @@ export function GroupView({ group, confirm, onCancel, preview = null, link = nul
 }): ReactElement {
   const { p } = useTheme();
   return (
-    <div aria-label={group.label ?? "Settings"} style={{ display: "flex", flexDirection: "column", marginBottom: 26 }}>
+    <div aria-label={group.label ?? t("settings.title")} style={{ display: "flex", flexDirection: "column", marginBottom: 26 }}>
       {(group.label || link) && <GroupLabel label={group.label ?? ""} link={link} />}
       <div style={{ display: "flex", flexDirection: "column", borderRadius: 14, backgroundColor: p.raised2 }}>
         {group.rows.map((row, ix) => (

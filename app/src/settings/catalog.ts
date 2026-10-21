@@ -12,16 +12,17 @@ import type { Agents } from "../chat/useAgents";
 import { appIcon } from "../components/ui";
 import { adoptToolchain } from "../engine/toolchain";
 import { RECORDINGS_DIR } from "../gpu/trace";
+import { LANGUAGE_NAMES, LANGUAGE_SETTINGS, type LanguageSetting, type PlainId, t, thisDevice } from "../i18n";
 import { loadSkills } from "../skills/load";
 import { resetWorkbenchLayout } from "../workbench/sizes";
 import { clearFolder, clearRecordings, cacheDir, deleteAllChats, moveToTrash, PROJECTS_DIR, THREADS_DIR } from "./actions";
-import type { Info } from "./info";
+import { type Info, measured, reaStatus, updateLine, updateShort } from "./info";
 import type { Action, Confirm, Control, GroupModel, Lead, Option, SettingRowModel } from "./model";
 import type { Page } from "./pages";
 import { DEFAULT_SETTINGS, type PathKey, PERMISSION_TOOLS, type PermissionLevel, type PermissionTool, saveSettings, type Settings, SETTINGS_FILE } from "./store";
 import { openLink, pickPath, RELEASE_NOTES, showInFinder, SPONSOR, tildePath } from "./system";
 import { ASSETS } from "../lib/assets";
-import { dataRoot, FILE_MANAGER, OS, THIS_DEVICE } from "../lib/platform";
+import { dataRoot, FILE_MANAGER, OS } from "../lib/platform";
 import { MOD } from "../lib/platform";
 import { codeFontsHere } from "./look";
 
@@ -55,8 +56,6 @@ export const ENGINE_LOGO = {
   ida: join(ENGINES_DIR, "ida.png"),
 } as const;
 
-const opts = (values: readonly string[]): readonly Option[] => values.map((value) => ({ value, label: value }));
-
 function btn(label: string, act: () => void, style: Action["style"] = "plain"): Action {
   return { label, act, style };
 }
@@ -69,13 +68,15 @@ type BoolKey = { [K in keyof Settings]: Settings[K] extends boolean ? K : never 
 
 type ChoiceKey = { [K in keyof Settings]: string extends Settings[K] ? never : Settings[K] extends string ? K : never }[keyof Settings];
 
+type Labels = Readonly<Record<string, string>>;
+
 function patchOf<K extends keyof Settings>(key: K, value: Settings[K]): Partial<Settings> {
   const patch: Partial<Settings> = {};
   patch[key] = value;
   return patch;
 }
 
-function pickControl<K extends ChoiceKey>(c: Ctx, kind: "seg" | "select", key: K, options: readonly Settings[K][], labels: Readonly<Record<string, string>> = {}, notes: Readonly<Record<string, string>> = {}): Control {
+function pickControl<K extends ChoiceKey>(c: Ctx, kind: "seg" | "select", key: K, options: readonly Settings[K][], labels: Labels = {}, notes: Labels = {}): Control {
   const pick = (value: string): void => {
     const next = options.find((option) => option === value);
     if (next !== undefined) c.update(patchOf(key, next));
@@ -85,8 +86,8 @@ function pickControl<K extends ChoiceKey>(c: Ctx, kind: "seg" | "select", key: K
 
 function makeHelpers(c: Ctx): {
   readonly tg: (key: BoolKey, title: string, desc: string, extra?: Partial<SettingRowModel>) => SettingRowModel;
-  readonly seg: <K extends ChoiceKey>(key: K, title: string, desc: string, options: readonly Settings[K][], labels?: Readonly<Record<string, string>>) => SettingRowModel;
-  readonly sel: <K extends ChoiceKey>(key: K, title: string, desc: string, options: readonly Settings[K][], notes?: Readonly<Record<string, string>>) => SettingRowModel;
+  readonly seg: <K extends ChoiceKey>(key: K, title: string, desc: string, options: readonly Settings[K][], labels?: Labels) => SettingRowModel;
+  readonly sel: <K extends ChoiceKey>(key: K, title: string, desc: string, options: readonly Settings[K][], labels?: Labels, notes?: Labels) => SettingRowModel;
   readonly path: (key: PathKey, title: string, shown: string, folder: boolean, extra?: Partial<SettingRowModel>) => SettingRowModel;
   readonly danger: (title: string, desc: string, button: string, confirm: Confirm, extra?: readonly Action[]) => SettingRowModel;
   readonly confirmed: (id: string, text: string, label: string, act: () => void, done: string) => Confirm;
@@ -102,7 +103,7 @@ function makeHelpers(c: Ctx): {
   return {
     tg: (key, title, desc, extra = {}) => ({ title, desc, control: { kind: "toggle", on: c.settings[key], flip: () => c.update(patchOf(key, !c.settings[key])) }, ...extra }),
     seg: (key, title, desc, options, labels = {}) => ({ title, desc, control: pickControl(c, "seg", key, options, labels) }),
-    sel: (key, title, desc, options, notes = {}) => ({ title, desc, control: pickControl(c, "select", key, options, {}, notes) }),
+    sel: (key, title, desc, options, labels = {}, notes = {}) => ({ title, desc, control: pickControl(c, "select", key, options, labels, notes) }),
     path: (key, title, shown, folder, extra = {}) => {
       const save = (value: string): void => {
         c.update(patchOf(key, value));
@@ -116,7 +117,7 @@ function makeHelpers(c: Ctx): {
       const chosen = c.settings[key] !== "";
       return {
         title, desc: tildePath(shown), mono: true, keywords: "folder location path choose", control: { kind: "none" },
-        buttons: [btn("Choose…", () => void choose()), btn(`Show in ${FILE_MANAGER}`, () => showInFinder(shown)), ...(chosen ? [btn("Reset", () => save(""))] : [])],
+        buttons: [btn(t("settings.choose"), () => void choose()), btn(t("settings.showIn", { app: FILE_MANAGER }), () => showInFinder(shown)), ...(chosen ? [btn(t("settings.reset"), () => save(""))] : [])],
         ...extra,
       };
     },
@@ -125,37 +126,41 @@ function makeHelpers(c: Ctx): {
   };
 }
 
-const SKILL_TEXT: Readonly<Record<string, readonly [string, string]>> = {
-  "first-look": ["First look", "Tour a new app: what it is, how it starts, what stands out."],
-  "explain-function": ["Explain a function", "Walk through the function you have open, step by step."],
-  "name-functions": ["Name functions", "Suggest clear names for unnamed functions and apply the ones you approve."],
-  find: ["Find", "Hunt for a string, behaviour or API across the whole app."],
-  "trace-feature": ["Trace a feature", "Follow a feature from the button you press to the code that does the work."],
-  "network-map": ["Map the network code", "List what the app talks to and the code that does it."],
-  decompile: ["Clean up pseudocode", "Rewrite a function into readable C with types and names."],
-  "shader-check": ["Check a shader", "Read a Metal shader and point out what makes it slow."],
+const SKILL_TEXT: Readonly<Record<string, readonly [PlainId, PlainId]>> = {
+  "first-look": ["skill.firstLook", "skill.firstLook.desc"],
+  "explain-function": ["skill.explainFunction", "skill.explainFunction.desc"],
+  "name-functions": ["skill.nameFunctions", "skill.nameFunctions.desc"],
+  find: ["skill.find", "skill.find.desc"],
+  "trace-feature": ["skill.traceFeature", "skill.traceFeature.desc"],
+  "network-map": ["skill.networkMap", "skill.networkMap.desc"],
+  decompile: ["skill.decompile", "skill.decompile.desc"],
+  "shader-check": ["skill.shaderCheck", "skill.shaderCheck.desc"],
 };
 
-const PERMISSION_TEXT: Readonly<Record<PermissionTool, readonly [string, string, string]>> = {
-  read: ["Read the open file", "Functions, strings, code and bytes in the app you have open.", "Reading"],
-  view: ["Move around the window", "Open functions, switch views and jump to addresses for you.", "Reading"],
-  rename: ["Rename functions and variables", "Saved in the project. You can undo any rename.", "Changing your project"],
-  notes: ["Add notes, comments and bookmarks", "Saved in the project next to the code.", "Changing your project"],
-  patch: ["Patch bytes", "Writes a patched copy. The original file is never touched.", "Changing your project"],
-  gpu: ["Run the app to record a GPU trace", "Starts the program under Instruments for a few seconds.", "Running things"],
-  debug: ["Run the app in the debugger", "Starts the program and stops at breakpoints.", "Running things"],
-  shell: [`Run commands on your computer`, "The agent’s own terminal tools, outside Eleven.", "Running things"],
+type PermissionGroup = "reading" | "changing" | "running";
+
+const PERMISSION_TEXT: Readonly<Record<PermissionTool, readonly [PlainId, PlainId, PermissionGroup]>> = {
+  read: ["permission.read", "permission.read.desc", "reading"],
+  view: ["permission.view", "permission.view.desc", "reading"],
+  rename: ["permission.rename", "permission.rename.desc", "changing"],
+  notes: ["permission.notes", "permission.notes.desc", "changing"],
+  patch: ["permission.patch", "permission.patch.desc", "changing"],
+  gpu: ["permission.gpu", "permission.gpu.desc", "running"],
+  debug: ["permission.debug", "permission.debug.desc", "running"],
+  shell: ["permission.shell", "permission.shell.desc", "running"],
 };
 
-function permissionRows(c: Ctx, group: string): readonly SettingRowModel[] {
+const LEVEL_LABELS: Readonly<Record<PermissionLevel, PlainId>> = { Allow: "permission.allow", Ask: "permission.ask", Never: "permission.never" };
+
+function permissionRows(c: Ctx, group: PermissionGroup): readonly SettingRowModel[] {
   const levels: readonly PermissionLevel[] = ["Allow", "Ask", "Never"];
   return PERMISSION_TOOLS.filter((tool) => PERMISSION_TEXT[tool][2] === group).map((tool) => ({
-    title: PERMISSION_TEXT[tool][0],
-    desc: PERMISSION_TEXT[tool][1],
+    title: t(PERMISSION_TEXT[tool][0]),
+    desc: t(PERMISSION_TEXT[tool][1]),
     keywords: "allow ask never agent",
     control: {
       kind: "seg",
-      options: opts(levels),
+      options: levels.map((level): Option => ({ value: level, label: t(LEVEL_LABELS[level]) })),
       value: c.settings.permissions[tool],
       pick: (value: string) => {
         const level = levels.find((candidate) => candidate === value);
@@ -173,16 +178,16 @@ function agentRows(c: Ctx): { readonly here: readonly SettingRowModel[]; readonl
     const found = c.installed.get(agent.id);
     const path = found?.command?.path ?? found?.cli ?? "";
     const login = signedIn(agent);
-    if (login === false) return info(agent.name, "Installed. Sign in once and Eleven remembers it.", { lead: lead(agent.id), ...(isDefault ? { tag: "Default" } : {}), status: { text: "Not signed in", tone: "warn" }, buttons: [btn("Sign in", () => { signIn(agent); c.toast(`Finish signing in to ${agent.name} in Terminal`); }, "primary")] });
-    const out = canSignOut(agent) ? [btn("Sign out", () => { signOut(agent); c.toast(`Signing out of ${agent.name} in Terminal`); })] : [];
-    return info(agent.name, `Version ${agent.version}, ${tildePath(path)}`, {
-      lead: lead(agent.id), ...(isDefault ? { tag: "Default" } : {}), status: { text: login ? "Signed in" : "Installed", tone: "good" },
-      buttons: [...(isDefault ? [] : [btn("Make default", () => c.update({ defaultAgent: agent.id }))]), ...out],
+    if (login === false) return info(agent.name, t("settings.agent.signInOnce"), { lead: lead(agent.id), ...(isDefault ? { tag: t("settings.agent.default") } : {}), status: { text: t("settings.agent.notSignedIn"), tone: "warn" }, buttons: [btn(t("settings.agent.signIn"), () => { signIn(agent); c.toast(t("settings.agent.finishSignIn", { name: agent.name })); }, "primary")] });
+    const out = canSignOut(agent) ? [btn(t("settings.agent.signOut"), () => { signOut(agent); c.toast(t("settings.agent.signingOut", { name: agent.name })); })] : [];
+    return info(agent.name, t("settings.agent.versionAt", { version: agent.version, path: tildePath(path) }), {
+      lead: lead(agent.id), ...(isDefault ? { tag: t("settings.agent.default") } : {}), status: { text: login ? t("settings.agent.signedIn") : t("settings.installed"), tone: "good" },
+      buttons: [...(isDefault ? [] : [btn(t("settings.agent.makeDefault"), () => c.update({ defaultAgent: agent.id }))]), ...out],
     });
   });
   const others = c.agents.list.filter((agent) => !c.installed.has(agent.id));
-  const more = (c.browsing ? others : others.slice(0, 2)).map((agent) => info(agent.name, `Not on ${THIS_DEVICE}. Eleven downloads it and keeps it up to date.`, {
-    lead: lead(agent.id), buttons: [btn("Make default", () => c.update({ defaultAgent: agent.id })), btn("Install", () => c.install(agent.id))],
+  const more = (c.browsing ? others : others.slice(0, 2)).map((agent) => info(agent.name, t("settings.agent.notHere", { device: thisDevice() }), {
+    lead: lead(agent.id), buttons: [btn(t("settings.agent.makeDefault"), () => c.update({ defaultAgent: agent.id })), btn(t("settings.install"), () => c.install(agent.id))],
   }));
   return { here, more };
 }
@@ -194,20 +199,20 @@ function askModelRow(c: Ctx): SettingRowModel {
   const others = Object.fromEntries(Object.entries(c.settings.askModels).filter(([id]) => id !== agent.id));
   const pick = (value: string): void => c.update({ askModels: value ? { ...others, [agent.id]: value } : others });
   const options: readonly Option[] = [
-    { value: "", label: "Same as the chat" },
+    { value: "", label: t("settings.askModel.sameAsChat") },
     ...models.map((model): Option => (model.description ? { value: model.value, label: model.name, note: model.description } : { value: model.value, label: model.name })),
   ];
-  const desc = models.length > 0 ? `For ${agent.name}. A smaller model answers sooner but explains less.` : `${agent.name}’s models show here once it has started.`;
-  return { title: "Model", desc, keywords: "ask explain quick answer selection", control: { kind: "select", value: c.settings.askModels[agent.id] ?? "", pick, options } };
+  const desc = models.length > 0 ? t("settings.askModel.desc", { name: agent.name }) : t("settings.askModel.notStarted", { name: agent.name });
+  return { title: t("settings.askModel"), desc, keywords: "ask explain quick answer selection", control: { kind: "select", value: c.settings.askModels[agent.id] ?? "", pick, options } };
 }
 
 function input(c: Ctx, key: "customAgent" | "customToolServer", title: string, desc: string, placeholder: string, done: string): SettingRowModel {
   const draft = c.drafts[key] ?? c.settings[key];
   return {
     title, desc, control: { kind: "input", value: draft, placeholder, set: (value) => c.setDraft(key, value) },
-    buttons: [btn("Add", () => {
+    buttons: [btn(t("settings.add"), () => {
       c.update(patchOf(key, draft.trim()));
-      c.toast(draft.trim() ? done : "Removed it");
+      c.toast(draft.trim() ? done : t("settings.removedIt"));
     })],
   };
 }
@@ -219,35 +224,35 @@ function engineRows(c: Ctx, h: ReturnType<typeof makeHelpers>): readonly Setting
   const e = c.info.engines;
   const row = (id: EngineRowId, name: string, desc: string, found: string | null, key: PathKey, folder: boolean): SettingRowModel => {
     const locate = async (): Promise<void> => {
-      const picked = await pickPath(folder ? "folder" : "file", `Locate ${name}`);
+      const picked = await pickPath(folder ? "folder" : "file", t("settings.engine.locateTitle", { name }));
       if (picked === null) return;
       c.update(patchOf(key, picked));
       adoptToolchain();
       c.refresh();
-      c.toast(`Using ${name} at ${tildePath(picked)}`);
+      c.toast(t("settings.engine.using", { name, path: tildePath(picked) }));
     };
-    if (found === null) return info(name, desc, { lead: { kind: "img", src: ENGINE_LOGO[id] }, status: { text: "Not found", tone: "quiet" }, buttons: [btn("Locate…", () => void locate())] });
+    if (found === null) return info(name, desc, { lead: { kind: "img", src: ENGINE_LOGO[id] }, status: { text: t("settings.notFound"), tone: "quiet" }, buttons: [btn(t("settings.engine.locate"), () => void locate())] });
     const engineId: EngineId = id;
-    const remove = h.confirmed(`remove-${id}`, `Remove ${name}? Projects keep their work, and you can install it again any time.`, "Remove", () => {
+    const remove = h.confirmed(`remove-${id}`, t("settings.engine.removeConfirm", { name }), t("settings.remove"), () => {
       void moveToTrash(found);
       c.update(patchOf(key, ""));
       adoptToolchain();
-    }, `Moved ${name} to the Trash`);
-    const update = id === "rizin" || id === "ghidra" ? [btn("Check for update", () => c.checkEngine(id))] : [];
+    }, t("settings.engine.trashed", { name }));
+    const update = id === "rizin" || id === "ghidra" ? [btn(t("settings.engine.checkUpdate"), () => c.checkEngine(id))] : [];
     return info(name, desc, {
       lead: { kind: "img", src: ENGINE_LOGO[id] },
       pick: { on: active === engineId, act: () => { chooseEngine(engineId); c.refresh(); } },
-      ...(active === engineId ? { tag: "Opens your files" } : {}),
-      status: { text: "Installed", tone: "good" },
-      buttons: [...update, btn("Remove", () => c.ask(remove.id))],
+      ...(active === engineId ? { tag: t("settings.engine.opensFiles") } : {}),
+      status: { text: t("settings.installed"), tone: "good" },
+      buttons: [...update, btn(t("settings.remove"), () => c.ask(remove.id))],
       confirm: remove,
     });
   };
   return [
-    row("rizin", "Rizin", `${e.rizin.version ? `Version ${e.rizin.version}. ` : ""}Fast, opens most apps in seconds.`, e.rizin.path, "rizinPath", false),
-    row("ghidra", "Ghidra", `${e.ghidra.version ? `Version ${e.ghidra.version}. ` : ""}Slower, with the clearest readable code.`, e.ghidra.path, "ghidraDir", true),
-    row("hopper", "Hopper", "Uses your Hopper license through its own tools.", e.hopper, "hopperPath", false),
-    row("ida", "IDA Pro", "Uses your IDA license. Needs IDA 9 with its MCP plugin.", e.ida, "idaPath", false),
+    row("rizin", "Rizin", e.rizin.version ? t("settings.engine.rizinVersion", { version: e.rizin.version }) : t("settings.engine.rizin"), e.rizin.path, "rizinPath", false),
+    row("ghidra", "Ghidra", e.ghidra.version ? t("settings.engine.ghidraVersion", { version: e.ghidra.version }) : t("settings.engine.ghidra"), e.ghidra.path, "ghidraDir", true),
+    row("hopper", "Hopper", t("settings.engine.hopper"), e.hopper, "hopperPath", false),
+    row("ida", "IDA Pro", t("settings.engine.ida"), e.ida, "idaPath", false),
   ];
 }
 
@@ -260,7 +265,11 @@ function newSkill(c: Ctx, folder: string): void {
   writeFileSync(file, `---\nname: ${name}\ndescription: One line on what this skill does.\n---\n\n1. The first step the agent takes.\n2. The next step.\n`);
   showInFinder(file);
   c.refresh();
-  c.toast("Created a new skill in your skills folder");
+  c.toast(t("settings.skills.created"));
+}
+
+function languageLabel(setting: LanguageSetting): string {
+  return setting === "auto" ? t("settings.language.auto") : LANGUAGE_NAMES[setting];
 }
 
 /** Every settings page as groups of rows, built from the saved settings and what Eleven found on this Mac. */
@@ -268,10 +277,12 @@ export function buildPages(c: Ctx): Readonly<Record<Page, readonly GroupModel[]>
   const s = c.settings;
   const h = makeHelpers(c);
   const { tg, seg, sel, path, danger, confirmed } = h;
-  const agentName = c.agents.list.find((agent) => agent.id === (s.defaultAgent ?? DEFAULT_AGENT_ID))?.name ?? "None";
+  const agentName = c.agents.list.find((agent) => agent.id === (s.defaultAgent ?? DEFAULT_AGENT_ID))?.name ?? t("settings.privacy.noAgent");
   const { here, more } = agentRows(c);
   const sizes = c.info.sizes;
   const app = c.info.app;
+  const showIn = t("settings.showIn", { app: FILE_MANAGER });
+  const opened = (): void => c.toast(t("settings.openedInBrowser"));
   const skillsFolder = s.skillsDir || join(dataRoot(), "skills");
   const builtIn = loadSkills();
   const flipSkill = (name: string): void => {
@@ -280,217 +291,221 @@ export function buildPages(c: Ctx): Readonly<Record<Page, readonly GroupModel[]>
   };
   const skillRow = (name: string, description: string): SettingRowModel => {
     const text = SKILL_TEXT[name];
-    return { title: text?.[0] ?? name, desc: text?.[1] ?? description, control: { kind: "toggle", on: !s.disabledSkills.includes(name), flip: () => flipSkill(name) } };
+    return { title: text ? t(text[0]) : name, desc: text ? t(text[1]) : description, control: { kind: "toggle", on: !s.disabledSkills.includes(name), flip: () => flipSkill(name) } };
   };
-  const recordings = confirmed("clear-rec", "Delete all GPU recordings? Profiles in your chats keep their numbers but can’t be opened again.", "Delete", clearRecordings, "Deleted GPU recordings");
+  const recordings = confirmed("clear-rec", t("settings.recordings.deleteConfirm"), t("settings.delete"), clearRecordings, t("settings.recordings.deleted"));
   const recordings2 = { ...recordings, id: "clear-rec2" };
   const exportDir = s.exportDir || join(homedir(), "Downloads", "Eleven");
+  const all = t("settings.all");
   return {
     general: [
-      { label: "Startup", rows: [
-        sel("launch", "When Eleven opens", "Start on Home, or go straight back to what you had open.", ["Home", "The last project"]),
-        tg("restoreLayout", "Reopen tabs and splits", "Bring back the workbench layout of each project when you open it."),
+      { label: null, rows: [
+        { ...sel("language", t("settings.language"), t("settings.language.desc"), LANGUAGE_SETTINGS, Object.fromEntries(LANGUAGE_SETTINGS.map((setting) => [setting, languageLabel(setting)]))), keywords: `language locale translation ${Object.values(LANGUAGE_NAMES).join(" ")}` },
       ] },
-      { label: "Updates", rows: [
-        ...(OS === "mac" ? [tg("autoUpdate", "Update automatically", "Download updates in the background and install them when you quit Eleven.")] : []),
-        seg("updateChannel", "Update channel", "Beta gets new features a few weeks early.", ["Stable", "Beta"]),
-        info(`Eleven ${app.version}`, app.line, { buttons: app.download ? [btn("Download", () => openLink(app.download ?? ""), "primary")] : [btn("Check now", c.checkApp)] }),
+      { label: t("settings.group.startup"), rows: [
+        sel("launch", t("settings.launch"), t("settings.launch.desc"), ["Home", "The last project"], { Home: t("settings.launch.home"), "The last project": t("settings.launch.lastProject") }),
+        tg("restoreLayout", t("settings.restoreLayout"), t("settings.restoreLayout.desc")),
       ] },
-      { label: "Home", rows: [
-        tg("showWhatsNew", "Show what’s new on Home", "A short note on Home after each update. Dismiss it and it stays gone."),
-        tg("showSuggestions", "Show suggested questions", "The starter questions under the composer on Home."),
+      { label: t("settings.group.updates"), rows: [
+        ...(OS === "mac" ? [tg("autoUpdate", t("settings.autoUpdate"), t("settings.autoUpdate.desc"))] : []),
+        seg("updateChannel", t("settings.updateChannel"), t("settings.updateChannel.desc"), ["Stable", "Beta"], { Stable: t("settings.updateChannel.stable"), Beta: t("settings.updateChannel.beta") }),
+        info(t("settings.elevenVersion", { version: app.version }), updateLine(app), { buttons: app.download ? [btn(t("settings.download"), () => openLink(app.download ?? ""), "primary")] : [btn(t("settings.checkNow"), c.checkApp)] }),
       ] },
-      { label: "Reset", rows: [
-        danger("Reset all settings", "Puts every setting back the way it was on day one. Your projects and chats stay.", "Reset…", confirmed("reset-all", "Reset every setting to its default? Your projects, chats and shortcuts you changed are kept.", "Reset settings", () => {
+      { label: t("settings.group.home"), rows: [
+        tg("showWhatsNew", t("settings.showWhatsNew"), t("settings.showWhatsNew.desc")),
+        tg("showSuggestions", t("settings.showSuggestions"), t("settings.showSuggestions.desc")),
+      ] },
+      { label: t("settings.group.reset"), rows: [
+        danger(t("settings.resetAll"), t("settings.resetAll.desc"), t("settings.resetAll.button"), confirmed("reset-all", t("settings.resetAll.confirm"), t("settings.resetAll.confirmButton"), () => {
           saveSettings({ ...DEFAULT_SETTINGS, keymap: s.keymap, shortcuts: s.shortcuts });
           adoptToolchain();
-        }, "Settings reset")),
+        }, t("settings.resetAll.done"))),
       ] },
     ],
     appearance: [
-      { label: "Window", preview: "window", rows: [
-        seg("uiSize", "Interface size", "Text and controls outside the code.", ["Small", "Default", "Large"]),
-        { title: "Transparency", desc: "How much of your desktop shows through around the edges. All the way down is solid.", keywords: "glass see-through opacity solid window background", control: { kind: "range", min: 0, max: 100, step: 5, value: s.transparency, unit: "%", set: (transparency) => c.update({ transparency }) } },
-        { title: "Frost", desc: "How much the desktop behind the window is blurred.", keywords: "glass blur frosted window background", dim: s.transparency === 0, control: { kind: "range", min: 0, max: 100, step: 5, value: s.frost, unit: "%", set: (frost) => c.update({ frost }) } },
+      { label: t("settings.group.window"), preview: "window", rows: [
+        seg("uiSize", t("settings.uiSize"), t("settings.uiSize.desc"), ["Small", "Default", "Large"], { Small: t("settings.uiSize.small"), Default: t("settings.uiSize.default"), Large: t("settings.uiSize.large") }),
+        { title: t("settings.transparency"), desc: t("settings.transparency.desc"), keywords: "glass see-through opacity solid window background", control: { kind: "range", min: 0, max: 100, step: 5, value: s.transparency, unit: "%", set: (transparency) => c.update({ transparency }) } },
+        { title: t("settings.frost"), desc: t("settings.frost.desc"), keywords: "glass blur frosted window background", dim: s.transparency === 0, control: { kind: "range", min: 0, max: 100, step: 5, value: s.frost, unit: "%", set: (frost) => c.update({ frost }) } },
       ] },
-      { label: "Code", preview: "code", rows: [
-        sel("codeFont", "Code font", "Used for pseudocode, assembly, hex and code in replies.", codeFontsHere()),
-        { title: "Code size", desc: "Applies to every code view, the graph and replies.", control: { kind: "range", min: 10, max: 18, step: 1, value: s.codeFontSize, unit: " pt", set: (value) => {
+      { label: t("settings.group.code"), preview: "code", rows: [
+        sel("codeFont", t("settings.codeFont"), t("settings.codeFont.desc"), codeFontsHere()),
+        { title: t("settings.codeSize"), desc: t("settings.codeSize.desc"), control: { kind: "range", min: 10, max: 18, step: 1, value: s.codeFontSize, unit: " pt", set: (value) => {
           const size = ([10, 11, 12, 13, 14, 15, 16, 17, 18] as const).find((candidate) => candidate === value);
           if (size) c.update({ codeFontSize: size });
         } } },
-        seg("lineSpacing", "Line spacing", "", ["Compact", "Normal", "Relaxed"]),
-        sel("colorScheme", "Colours", "How keywords, names, strings and numbers are coloured.", ["Eleven", "Classic", "Quiet"]),
-        tg("lineNumbers", "Line numbers", "In pseudocode and shader views."),
-        tg("graphUsesCodeSize", "Use the code size in graphs", "Off keeps graph blocks small so more fits on screen."),
+        seg("lineSpacing", t("settings.lineSpacing"), "", ["Compact", "Normal", "Relaxed"], { Compact: t("settings.lineSpacing.compact"), Normal: t("settings.lineSpacing.normal"), Relaxed: t("settings.lineSpacing.relaxed") }),
+        sel("colorScheme", t("settings.colorScheme"), t("settings.colorScheme.desc"), ["Eleven", "Classic", "Quiet"], { Classic: t("settings.colorScheme.classic"), Quiet: t("settings.colorScheme.quiet") }),
+        tg("lineNumbers", t("settings.lineNumbers"), t("settings.lineNumbers.desc")),
+        tg("graphUsesCodeSize", t("settings.graphUsesCodeSize"), t("settings.graphUsesCodeSize.desc")),
       ] },
     ],
     keyboard: [],
     chat: [
-      { label: "Replies", rows: [
-        tg("showThinking", "Show the agent’s thinking", "Folded under each reply. Open it to see how the agent got there."),
-        sel("chatHistory", "How much of the chat the agent sees", "More context gives better answers on long chats but is slower.", ["Short", "Normal", "Long"], { Short: "Last 10 messages", Normal: "Last 20 messages", Long: "Last 50 messages" }),
-        sel("openWorkbench", "Open the workbench", "The full workbench next to the chat.", ["When the agent opens code", "Always", "Only when I ask"]),
+      { label: t("settings.group.replies"), rows: [
+        tg("showThinking", t("settings.showThinking"), t("settings.showThinking.desc")),
+        sel("chatHistory", t("settings.chatHistory"), t("settings.chatHistory.desc"), ["Short", "Normal", "Long"], { Short: t("settings.chatHistory.short"), Normal: t("settings.chatHistory.normal"), Long: t("settings.chatHistory.long") }, { Short: t("settings.chatHistory.shortNote"), Normal: t("settings.chatHistory.normalNote"), Long: t("settings.chatHistory.longNote") }),
+        sel("openWorkbench", t("settings.openWorkbench"), t("settings.openWorkbench.desc"), ["When the agent opens code", "Always", "Only when I ask"], { "When the agent opens code": t("settings.openWorkbench.whenCode"), Always: t("settings.openWorkbench.always"), "Only when I ask": t("settings.openWorkbench.whenAsked") }),
       ] },
-      { label: "Composer", rows: [seg("sendKey", "Send with", "The other one adds a new line.", ["Return", "Command Return"], { "Command Return": `${MOD.replace("+", "")} Return` })] },
-      { label: "Notifications", rows: [
-        tg("notifyWhenDone", "Notify me when the agent finishes", "Only when Eleven isn’t the window in front."),
-        tg("notifyWhenAsked", "Notify me when the agent needs my OK", "Allow or refuse right from the notification."),
-        tg("notifyWhenReady", "Notify me when a file is ready", "When reading a big app takes a while."),
-        tg("soundWhenAsked", "Play a sound when the agent needs you", "For questions and permission requests."),
+      { label: t("settings.group.composer"), rows: [seg("sendKey", t("settings.sendKey"), t("settings.sendKey.desc"), ["Return", "Command Return"], { "Command Return": `${MOD.replace("+", "")} Return` })] },
+      { label: t("settings.group.notifications"), rows: [
+        tg("notifyWhenDone", t("settings.notifyWhenDone"), t("settings.notifyWhenDone.desc")),
+        tg("notifyWhenAsked", t("settings.notifyWhenAsked"), t("settings.notifyWhenAsked.desc")),
+        tg("notifyWhenReady", t("settings.notifyWhenReady"), t("settings.notifyWhenReady.desc")),
+        tg("soundWhenAsked", t("settings.soundWhenAsked"), t("settings.soundWhenAsked.desc")),
       ] },
     ],
     agents: [
-      { label: `On ${THIS_DEVICE}`, foot: "Every agent gets the same tools: Eleven’s analysis engine and control of this window.", rows: [
+      { label: t("settings.group.onDevice", { device: thisDevice() }), foot: t("settings.agents.foot"), rows: [
         ...here,
-        info("Look for agents again", "After installing one from the terminal.", { buttons: [btn("Rescan", c.rescan)] }),
+        info(t("settings.rescan"), t("settings.rescan.desc"), { buttons: [btn(t("settings.rescan.button"), c.rescan)] }),
       ] },
-      { label: "More agents", rows: [
+      { label: t("settings.group.moreAgents"), rows: [
         ...more,
-        info(`Browse all ${c.agents.list.length} agents`, "From the open agent registry, the same one Zed uses.", { buttons: [btn(c.browsing ? "Show fewer" : "Browse…", () => c.setBrowsing(!c.browsing))] }),
-        input(c, "customAgent", "Add your own agent", "Any command that speaks the Agent Client Protocol.", "my-agent --acp", "Added your agent"),
+        info(t("settings.browseAgents", { count: c.agents.list.length }), t("settings.browseAgents.desc"), { buttons: [btn(c.browsing ? t("settings.browseAgents.fewer") : t("settings.browseAgents.button"), () => c.setBrowsing(!c.browsing))] }),
+        input(c, "customAgent", t("settings.customAgent"), t("settings.customAgent.desc"), "my-agent --acp", t("settings.customAgent.done")),
       ] },
-      { label: "Tools agents get", foot: "Tool servers use the Model Context Protocol. Every agent gets the ones that are on.", rows: [
-        tg("elevenTools", "Eleven", "Open functions, switch views, rename, take notes and record GPU traces in this window.", { lead: { kind: "img", src: appIcon(c.icon) }, keywords: "mcp tool server" }),
-        tg("reaTools", "Analysis tools (REA)", "Read functions, strings, cross-references and bytes from the open app.", { lead: { kind: "img", src: join(ENGINES_DIR, "rea.svg") }, keywords: "mcp tool server" }),
-        tg("idaTools", "IDA Pro", "Uses your IDA license through its MCP plugin.", { lead: { kind: "img", src: ENGINE_LOGO.ida }, keywords: "mcp tool server" }),
-        input(c, "customToolServer", "Add a tool server", "Any MCP server. Every agent gets its tools.", "npx my-mcp-server", "Added the tool server"),
+      { label: t("settings.group.tools"), foot: t("settings.tools.foot"), rows: [
+        tg("elevenTools", "Eleven", t("settings.elevenTools.desc"), { lead: { kind: "img", src: appIcon(c.icon) }, keywords: "mcp tool server" }),
+        tg("reaTools", t("settings.reaTools"), t("settings.reaTools.desc"), { lead: { kind: "img", src: join(ENGINES_DIR, "rea.svg") }, keywords: "mcp tool server" }),
+        tg("idaTools", "IDA Pro", t("settings.idaTools.desc"), { lead: { kind: "img", src: ENGINE_LOGO.ida }, keywords: "mcp tool server" }),
+        input(c, "customToolServer", t("settings.customToolServer"), t("settings.customToolServer.desc"), "npx my-mcp-server", t("settings.customToolServer.done")),
       ] },
-      { label: "Ask about code", foot: "Select lines in any code view, then Ask or Explain. These only change those quick answers, not the chat.", rows: [
+      { label: t("settings.group.askAboutCode"), foot: t("settings.askAboutCode.foot"), rows: [
         askModelRow(c),
-        tg("askFast", "Fast mode", "Quicker answers from agents that offer it, like Claude. It can cost more.", { keywords: "ask explain quick answer speed" }),
+        tg("askFast", t("settings.askFast"), t("settings.askFast.desc"), { keywords: "ask explain quick answer speed" }),
       ] },
-      { label: "Running agents", rows: [
-        tg("keepAgentsRunning", "Keep agents running between chats", "Replies start faster. Uses a little more memory."),
-        tg("startAgentWithProject", "Start the agent when a project opens", "So it’s ready before you ask."),
+      { label: t("settings.group.runningAgents"), rows: [
+        tg("keepAgentsRunning", t("settings.keepAgentsRunning"), t("settings.keepAgentsRunning.desc")),
+        tg("startAgentWithProject", t("settings.startAgentWithProject"), t("settings.startAgentWithProject.desc")),
       ] },
     ],
     permissions: [
-      { label: "Reading", rows: permissionRows(c, "Reading") },
-      { label: "Changing your project", rows: permissionRows(c, "Changing your project") },
-      { label: "Running things", rows: permissionRows(c, "Running things") },
-      { label: "Your answers", rows: [
-        tg("rememberAnswers", "Remember “Always allow” for each project", "When you pick Always allow in a chat, it sticks for that project only."),
-        info("Forget remembered answers", c.info.remembered === 0 ? "No projects have answers saved." : `${c.info.remembered} ${c.info.remembered === 1 ? "project has" : "projects have"} answers saved.`, { buttons: [btn("Forget all", () => {
+      { label: t("settings.group.reading"), rows: permissionRows(c, "reading") },
+      { label: t("settings.group.changing"), rows: permissionRows(c, "changing") },
+      { label: t("settings.group.running"), rows: permissionRows(c, "running") },
+      { label: t("settings.group.answers"), rows: [
+        tg("rememberAnswers", t("settings.rememberAnswers"), t("settings.rememberAnswers.desc")),
+        info(t("settings.forgetAnswers"), c.info.remembered === 0 ? t("settings.forgetAnswers.none") : c.info.remembered === 1 ? t("settings.forgetAnswers.one") : t("settings.forgetAnswers.many", { count: c.info.remembered }), { buttons: [btn(t("settings.forgetAnswers.button"), () => {
           const count = forgetAnswers();
           c.refresh();
-          c.toast(count === 0 ? "No answers were saved" : `Forgot the answers saved in ${count} ${count === 1 ? "project" : "projects"}`);
+          c.toast(count === 0 ? t("settings.forgetAnswers.noneSaved") : count === 1 ? t("settings.forgetAnswers.forgotOne") : t("settings.forgetAnswers.forgotMany", { count }));
         })] }),
       ] },
     ],
     privacy: [
-      { label: "What leaves your computer", foot: `Projects, chats and caches never leave ${THIS_DEVICE} unless you export them.`, rows: [
-        info("The agent you use", "Code and questions you send go to that agent’s provider, under its own privacy terms. Local agents keep everything here.", { status: { text: agentName, tone: "quiet" } }),
-        tg("hidePaths", "Hide your name in paths", "Agents see ~/Downloads instead of /Users/yourname/Downloads."),
-        tg("askBeforeWholeFile", "Ask before sending a whole file", "Agents normally send only the functions they read. Ask before they upload the entire app."),
+      { label: t("settings.group.leaves"), foot: t("settings.leaves.foot", { device: thisDevice() }), rows: [
+        info(t("settings.privacy.agent"), t("settings.privacy.agent.desc"), { status: { text: agentName, tone: "quiet" } }),
+        tg("hidePaths", t("settings.hidePaths"), t("settings.hidePaths.desc")),
+        tg("askBeforeWholeFile", t("settings.askBeforeWholeFile"), t("settings.askBeforeWholeFile.desc")),
       ] },
-      { label: "Help improve Eleven", rows: [
-        tg("countInstall", "Count this install", "Sends a random ID, the version and your system when Eleven opens, so we know how many people use it."),
-        tg("crashReports", "Send crash reports", "Where Eleven crashed, its version and your system. Never your files or chats."),
-        tg("usageStats", "Share how features are used", "Counts like how often the graph is opened. Off by default."),
+      { label: t("settings.group.improve"), rows: [
+        tg("countInstall", t("settings.countInstall"), t("settings.countInstall.desc")),
+        tg("crashReports", t("settings.crashReports"), t("settings.crashReports.desc")),
+        tg("usageStats", t("settings.usageStats"), t("settings.usageStats.desc")),
       ] },
     ],
     skills: [
-      { label: "Built in", rows: builtIn.filter((skill) => SKILL_TEXT[skill.name]).map((skill) => skillRow(skill.name, skill.description)) },
-      { label: "Yours", rows: [
+      { label: t("settings.group.builtIn"), rows: builtIn.filter((skill) => SKILL_TEXT[skill.name]).map((skill) => skillRow(skill.name, skill.description)) },
+      { label: t("settings.group.yours"), rows: [
         ...builtIn.filter((skill) => !SKILL_TEXT[skill.name]).map((skill) => skillRow(skill.name, skill.description)),
-        path("skillsDir", "Skills folder", skillsFolder, true),
-        info("New skill", "A Markdown file with a name, a one line description and the steps.", { buttons: [btn("New skill…", () => newSkill(c, skillsFolder), "primary")] }),
-        tg("skillsInComposer", "Show skills in the composer", "Type / in the composer to pick one."),
+        path("skillsDir", t("settings.skillsDir"), skillsFolder, true),
+        info(t("settings.newSkill"), t("settings.newSkill.desc"), { buttons: [btn(t("settings.newSkill.button"), () => newSkill(c, skillsFolder), "primary")] }),
+        tg("skillsInComposer", t("settings.skillsInComposer"), t("settings.skillsInComposer.desc")),
       ] },
     ],
     engines: [
-      { label: "Open files with", foot: "The engine you pick opens files. Eleven still uses the others when you ask for something only they can do.", rows: engineRows(c, h) },
-      { label: "Together", rows: [tg("ghidraPseudocode", "Use Ghidra for readable code", "Open files fast with Rizin, then show Ghidra’s clearer pseudocode when it’s ready.", { dim: activeEngine()?.id === "ghidra" })] },
+      { label: t("settings.group.openWith"), foot: t("settings.openWith.foot"), rows: engineRows(c, h) },
+      { label: t("settings.group.together"), rows: [tg("ghidraPseudocode", t("settings.ghidraPseudocode"), t("settings.ghidraPseudocode.desc"), { dim: activeEngine()?.id === "ghidra" })] },
       { label: "Ghidra", rows: [
-        sel("ghidraMemory", "Memory", `Big apps open faster with more. Automatic picks 2 to 4 GB from what ${THIS_DEVICE} has.`, ["Automatic", "2 GB", "4 GB", "8 GB", "16 GB", "32 GB", "64 GB"]),
-        sel("ghidraTimeout", "Analysis time limit", "How long Ghidra may spend on a file before it gives up. Big apps can need hours. Restart Eleven after changing it.", ["30 minutes", "2 hours", "6 hours", "12 hours"]),
-        tg("findParameters", "Work out function parameters", "Better pseudocode for big apps. Makes the first open slower."),
-        tg("rebuildSwitches", "Rebuild switch statements", "Turns jump tables back into switch blocks."),
-        tg("hiddenCode", "Look for code no one calls", "Finds more functions in stripped apps. The slowest option."),
-        tg("swiftNames", "Demangle Swift names", "Readable Swift function names. Turn off if a big Swift app takes too long to open."),
-        path("javaHome", "Java", c.info.java.path ?? "Not found", true, { status: c.info.java.version ? { text: `Java ${c.info.java.version}`, tone: "good" } : { text: "Not found", tone: "warn" } }),
+        sel("ghidraMemory", t("settings.ghidraMemory"), t("settings.ghidraMemory.desc", { device: thisDevice() }), ["Automatic", "2 GB", "4 GB", "8 GB", "16 GB", "32 GB", "64 GB"], { Automatic: t("settings.ghidraMemory.automatic") }),
+        sel("ghidraTimeout", t("settings.ghidraTimeout"), t("settings.ghidraTimeout.desc"), ["30 minutes", "2 hours", "6 hours", "12 hours"], { "30 minutes": t("settings.ghidraTimeout.minutes", { count: 30 }), "2 hours": t("settings.ghidraTimeout.hours", { count: 2 }), "6 hours": t("settings.ghidraTimeout.hours", { count: 6 }), "12 hours": t("settings.ghidraTimeout.hours", { count: 12 }) }),
+        tg("findParameters", t("settings.findParameters"), t("settings.findParameters.desc")),
+        tg("rebuildSwitches", t("settings.rebuildSwitches"), t("settings.rebuildSwitches.desc")),
+        tg("hiddenCode", t("settings.hiddenCode"), t("settings.hiddenCode.desc")),
+        tg("swiftNames", t("settings.swiftNames"), t("settings.swiftNames.desc")),
+        path("javaHome", "Java", c.info.java.path ?? t("settings.notFound"), true, { status: c.info.java.version ? { text: `Java ${c.info.java.version}`, tone: "good" } : { text: t("settings.notFound"), tone: "warn" } }),
       ] },
-      { label: "Analysis tools", rows: [
-        info(`REA ${c.info.rea.version ?? ""}`.trim(), "Comes with Eleven. Gives agents the tools to read apps.", { status: c.info.rea.status }),
+      { label: t("settings.group.analysisTools"), rows: [
+        info(`REA ${c.info.rea.version ?? ""}`.trim(), t("settings.rea.desc"), { status: reaStatus(c.info.rea.state) }),
       ] },
     ],
     code: [
-      { label: "Opening a function", rows: [
-        seg("firstView", "Show first", "What you see when you open a function. Switch any time in the view.", ["Pseudocode", "Assembly", "Graph", "Hex"]),
-        sel("universalApps", "Universal apps", "Apps with Apple silicon and Intel code inside.", ["Ask each time", "Open the one for this Mac"]),
+      { label: t("settings.group.opening"), rows: [
+        seg("firstView", t("settings.firstView"), t("settings.firstView.desc"), ["Pseudocode", "Assembly", "Graph", "Hex"], { Pseudocode: t("settings.firstView.pseudocode"), Assembly: t("settings.firstView.assembly"), Graph: t("settings.firstView.graph"), Hex: t("settings.firstView.hex") }),
+        sel("universalApps", t("settings.universalApps"), t("settings.universalApps.desc"), ["Ask each time", "Open the one for this Mac"], { "Ask each time": t("settings.universalApps.ask"), "Open the one for this Mac": t("settings.universalApps.native") }),
       ] },
-      { label: "Addresses", preview: "address", rows: [
-        tg("addressPrefix", "Start with 0x", ""),
-        tg("addressUpper", "Capital letters", "For hex digits A to F."),
-        tg("addressPad", "Pad to full width", "Every address the same length, so columns line up."),
+      { label: t("settings.group.addresses"), preview: "address", rows: [
+        tg("addressPrefix", t("settings.addressPrefix"), ""),
+        tg("addressUpper", t("settings.addressUpper"), t("settings.addressUpper.desc")),
+        tg("addressPad", t("settings.addressPad"), t("settings.addressPad.desc")),
       ] },
-      { label: "Hex and lists", rows: [
-        seg("hexRow", "Bytes per row", "In the hex view.", ["8", "16", "32"]),
-        sel("listLimit", "Strings and symbols to show", "Search always looks through all of them.", ["400", "1,000", "5,000", "All"]),
+      { label: t("settings.group.hexAndLists"), rows: [
+        seg("hexRow", t("settings.hexRow"), t("settings.hexRow.desc"), ["8", "16", "32"]),
+        sel("listLimit", t("settings.listLimit"), t("settings.listLimit.desc"), ["400", "1,000", "5,000", "All"], { All: all }),
       ] },
-      { label: "Graph", rows: [
-        tg("minimap", "Show the minimap", "The small overview in the corner of big graphs."),
-        seg("blockLines", "Lines per block before folding", "", ["4", "8", "16", "All"]),
+      { label: t("settings.group.graph"), rows: [
+        tg("minimap", t("settings.minimap"), t("settings.minimap.desc")),
+        seg("blockLines", t("settings.blockLines"), "", ["4", "8", "16", "All"], { All: all }),
       ] },
     ],
     debugging: [
-      { label: "Debugger", rows: [path("lldbDap", "Debugger", c.info.lldb ?? "Not found", false, { status: c.info.lldb ? { text: "Found", tone: "good" } : { text: "Not found", tone: "warn" } })] },
-      { label: "Starting", rows: [
-        tg("stopAtFunction", "Stop at the function you’re looking at", "Puts a breakpoint there before the program starts."),
-        tg("stopAtEntry", "Stop at the first instruction", "Pause before any of the program’s code runs."),
-        { title: "Arguments", desc: "Passed to the program each time it starts.", control: { kind: "input", value: s.programArgs, placeholder: "--verbose", set: (programArgs) => c.update({ programArgs }) } },
+      { label: t("settings.group.debugger"), rows: [path("lldbDap", t("settings.lldbDap"), c.info.lldb ?? t("settings.notFound"), false, { status: c.info.lldb ? { text: t("settings.found"), tone: "good" } : { text: t("settings.notFound"), tone: "warn" } })] },
+      { label: t("settings.group.starting"), rows: [
+        tg("stopAtFunction", t("settings.stopAtFunction"), t("settings.stopAtFunction.desc")),
+        tg("stopAtEntry", t("settings.stopAtEntry"), t("settings.stopAtEntry.desc")),
+        { title: t("settings.programArgs"), desc: t("settings.programArgs.desc"), control: { kind: "input", value: s.programArgs, placeholder: "--verbose", set: (programArgs) => c.update({ programArgs }) } },
       ] },
-      { label: "Showing values", rows: [sel("variableLimit", "Variables to show", "Per scope. Big structs fold after this many.", ["50", "200", "1,000"])] },
+      { label: t("settings.group.values"), rows: [sel("variableLimit", t("settings.variableLimit"), t("settings.variableLimit.desc"), ["50", "200", "1,000"])] },
     ],
     gpu: [
-      { label: "Recording", rows: [
-        sel("gpuTemplate", "Instruments template", "What gets recorded while the app runs.", ["Metal System Trace", "Game Performance", "Metal Application"]),
-        { title: "Record for", desc: "Stops sooner if the app quits.", control: { kind: "range", min: 5, max: 60, step: 5, value: s.gpuSeconds, unit: " s", set: (value) => {
+      { label: t("settings.group.recording"), rows: [
+        sel("gpuTemplate", t("settings.gpuTemplate"), t("settings.gpuTemplate.desc"), ["Metal System Trace", "Game Performance", "Metal Application"]),
+        { title: t("settings.gpuSeconds"), desc: t("settings.gpuSeconds.desc"), control: { kind: "range", min: 5, max: 60, step: 5, value: s.gpuSeconds, unit: " s", set: (value) => {
           const seconds = ([5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60] as const).find((candidate) => candidate === value);
           if (seconds) c.update({ gpuSeconds: seconds });
         } } },
-        seg("gpuSkipFrames", "Frames to skip at the start", "The first frames are often slow while the app loads.", ["0", "3", "10"]),
+        seg("gpuSkipFrames", t("settings.gpuSkipFrames"), t("settings.gpuSkipFrames.desc"), ["0", "3", "10"]),
       ] },
-      { label: "Keeping recordings", rows: [
-        sel("keepRecordings", "Recordings to keep", "Older ones are deleted. Each can be a few hundred MB.", ["1", "3", "10", "All"]),
-        danger("GPU recordings", `${sizes.recordings} in ${tildePath(RECORDINGS_DIR)}`, "Delete all…", recordings, [btn(`Show in ${FILE_MANAGER}`, () => showInFinder(RECORDINGS_DIR))]),
+      { label: t("settings.group.keepingRecordings"), rows: [
+        sel("keepRecordings", t("settings.keepRecordings"), t("settings.keepRecordings.desc"), ["1", "3", "10", "All"], { All: all }),
+        danger(t("settings.recordings"), t("settings.recordings.where", { size: measured(sizes.recordings), path: tildePath(RECORDINGS_DIR) }), t("settings.deleteAll"), recordings, [btn(showIn, () => showInFinder(RECORDINGS_DIR))]),
       ].map((row, ix) => (ix === 1 ? { ...row, mono: true } : row)) },
     ],
     storage: [
-      { label: "Exports and patches", rows: [
-        path("exportDir", "Save to", exportDir, true),
-        tg("revealExports", `Show in ${FILE_MANAGER} after saving`, "For exported code, Objective-C lists and patched copies."),
+      { label: t("settings.group.exports"), rows: [
+        path("exportDir", t("settings.exportDir"), exportDir, true),
+        tg("revealExports", t("settings.revealExports", { app: FILE_MANAGER }), t("settings.revealExports.desc")),
       ] },
-      { label: "Your work", rows: [
-        info("Projects", `${sizes.projects}. Renames, notes, bookmarks and patches for ${sizes.apps} ${sizes.apps === 1 ? "app" : "apps"}.`, { buttons: [btn(`Show in ${FILE_MANAGER}`, () => showInFinder(PROJECTS_DIR))] }),
-        danger("Chats", `${sizes.chats}. Every conversation, in its project.`, "Delete all…", confirmed("clear-chats", "Delete every chat in every project? Renames, notes and patches stay. This can’t be undone.", "Delete chats", deleteAllChats, "Deleted all chats"), [btn(`Show in ${FILE_MANAGER}`, () => showInFinder(THREADS_DIR))]),
-        tg("autosave", "Save changes as you go", "Renames and notes save a moment after you make them."),
+      { label: t("settings.group.yourWork"), rows: [
+        info(t("settings.projects"), sizes.apps === 1 ? t("settings.projects.one", { size: measured(sizes.projects) }) : t("settings.projects.many", { size: measured(sizes.projects), count: sizes.apps }), { buttons: [btn(showIn, () => showInFinder(PROJECTS_DIR))] }),
+        danger(t("settings.chats"), t("settings.chats.desc", { size: measured(sizes.chats) }), t("settings.deleteAll"), confirmed("clear-chats", t("settings.chats.confirm"), t("settings.chats.confirmButton"), deleteAllChats, t("settings.chats.done")), [btn(showIn, () => showInFinder(THREADS_DIR))]),
+        tg("autosave", t("settings.autosave"), t("settings.autosave.desc")),
       ] },
-      { label: "Space Eleven can free up", rows: [
-        danger("Analysis cache", `${sizes.cache}. Apps you opened before open instantly.`, "Clear…", confirmed("clear-cache", "Clear the analysis cache? Nothing is lost, but each app takes longer the next time you open it.", "Clear cache", () => clearFolder(cacheDir()), "Cleared the analysis cache")),
-        danger("GPU recordings", `${sizes.recordings}.`, "Clear…", recordings2),
+      { label: t("settings.group.freeUp"), rows: [
+        danger(t("settings.cache"), t("settings.cache.desc", { size: measured(sizes.cache) }), t("settings.clear"), confirmed("clear-cache", t("settings.cache.confirm"), t("settings.cache.confirmButton"), () => clearFolder(cacheDir()), t("settings.cache.done"))),
+        danger(t("settings.recordings"), t("settings.recordings.size", { size: measured(sizes.recordings) }), t("settings.clear"), recordings2),
       ] },
-      { label: "Window", rows: [
-        info("Reset the workbench layout", "Puts panels, splits and sizes back to how they started.", { buttons: [btn("Reset", () => { resetWorkbenchLayout(); c.toast("Layout reset"); })] }),
+      { label: t("settings.group.window"), rows: [
+        info(t("settings.resetLayout"), t("settings.resetLayout.desc"), { buttons: [btn(t("settings.reset"), () => { resetWorkbenchLayout(); c.toast(t("settings.resetLayout.done")); })] }),
       ] },
     ],
     about: [
       { label: null, rows: [
-        info("Eleven", `Version ${app.version} (${process.arch === "arm64" ? "Apple silicon" : "Intel"}). ${app.short}`, { lead: { kind: "img", src: appIcon(c.icon) }, buttons: app.download ? [btn("Download", () => openLink(app.download ?? ""), "primary")] : [btn("Check for updates", c.checkApp)] }),
-        info("What’s new", "Notes for every release.", { buttons: [btn("Open", () => { openLink(RELEASE_NOTES); c.toast("Opened the release notes"); })] }),
-        info("Support Eleven", "Eleven is free and built by one person. Sponsoring pays for signed builds, Linux support and new features.", { keywords: "donate sponsor fund", buttons: [btn("Sponsor", () => { openLink(SPONSOR); c.toast("Opened in your browser"); })] }),
+        info("Eleven", t("settings.about.version", { version: app.version, chip: process.arch === "arm64" ? t("settings.about.appleSilicon") : "Intel", update: updateShort(app) }), { lead: { kind: "img", src: appIcon(c.icon) }, buttons: app.download ? [btn(t("settings.download"), () => openLink(app.download ?? ""), "primary")] : [btn(t("settings.about.checkUpdates"), c.checkApp)] }),
+        info(t("settings.about.whatsNew"), t("settings.about.whatsNew.desc"), { buttons: [btn(t("settings.open"), () => { openLink(RELEASE_NOTES); c.toast(t("settings.about.whatsNew.opened")); })] }),
+        info(t("settings.about.support"), t("settings.about.support.desc"), { keywords: "donate sponsor fund", buttons: [btn(t("settings.about.sponsor"), () => { openLink(SPONSOR); opened(); })] }),
       ] },
-      { label: "Help", rows: [
-        info("Run setup again", "Install engines and agents, and pick shortcuts.", { buttons: [btn("Start", c.setup)] }),
-        info("Report a problem", "Copies Eleven’s version, engines and recent errors so you can paste them in a bug report. No file contents.", { buttons: [btn("Copy details", c.copyDetails)] }),
-        info("Settings file", tildePath(SETTINGS_FILE), { mono: true, buttons: [btn(`Show in ${FILE_MANAGER}`, () => showInFinder(SETTINGS_FILE))] }),
+      { label: t("settings.group.help"), rows: [
+        info(t("settings.about.setup"), t("settings.about.setup.desc"), { buttons: [btn(t("settings.about.setup.button"), c.setup)] }),
+        info(t("settings.about.report"), t("settings.about.report.desc"), { buttons: [btn(t("settings.about.report.button"), c.copyDetails)] }),
+        info(t("settings.about.settingsFile"), tildePath(SETTINGS_FILE), { mono: true, buttons: [btn(showIn, () => showInFinder(SETTINGS_FILE))] }),
       ] },
-      { label: "Made with", rows: [
-        info("REA", "Reverse engineer anything. How Eleven and its agents read every app.", { lead: { kind: "img", src: join(ENGINES_DIR, "rea.svg") }, buttons: [btn("Website", () => { openLink("https://github.com/morluto/rea"); c.toast("Opened in your browser"); })] }),
-        info("Rizin", "Fast reverse engineering framework.", { lead: { kind: "img", src: ENGINE_LOGO.rizin }, buttons: [btn("Website", () => { openLink("https://rizin.re"); c.toast("Opened in your browser"); })] }),
-        info("Ghidra", "Decompiler from the NSA.", { lead: { kind: "img", src: ENGINE_LOGO.ghidra }, buttons: [btn("Website", () => { openLink("https://ghidra-sre.org"); c.toast("Opened in your browser"); })] }),
-        info("Agent Client Protocol", "How Eleven talks to every agent.", { lead: { kind: "img", src: join(ENGINES_DIR, "acp-light.png"), darkSrc: join(ENGINES_DIR, "acp-dark.png") }, buttons: [btn("Website", () => { openLink("https://agentclientprotocol.com"); c.toast("Opened in your browser"); })] }),
+      { label: t("settings.group.madeWith"), rows: [
+        info("REA", t("settings.about.rea"), { lead: { kind: "img", src: join(ENGINES_DIR, "rea.svg") }, buttons: [btn(t("settings.website"), () => { openLink("https://github.com/morluto/rea"); opened(); })] }),
+        info("Rizin", t("settings.about.rizin"), { lead: { kind: "img", src: ENGINE_LOGO.rizin }, buttons: [btn(t("settings.website"), () => { openLink("https://rizin.re"); opened(); })] }),
+        info("Ghidra", t("settings.about.ghidra"), { lead: { kind: "img", src: ENGINE_LOGO.ghidra }, buttons: [btn(t("settings.website"), () => { openLink("https://ghidra-sre.org"); opened(); })] }),
+        info("Agent Client Protocol", t("settings.about.acp"), { lead: { kind: "img", src: join(ENGINES_DIR, "acp-light.png"), darkSrc: join(ENGINES_DIR, "acp-dark.png") }, buttons: [btn(t("settings.website"), () => { openLink("https://agentclientprotocol.com"); opened(); })] }),
       ] },
     ],
   };

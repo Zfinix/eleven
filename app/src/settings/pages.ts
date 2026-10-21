@@ -1,4 +1,4 @@
-import { THIS_DEVICE } from "../lib/platform";
+import { t, thisDevice } from "../i18n";
 
 export const PAGES = ["general", "appearance", "keyboard", "chat", "agents", "permissions", "privacy", "skills", "engines", "code", "debugging", "gpu", "storage", "about"] as const;
 
@@ -10,40 +10,6 @@ export const NAV_GROUPS: readonly (readonly Page[])[] = [
   ["engines", "code", "debugging", "gpu"],
   ["storage", "about"],
 ];
-
-const TITLES: Readonly<Record<Page, string>> = {
-  general: "General",
-  appearance: "Appearance",
-  keyboard: "Keyboard",
-  chat: "Chat",
-  agents: "Agents",
-  permissions: "Permissions",
-  privacy: "Privacy",
-  skills: "Skills",
-  engines: "Engines",
-  code: "Code views",
-  debugging: "Debugging",
-  gpu: "GPU",
-  storage: "Storage",
-  about: "About",
-};
-
-const INTROS: Readonly<Record<Page, string>> = {
-  general: "How Eleven starts, updates and keeps you posted.",
-  appearance: "Theme, sizes and how code looks everywhere in Eleven.",
-  keyboard: "Click a shortcut to change it. Shortcuts follow the tool your hands already know.",
-  chat: "How conversations look and when Eleven gets your attention.",
-  agents: `The agents on ${THIS_DEVICE}, which one starts new projects, and how they run.`,
-  permissions: "What agents can do on their own and what they ask you about first.",
-  privacy: `What stays on ${THIS_DEVICE} and what goes to the agent you use.`,
-  skills: "Playbooks you can start from the composer or the palette. Any agent can follow them.",
-  engines: "The tools Eleven reads apps with. One is enough. With more, Eleven picks the right one for each job.",
-  code: "Pseudocode, assembly, graphs, hex and lists.",
-  debugging: "Running a program under the debugger from the workbench.",
-  gpu: "Recording GPU traces for shaders, models and Metal apps.",
-  storage: "Where Eleven keeps your work and how much room it takes.",
-  about: "Version, updates and help.",
-};
 
 const PATHS: Readonly<Record<Page, string>> = {
   general: "M12 9a3 3 0 100 6 3 3 0 000-6zM19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z",
@@ -65,11 +31,11 @@ const PATHS: Readonly<Record<Page, string>> = {
 const SPARK = "M19.5 1.2c.4 2 1.4 3 3.4 3.4-2 .4-3 1.4-3.4 3.4-.4-2-1.4-3-3.4-3.4 2-.4 3-1.4 3.4-3.4z";
 
 export function pageTitle(page: Page): string {
-  return TITLES[page];
+  return t(`settings.page.${page}`);
 }
 
 export function pageIntro(page: Page): string {
-  return INTROS[page];
+  return page === "agents" || page === "privacy" ? t(`settings.intro.${page}`, { device: thisDevice() }) : t(`settings.intro.${page}`);
 }
 
 /** The page's icon from the design board, as SVG drawn in currentColor. */
