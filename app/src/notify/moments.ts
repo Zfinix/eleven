@@ -1,5 +1,6 @@
 import { toolLabel } from "../agents/describe";
 import type { PermissionChoice } from "../agents/events";
+import { t } from "../i18n";
 import { isRecord } from "../lib/guards";
 
 export type ChatRef = { readonly id: string; readonly title: string; readonly project: string | null };
@@ -35,8 +36,8 @@ function firstLine(text: string): string {
 function askedFor(tool: string, input: unknown): string {
   const { label } = toolLabel(tool, input);
   if (label.length <= 60 && !/[;|&$]/.test(label)) return label;
-  if (isRecord(input) && "command" in input) return "Run a command";
-  return /[;|&$]/.test(label) ? "Run a command" : `${label.slice(0, 59).trimEnd()}…`;
+  if (isRecord(input) && "command" in input) return t("notify.runCommand");
+  return /[;|&$]/.test(label) ? t("notify.runCommand") : `${label.slice(0, 59).trimEnd()}…`;
 }
 
 function chatTitle(chat: ChatRef, agent: string): string {
@@ -54,31 +55,31 @@ export function askButtons(choices: readonly PermissionChoice[]): readonly Permi
   return [allow, refuse].filter((choice): choice is PermissionChoice => choice !== undefined);
 }
 
-function functionCount(n: number): string {
-  return `${n.toLocaleString("en-US")} ${n === 1 ? "function" : "functions"}`;
+function readBody(engine: string, n: number): string {
+  return n === 1 ? t("notify.readOne", { engine }) : t("notify.readMany", { engine, count: n.toLocaleString("en-US") });
 }
 
 export function noteFor(moment: Moment): Note {
   switch (moment.kind) {
     case "agentDone": {
       const answer = firstLine(moment.answer);
-      return { tag: `done:${moment.chat.id}`, title: chatTitle(moment.chat, moment.agent), body: answer ? `${moment.agent}: ${answer}` : `${moment.agent} finished.`, actions: [] };
+      return { tag: `done:${moment.chat.id}`, title: chatTitle(moment.chat, moment.agent), body: answer ? `${moment.agent}: ${answer}` : t("notify.finished", { agent: moment.agent }), actions: [] };
     }
     case "agentNeedsYou": {
-      const where = moment.chat.project ? ` in ${moment.chat.project}` : "";
+      const what = askedFor(moment.tool, moment.input);
       return {
         tag: askTag(moment.chat.id, moment.ask),
-        title: `${moment.agent} needs your OK`,
-        body: `${askedFor(moment.tool, moment.input)}${where}`,
+        title: t("notify.needsYou", { agent: moment.agent }),
+        body: moment.chat.project ? t("notify.inProject", { what, project: moment.chat.project }) : what,
         actions: askButtons(moment.choices).map((choice) => ({ id: choice.id, label: choice.label })),
       };
     }
     case "agentStopped":
-      return { tag: `stopped:${moment.chat.id}`, title: `${moment.agent} stopped`, body: firstLine(moment.reason) || "Open the chat to see what happened.", actions: [] };
+      return { tag: `stopped:${moment.chat.id}`, title: t("notify.stopped", { agent: moment.agent }), body: firstLine(moment.reason) || t("notify.stopped.body"), actions: [] };
     case "opened":
-      return { tag: `opened:${moment.project}`, title: `${moment.name} is ready`, body: `${moment.engine} finished reading ${functionCount(moment.functions)}.`, actions: [] };
+      return { tag: `opened:${moment.project}`, title: t("notify.ready", { name: moment.name }), body: readBody(moment.engine, moment.functions), actions: [] };
     case "openFailed":
-      return { tag: `openFailed:${moment.name}`, title: `Couldn't open ${moment.name}`, body: firstLine(moment.advice), actions: [] };
+      return { tag: `openFailed:${moment.name}`, title: t("notify.openFailed", { name: moment.name }), body: firstLine(moment.advice), actions: [] };
     default: {
       const unhandled: never = moment;
       return unhandled;

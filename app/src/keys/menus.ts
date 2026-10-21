@@ -1,5 +1,6 @@
 import type { MenuItemSpec, MenuSpec } from "@gpuix/native";
 
+import { type PlainId, t } from "../i18n";
 import { type CommandId, isCommandId } from "./commands";
 import { type Combo, isBareCombo } from "./keymaps";
 import { isMenuActionId, type MenuActionId } from "./menuActions";
@@ -36,142 +37,142 @@ const SEPARATOR: MenuItemSpec = { role: "separator" };
  * A command with ⌘ or ⌃ shows its shortcut and presses it when chosen, so it acts exactly like the keyboard.
  * A one-key shortcut would let the menu take that key from text fields, so those call back by id instead.
  */
-function command(ctx: MenuContext, id: CommandId, label: string): MenuItemSpec {
+function command(ctx: MenuContext, id: CommandId, label: PlainId): MenuItemSpec {
   const combo = ctx.combo(id);
-  const item: MenuItemSpec = { id: choiceId({ kind: "command", id }), label, enabled: ctx.bound(id) };
+  const item: MenuItemSpec = { id: choiceId({ kind: "command", id }), label: t(label), enabled: ctx.bound(id) };
   return combo && !isBareCombo(combo) ? { ...item, keys: combo } : item;
 }
 
-function action(ctx: MenuContext, id: MenuActionId, label: string): MenuItemSpec {
-  return { id: choiceId({ kind: "action", id }), label, enabled: ctx.offered(id) };
+function action(ctx: MenuContext, id: MenuActionId, label: PlainId): MenuItemSpec {
+  return { id: choiceId({ kind: "action", id }), label: t(label), enabled: ctx.offered(id) };
 }
 
-function app(id: AppItem, label: string): MenuItemSpec {
-  return { id: choiceId({ kind: "app", id }), label };
+function app(id: AppItem, label: PlainId): MenuItemSpec {
+  return { id: choiceId({ kind: "app", id }), label: t(label) };
 }
 
 /** Text fields handle these themselves, so they press the standard keys and are always on. */
-function edit(label: string, keys: string): MenuItemSpec {
-  return { label, keys };
+function edit(label: PlainId, keys: string): MenuItemSpec {
+  return { label: t(label), keys };
 }
 
 function recentMenu(ctx: MenuContext): MenuItemSpec {
-  if (ctx.recent.length === 0) return { label: "Open Recent", enabled: false, items: [] };
-  return { label: "Open Recent", items: ctx.recent.map((project) => ({ id: choiceId({ kind: "recent", id: project.id }), label: project.name })) };
+  if (ctx.recent.length === 0) return { label: t("menu.openRecent"), enabled: false, items: [] };
+  return { label: t("menu.openRecent"), items: ctx.recent.map((project) => ({ id: choiceId({ kind: "recent", id: project.id }), label: project.name })) };
 }
 
 export function menuBar(ctx: MenuContext): MenuSpec[] {
   return [
     { label: "Eleven", items: [
-      app("about", "About Eleven"),
-      app("updates", "Check for Updates…"),
+      app("about", "menu.about"),
+      app("updates", "menu.checkUpdates"),
       SEPARATOR,
-      command(ctx, "settings", "Settings…"),
+      command(ctx, "settings", "menu.settings"),
       SEPARATOR,
       { role: "services" },
       SEPARATOR,
-      { role: "hide", label: "Hide Eleven" },
+      { role: "hide", label: t("menu.hide") },
       { role: "hideOthers" },
       { role: "showAll" },
       SEPARATOR,
-      { role: "quit", label: "Quit Eleven" },
+      { role: "quit", label: t("menu.quit") },
     ] },
-    { label: "File", items: [
-      command(ctx, "thread", "New Chat"),
-      command(ctx, "open", "Open…"),
+    { label: t("menu.file"), items: [
+      command(ctx, "thread", "menu.newChat"),
+      command(ctx, "open", "menu.open"),
       recentMenu(ctx),
       SEPARATOR,
-      command(ctx, "save", "Save Project"),
+      command(ctx, "save", "menu.save"),
       SEPARATOR,
-      { label: "Export", items: [
-        action(ctx, "exportPseudocode", "Pseudocode of This Function"),
-        action(ctx, "exportAssembly", "Assembly of This Function"),
+      { label: t("menu.export"), items: [
+        action(ctx, "exportPseudocode", "menu.exportPseudocode"),
+        action(ctx, "exportAssembly", "menu.exportAssembly"),
         SEPARATOR,
-        action(ctx, "exportAllPseudocode", "All Pseudocode"),
-        action(ctx, "exportObjc", "Objective-C Classes"),
+        action(ctx, "exportAllPseudocode", "menu.exportAllPseudocode"),
+        action(ctx, "exportObjc", "menu.exportObjc"),
       ] },
-      action(ctx, "compare", "Compare with Another Binary…"),
-      action(ctx, "writePatched", "Write Patched Copy"),
+      action(ctx, "compare", "menu.compare"),
+      action(ctx, "writePatched", "menu.writePatched"),
       SEPARATOR,
       { role: "close" },
     ] },
-    { label: "Edit", items: [
-      edit("Undo", "cmd-z"),
-      edit("Redo", "shift-cmd-z"),
+    { label: t("menu.edit"), items: [
+      edit("menu.undo", "cmd-z"),
+      edit("menu.redo", "shift-cmd-z"),
       SEPARATOR,
-      edit("Cut", "cmd-x"),
-      edit("Copy", "cmd-c"),
-      edit("Paste", "cmd-v"),
-      edit("Select All", "cmd-a"),
+      edit("menu.cut", "cmd-x"),
+      edit("menu.copy", "cmd-c"),
+      edit("menu.paste", "cmd-v"),
+      edit("menu.selectAll", "cmd-a"),
       SEPARATOR,
-      command(ctx, "find", "Find…"),
-      command(ctx, "findNext", "Find Next"),
-      command(ctx, "findPrevious", "Find Previous"),
+      command(ctx, "find", "menu.find"),
+      command(ctx, "findNext", "menu.findNext"),
+      command(ctx, "findPrevious", "menu.findPrevious"),
     ] },
-    { label: "Navigate", items: [
-      command(ctx, "goto", "Go to Address or Symbol…"),
-      command(ctx, "palette", "Search Everything…"),
+    { label: t("menu.navigate"), items: [
+      command(ctx, "goto", "menu.goto"),
+      command(ctx, "palette", "menu.palette"),
       SEPARATOR,
-      command(ctx, "back", "Back"),
-      command(ctx, "forward", "Forward"),
+      command(ctx, "back", "menu.back"),
+      command(ctx, "forward", "menu.forward"),
       SEPARATOR,
-      command(ctx, "xrefs", "Cross-References"),
+      command(ctx, "xrefs", "menu.xrefs"),
     ] },
-    { label: "Modify", items: [
-      command(ctx, "rename", "Rename…"),
-      command(ctx, "comment", "Comment…"),
-      command(ctx, "bookmark", "Bookmark"),
-      command(ctx, "patch", "Patch Bytes Here…"),
+    { label: t("menu.modify"), items: [
+      command(ctx, "rename", "menu.rename"),
+      command(ctx, "comment", "menu.comment"),
+      command(ctx, "bookmark", "menu.bookmark"),
+      command(ctx, "patch", "menu.patch"),
       SEPARATOR,
-      { label: "Mark As", items: [
-        command(ctx, "markCode", "Code"),
-        command(ctx, "markProcedure", "Function"),
-        command(ctx, "markData", "Data"),
-        command(ctx, "markString", "C String"),
-        command(ctx, "markUndefined", "Undefined"),
+      { label: t("menu.markAs"), items: [
+        command(ctx, "markCode", "menu.markCode"),
+        command(ctx, "markProcedure", "menu.markProcedure"),
+        command(ctx, "markData", "menu.markData"),
+        command(ctx, "markString", "menu.markString"),
+        command(ctx, "markUndefined", "menu.markUndefined"),
       ] },
-      { label: "Show Number As", items: [
-        command(ctx, "showHex", "Hexadecimal"),
-        command(ctx, "showDecimal", "Decimal"),
-        command(ctx, "showCharacter", "Character"),
-        command(ctx, "showOffset", "Offset"),
-        command(ctx, "showAddress", "Address"),
+      { label: t("menu.showAs"), items: [
+        command(ctx, "showHex", "menu.showHex"),
+        command(ctx, "showDecimal", "menu.showDecimal"),
+        command(ctx, "showCharacter", "menu.showCharacter"),
+        command(ctx, "showOffset", "menu.showOffset"),
+        command(ctx, "showAddress", "menu.showAddress"),
       ] },
     ] },
-    { label: "View", items: [
-      command(ctx, "pseudo", "Pseudocode"),
-      command(ctx, "graph", "Graph"),
-      command(ctx, "strings", "Strings"),
+    { label: t("menu.view"), items: [
+      command(ctx, "pseudo", "menu.pseudo"),
+      command(ctx, "graph", "menu.graph"),
+      command(ctx, "strings", "menu.strings"),
       SEPARATOR,
-      command(ctx, "split", "Split Right"),
-      command(ctx, "splitDown", "Split Down"),
+      command(ctx, "split", "menu.split"),
+      command(ctx, "splitDown", "menu.splitDown"),
       SEPARATOR,
-      action(ctx, "sidebar", "Sidebar"),
-      command(ctx, "details", "Details"),
-      command(ctx, "terminal", "Terminal"),
+      action(ctx, "sidebar", "menu.sidebar"),
+      command(ctx, "details", "menu.details"),
+      command(ctx, "terminal", "menu.terminal"),
     ] },
-    { label: "Agent", items: [
-      command(ctx, "agent", "Agent Panel"),
-      command(ctx, "stop", "Stop the Agent"),
+    { label: t("menu.agent"), items: [
+      command(ctx, "agent", "menu.agentPanel"),
+      command(ctx, "stop", "menu.stop"),
     ] },
-    { label: "Debug", items: [
-      command(ctx, "debug", "Debug This Program"),
+    { label: t("menu.debug"), items: [
+      command(ctx, "debug", "menu.debugProgram"),
       SEPARATOR,
-      command(ctx, "continue", "Continue"),
-      command(ctx, "stepOver", "Step Over"),
-      command(ctx, "stepIn", "Step Into"),
-      command(ctx, "stepOut", "Step Out"),
+      command(ctx, "continue", "menu.continue"),
+      command(ctx, "stepOver", "menu.stepOver"),
+      command(ctx, "stepIn", "menu.stepIn"),
+      command(ctx, "stepOut", "menu.stepOut"),
     ] },
-    { label: "Window", items: [
+    { label: t("menu.window"), items: [
       { role: "minimize" },
       { role: "zoom" },
     ] },
-    { label: "Help", items: [
-      app("shortcuts", "Keyboard Shortcuts"),
-      app("whatsNew", "What’s New in Eleven"),
-      app("support", "Support Eleven…"),
+    { label: t("menu.help"), items: [
+      app("shortcuts", "menu.shortcuts"),
+      app("whatsNew", "menu.whatsNew"),
+      app("support", "menu.support"),
       SEPARATOR,
-      app("report", "Report a Problem…"),
+      app("report", "menu.report"),
     ] },
   ];
 }

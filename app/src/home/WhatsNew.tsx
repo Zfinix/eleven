@@ -2,6 +2,7 @@ import { join } from "node:path";
 
 import { type ReactElement, useState } from "react";
 
+import { t } from "../i18n";
 import { ASSETS } from "../lib/assets";
 import { useTheme } from "../theme";
 import { Icon } from "../components/ui";
@@ -68,7 +69,7 @@ function Hero({ art, onClose }: { readonly art: NewsArt; readonly onClose: () =>
         {art.kind !== "shot" && artSource(art).map((src) => <Badge key={src}><img src={src} objectFit="contain" style={{ width: LOGO, height: LOGO }} /></Badge>)}
       </div>
       {art.kind === "shot" && <img src={join(ASSETS, "news", art.file)} objectFit="cover" style={{ ...layer, pointerEvents: "none" }} />}
-      <div onClick={onClose} role="button" aria-label="Close" style={{ position: "absolute", top: 10, right: 10, display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, cursor: "pointer", hover: { opacity: 0.72 } }}>
+      <div onClick={onClose} role="button" aria-label={t("news.close")} style={{ position: "absolute", top: 10, right: 10, display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, cursor: "pointer", hover: { opacity: 0.72 } }}>
         <Icon name="close" size={13} color={art.kind === "shot" ? "#e6e6e6" : "#b8b8b6"} />
       </div>
     </div>
@@ -87,13 +88,13 @@ function Pager({ at, count, onGo }: { readonly at: number; readonly count: numbe
   };
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
-      {step("back", "Previous", at - 1)}
+      {step("back", t("news.previous"), at - 1)}
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         {Array.from({ length: count }, (_, index) => (
-          <div key={index} onClick={() => onGo(index)} role="button" aria-label={`Card ${index + 1} of ${count}`} aria-selected={index === at} style={{ width: 6, height: 6, borderRadius: 3, cursor: "pointer", backgroundColor: index === at ? p.text : p.line3 }} />
+          <div key={index} onClick={() => onGo(index)} role="button" aria-label={t("news.card", { index: index + 1, count })} aria-selected={index === at} style={{ width: 6, height: 6, borderRadius: 3, cursor: "pointer", backgroundColor: index === at ? p.text : p.line3 }} />
         ))}
       </div>
-      {step("forward", "Next", at + 1)}
+      {step("forward", t("news.next"), at + 1)}
     </div>
   );
 }
@@ -121,13 +122,13 @@ export function WhatsNew({ news, onClose }: {
       }
     }
   };
-  const label = item.action.kind === "none" ? (last ? "Done" : "Next") : item.action.label;
+  const label = item.action.kind === "none" ? (last ? t("news.done") : t("news.next")) : item.action.label;
   const shadow = { offsetX: 0, offsetY: 16, blurRadius: 40, spreadRadius: 0, color: "rgba(0,0,0,0.35)" };
   return (
     <div role="dialog" aria-label={item.title} style={{ position: "absolute", left: 10, bottom: 10, display: "flex", flexDirection: "column", width: WIDTH, borderWidth: 1, borderColor: p.line2, borderRadius: RADIUS, backgroundColor: p.raised2, overflow: "hidden", boxShadow: shadow }}>
       <Hero art={item.art} onClose={onClose} />
       <div style={{ display: "flex", flexDirection: "column", paddingTop: 18, paddingLeft: 16, paddingRight: 16, paddingBottom: 12 }}>
-        <div style={{ fontSize: 12.5, color: p.muted }}>{`What's new · ${at + 1} of ${NEWS.length}`}</div>
+        <div style={{ fontSize: 12.5, color: p.muted }}>{t("news.position", { index: at + 1, count: NEWS.length })}</div>
         <div style={{ marginTop: 2, fontSize: 18, lineHeight: 26, fontWeight: 500, color: p.text }}>{item.title}</div>
         <div style={{ marginTop: 6, minHeight: 60, color: p.text3 }}>{item.body}</div>
         <div onClick={act} role="button" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 36, marginTop: 16, borderRadius: 10, backgroundColor: p.sel2, color: p.text, cursor: "pointer", hover: { opacity: 0.72 } }}>

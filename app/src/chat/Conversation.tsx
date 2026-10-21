@@ -3,6 +3,7 @@ import { type ReactElement, type ReactNode, useState } from "react";
 import { toolLabel } from "../agents/describe";
 import type { PlanItem } from "../agents/events";
 import { Tooltip } from "../components/kit";
+import { type PlainId, t } from "../i18n";
 import { seconds, useNow } from "../lib/useNow";
 import { useTheme } from "../theme";
 import { Icon, Row, Spacer } from "../components/ui";
@@ -10,7 +11,7 @@ import { MessageRow, useRowActions } from "./MessageRow";
 import type { Draft, Message, ThreadState } from "./thread";
 import type { Thread } from "./useThread";
 
-const VERBS = ["Taking it apart", "Reading the code", "Tracing calls", "Following references", "Untangling", "Decompiling"] as const;
+const VERBS: readonly [PlainId, ...PlainId[]] = ["chat.verb.takingApart", "chat.verb.reading", "chat.verb.tracing", "chat.verb.following", "chat.verb.untangling", "chat.verb.decompiling"];
 const VERB_MS = 2400;
 const SHIMMER_MS = 1800;
 const SHIMMER_CHAR_PX = 7.5;
@@ -54,14 +55,14 @@ export function Working({ since, tool }: { readonly since: number; readonly tool
   const { p } = useTheme();
   const now = useNow(true, 33);
   const pulse = Math.floor(now / 600) % 2 === 0;
-  const verb = tool ?? VERBS[Math.floor((now - since) / VERB_MS) % VERBS.length] ?? VERBS[0];
+  const verb = tool ?? t(VERBS[Math.floor((now - since) / VERB_MS) % VERBS.length] ?? VERBS[0]);
   return (
     <Row gap={9} style={{ height: 24 }}>
       <div style={{ display: "flex", opacity: pulse ? 1 : 0.45 }}>
         <Icon name="spark" size={14} color={p.data} />
       </div>
       <Shimmer text={`${verb}…`} color={p.text} now={now} />
-      <div style={{ fontSize: 12, color: p.faint }}>{`${seconds(now - since)} · esc to stop`}</div>
+      <div style={{ fontSize: 12, color: p.faint }}>{t("chat.escToStop", { time: seconds(now - since) })}</div>
     </Row>
   );
 }
@@ -80,7 +81,7 @@ function PlanPanel({ items }: { readonly items: readonly PlanItem[] }): ReactEle
       <Row gap={8} style={{ cursor: "pointer", hover: { opacity: 0.72 } }}>
         <div onClick={() => setOpen(!open)} style={{ display: "flex", alignItems: "center", gap: 8, flexGrow: 1 }}>
           <Icon name="plan" size={14} color={p.text3} />
-          <div style={{ fontSize: 12.5, color: p.text3 }}>{`Plan · ${done} of ${items.length} done`}</div>
+          <div style={{ fontSize: 12.5, color: p.text3 }}>{t("chat.plan", { done, count: items.length })}</div>
           <Spacer />
           <Icon name={open ? "disclosure" : "forward"} size={11} color={p.faint} />
         </div>
@@ -101,13 +102,13 @@ export function QueuePanel({ queue, onRemove }: { readonly queue: readonly Draft
     <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 8, paddingTop: 8, paddingBottom: 6, paddingLeft: 12, paddingRight: 8, borderWidth: 1, borderColor: p.line2, borderRadius: 14, backgroundColor: p.raised }}>
       <Row gap={8} style={{ fontSize: 12, color: p.muted, marginBottom: 2 }}>
         <Icon name="clock" size={13} />
-        <div>{`${queue.length} queued, sends when the agent is done`}</div>
+        <div>{t("chat.queued", { count: queue.length })}</div>
       </Row>
       {queue.map((draft, ix) => (
         <Row key={`${ix}-${draft.text}`} gap={8} style={{ height: 24, fontSize: 12.5 }}>
           <div style={{ flexGrow: 1, minWidth: 0, color: p.text2, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>{draft.text}</div>
-          {draft.attachments.length > 0 && <div style={{ flexShrink: 0, color: p.muted }}>{draft.attachments.length === 1 ? "1 file" : `${draft.attachments.length} files`}</div>}
-          <div onClick={() => onRemove(ix)} aria-label="Remove from queue" style={{ display: "flex", padding: 4, cursor: "pointer", hover: { opacity: 0.72 } }}>
+          {draft.attachments.length > 0 && <div style={{ flexShrink: 0, color: p.muted }}>{draft.attachments.length === 1 ? t("chat.oneFile") : t("chat.files", { count: draft.attachments.length })}</div>}
+          <div onClick={() => onRemove(ix)} aria-label={t("chat.removeFromQueue")} style={{ display: "flex", padding: 4, cursor: "pointer", hover: { opacity: 0.72 } }}>
             <Icon name="close" size={11} />
           </div>
         </Row>
@@ -118,17 +119,17 @@ export function QueuePanel({ queue, onRemove }: { readonly queue: readonly Draft
 
 function Header({ state, title, agentName, onWorkbench }: { readonly state: ThreadState; readonly title: string; readonly agentName: string; readonly onWorkbench: (() => void) | null }): ReactElement {
   const { p } = useTheme();
-  const status = state.agent.kind === "starting" ? `Starting ${agentName}…` : agentName;
+  const status = state.agent.kind === "starting" ? t("chat.starting", { name: agentName }) : agentName;
   return (
     <Row gap={8} style={{ height: 44, flexShrink: 0, paddingLeft: 16, paddingRight: 14, borderBottomWidth: 1, borderColor: p.fill }}>
       <div style={{ flexShrink: 1, minWidth: 0, fontWeight: 500, color: p.text, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>{title}</div>
       <div style={{ flexShrink: 0, color: p.muted, whiteSpace: "nowrap" }}>{`· ${status}`}</div>
       <Spacer />
       {onWorkbench && (
-        <Tooltip label="Back to the code view for this file">
+        <Tooltip label={t("chat.backToCode")}>
           <div onClick={onWorkbench} role="button" style={{ display: "flex", alignItems: "center", gap: 6, height: 28, flexShrink: 0, paddingLeft: 10, paddingRight: 10, borderWidth: 1, borderColor: p.sel, borderRadius: 8, color: p.text3, fontSize: 12.5, cursor: "pointer", hover: { opacity: 0.72 } }}>
             <Icon name="expand" size={13} color={p.text3} />
-            <div>Workbench</div>
+            <div>{t("canvas.workbench")}</div>
           </div>
         </Tooltip>
       )}

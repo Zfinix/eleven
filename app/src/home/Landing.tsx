@@ -1,23 +1,29 @@
 import type { ReactElement, ReactNode } from "react";
 
+import { t } from "../i18n";
 import { useTheme } from "../theme";
 import { appIcon, Icon, Row } from "../components/ui";
 
-function suggestions(file: string | null, model: boolean): readonly { readonly kind: string; readonly icon: string; readonly text: string; readonly ask: string }[] {
-  const binary = file ?? "/bin/ls";
-  const first = model && file
-    ? { kind: "Model", icon: "model", text: `What is in ${file}, and is it safe to load?`, ask: `What is in ${file}, and is it safe to load?` }
-    : { kind: "Binary", icon: "binary", text: `What does ${binary} do when it starts?`, ask: `What does ${binary} do when it starts, and where does it print its usage?` };
+type Idea = { readonly kind: string; readonly label: string; readonly icon: string; readonly text: string; readonly ask: string };
+
+function binaryIdea(name: string): Idea {
+  return { kind: "Binary", label: t("landing.kind.binary"), icon: "binary", text: t("landing.binary", { name }), ask: t("landing.binary.ask", { name }) };
+}
+
+function suggestions(file: string | null, model: boolean): readonly Idea[] {
+  const modelIdea = (text: string): Idea => ({ kind: "Model", label: t("landing.kind.model"), icon: "model", text, ask: text });
+  const notes = t("landing.notes");
+  const shader = t("landing.shader");
   return [
-    first,
-    { kind: "App", icon: "app", text: "How does Notes save attachments?", ask: "How does Notes save attachments?" },
-    ...(model ? [{ kind: "Binary", icon: "binary", text: "What does /bin/ls do when it starts?", ask: "What does /bin/ls do when it starts, and where does it print its usage?" }] : [{ kind: "Model", icon: "model", text: "Is this .pt file safe to load?", ask: "Is this .pt file safe to load?" }]),
-    { kind: "Shader", icon: "gpu", text: "Why is this blur shader slow?", ask: "Why is this blur shader slow?" },
+    model && file ? modelIdea(t("landing.model", { name: file })) : binaryIdea(file ?? "/bin/ls"),
+    { kind: "App", label: t("landing.kind.app"), icon: "app", text: notes, ask: notes },
+    model ? binaryIdea("/bin/ls") : modelIdea(t("landing.pt")),
+    { kind: "Shader", label: t("landing.kind.shader"), icon: "gpu", text: shader, ask: shader },
   ];
 }
 
-function Suggestion({ kind, icon, text, ask, onPick }: {
-  readonly kind: string;
+function Suggestion({ label, icon, text, ask, onPick }: {
+  readonly label: string;
   readonly icon: string;
   readonly text: string;
   readonly ask: string;
@@ -28,7 +34,7 @@ function Suggestion({ kind, icon, text, ask, onPick }: {
     <div onClick={() => onPick(ask)} style={{ display: "flex", flexDirection: "column", gap: 3, paddingTop: 12, paddingBottom: 12, paddingLeft: 14, paddingRight: 14, borderWidth: 1, borderColor: p.fill2, borderRadius: 14, cursor: "pointer", hover: { opacity: 0.72 } }}>
       <Row gap={6} style={{ fontSize: 11.5, color: p.muted }}>
         <Icon name={icon} size={14} />
-        <div>{kind}</div>
+        <div>{label}</div>
       </Row>
       <div style={{ color: p.text }}>{text}</div>
     </div>
@@ -41,12 +47,12 @@ export function Landing({ composer, file, model = false, onSuggest, showSuggesti
   return (
     <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, alignItems: "center", justifyContent: "center", paddingTop: 32, paddingLeft: 24, paddingRight: 24, paddingBottom: 64 }}>
       <img src={appIcon(p.icon)} style={{ width: 56, height: 56, marginBottom: 14 }} />
-      <div style={{ fontSize: 28, fontWeight: 500, marginBottom: 22, color: p.text }}>What should we take apart?</div>
+      <div style={{ fontSize: 28, fontWeight: 500, marginBottom: 22, color: p.text }}>{t("landing.title")}</div>
       {composer}
       {showSuggestions && (
         <div style={{ display: "grid", gridTemplateColumns: 2, gap: 10, marginTop: 16, width: "100%", maxWidth: 700 }}>
           {suggestions(file, model).map((s) => (
-            <Suggestion key={s.kind} kind={s.kind} icon={s.icon} text={s.text} ask={s.ask} onPick={onSuggest} />
+            <Suggestion key={s.kind} label={s.label} icon={s.icon} text={s.text} ask={s.ask} onPick={onSuggest} />
           ))}
         </div>
       )}

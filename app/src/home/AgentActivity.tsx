@@ -4,6 +4,7 @@ import type { AgentIcon } from "../agents/icons";
 import type { ChatTab } from "../chat/useChat";
 import { authorName, describeEdit, type Edit } from "../engine/edits";
 import { loadProject, onProjectChange } from "../engine/project";
+import { t } from "../i18n";
 import { useTheme } from "../theme";
 import { AgentLogo, Dot } from "../components/ui";
 
@@ -65,14 +66,15 @@ export function AgentActivity({ tabs, project, logoOf, agentName, onOpenChat }: 
   if (working.length === 0 && edits.length === 0) return null;
   return (
     <>
-      <div style={{ display: "flex", alignItems: "center", height: 26, flexShrink: 0, marginTop: 14, paddingLeft: 8, paddingRight: 8, fontSize: 12, fontWeight: 500, color: p.faint }}>Agents</div>
+      <div style={{ display: "flex", alignItems: "center", height: 26, flexShrink: 0, marginTop: 14, paddingLeft: 8, paddingRight: 8, fontSize: 12, fontWeight: 500, color: p.faint }}>{t("home.agents")}</div>
       {working.map((tab) => (
-        <ActivityRow key={tab.id} logo={logoOf(tab.agent)} title={`${agentName(tab.agent)} · ${tab.title}`} detail={tab.found ?? "Working on it"} busy={tab.busy} onClick={() => onOpenChat(tab.id)} />
+        <ActivityRow key={tab.id} logo={logoOf(tab.agent)} title={`${agentName(tab.agent)} · ${tab.title}`} detail={tab.found ?? t("home.workingOnIt")} busy={tab.busy} onClick={() => onOpenChat(tab.id)} />
       ))}
       {edits.map((edit) => {
         const chat = edit.by.kind === "agent" ? edit.by.chat : null;
         const agent = edit.by.kind === "agent" ? edit.by.agent : "";
-        const detail = `${describeEdit(edit, (key) => key)}${edit.status === "proposed" ? " (waiting for you)" : ""}`;
+        const what = describeEdit(edit, (key) => key);
+        const detail = edit.status === "proposed" ? t("home.waitingForYou", { what }) : what;
         return <ActivityRow key={edit.id} logo={logoOf(agent)} title={agentName(authorName(edit.by))} detail={detail} busy={false} onClick={chat ? () => onOpenChat(chat) : null} />;
       })}
     </>
