@@ -1,6 +1,6 @@
 import type { AgentStatus } from "./agentSetup";
-import { type EngineId, engineNamed, engineReady, type Found, type Install, rowState } from "./engines";
-import { THIS_DEVICE } from "../lib/platform";
+import { t, thisDevice } from "../i18n";
+import { type EngineId, engineNamed, engineNames, engineReady, type Found, type Install, rowState } from "./engines";
 
 export type StripAction = "installEngines" | "installAgent" | "signIn" | "unqueue";
 
@@ -33,9 +33,7 @@ function chosenPath(r: Readiness): readonly EngineId[] {
   return ["rizin"];
 }
 
-function names(ids: readonly EngineId[]): string {
-  return ids.map((id) => engineNamed(id).name).join(" and ");
-}
+
 
 function average(values: readonly (number | null)[]): number | null {
   return values.some((value) => value === null) ? null : values.reduce<number>((sum, value) => sum + (value ?? 0), 0) / values.length;
@@ -47,20 +45,20 @@ export function stripFor(r: Readiness): Strip | null {
   const failed = path.filter((id) => rowState(r.found[id], r.installs[id]) === "failed");
   const missing = path.filter((id) => rowState(r.found[id], r.installs[id]) === "missing");
   const busy = path.filter((id) => rowState(r.found[id], r.installs[id]) === "installing");
-  if (failed.length > 0) return { tone: "failed", text: `The ${names(failed)} download stopped. Check your connection, then try again.`, blocks: true, progress: undefined, action: { label: "Try again", does: "installEngines", primary: false }, engines: [...failed, ...missing] };
+  if (failed.length > 0) return { tone: "failed", text: t("setup.strip.stopped", { names: engineNames(failed) }), blocks: true, progress: undefined, action: { label: t("setup.tryAgain"), does: "installEngines", primary: false }, engines: [...failed, ...missing] };
   if (missing.length > 0) {
     const size = missing.reduce((sum, id) => sum + engineNamed(id).megabytes, 0);
-    return { tone: "missing", text: `To read Calculator, Eleven needs ${names(missing)} (${size} MB).`, blocks: true, progress: undefined, action: { label: "Install", does: "installEngines", primary: true }, engines: missing };
+    return { tone: "missing", text: t("setup.strip.needs", { names: engineNames(missing), size }), blocks: true, progress: undefined, action: { label: t("setup.install"), does: "installEngines", primary: true }, engines: missing };
   }
-  if (r.agent === "install" || r.agent === "failed") return { tone: "missing", text: `${r.agentName} isn't installed yet. Install it, or pick another agent below.`, blocks: true, progress: undefined, action: { label: "Install", does: "installAgent", primary: true }, engines: [] };
-  if (r.agent === "unavailable") return { tone: "missing", text: `${r.agentName} can't run on ${THIS_DEVICE} yet. Pick another agent below.`, blocks: true, progress: undefined, action: null, engines: [] };
-  if (r.agent === "signin") return { tone: "signin", text: `Sign in to ${r.agentName} to send. It opens your browser, then brings you back.`, blocks: true, progress: undefined, action: { label: "Sign in", does: "signIn", primary: true }, engines: [] };
+  if (r.agent === "install" || r.agent === "failed") return { tone: "missing", text: t("setup.strip.agentMissing", { name: r.agentName }), blocks: true, progress: undefined, action: { label: t("setup.install"), does: "installAgent", primary: true }, engines: [] };
+  if (r.agent === "unavailable") return { tone: "missing", text: t("setup.strip.agentUnavailable", { name: r.agentName, device: thisDevice() }), blocks: true, progress: undefined, action: null, engines: [] };
+  if (r.agent === "signin") return { tone: "signin", text: t("setup.strip.signIn", { name: r.agentName }), blocks: true, progress: undefined, action: { label: t("setup.signIn"), does: "signIn", primary: true }, engines: [] };
   if (busy.length > 0 || r.agent === "installing") {
-    const what = busy.length > 0 ? names(busy) : r.agentName;
+    const what = busy.length > 0 ? engineNames(busy) : r.agentName;
     const progress = busy.length > 0 ? average(busy.map((id) => { const install = r.installs[id]; return install.phase === "running" ? install.progress : null; })) : null;
     return r.waiting
-      ? { tone: "busy", text: `Your question sends as soon as ${what} is installed.`, blocks: false, progress, action: { label: "Don't send", does: "unqueue", primary: false }, engines: [] }
-      : { tone: "busy", text: `Installing ${what}. You can send now and it goes out when it's ready.`, blocks: false, progress, action: null, engines: [] };
+      ? { tone: "busy", text: t("setup.strip.queued", { name: what }), blocks: false, progress, action: { label: t("setup.strip.dontSend"), does: "unqueue", primary: false }, engines: [] }
+      : { tone: "busy", text: t("setup.strip.installing", { name: what }), blocks: false, progress, action: null, engines: [] };
   }
   return null;
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { adoptToolchain } from "../engine/toolchain";
+import { t } from "../i18n";
 import { currentSettings, saveSettings } from "../settings/store";
 import { pickPath } from "../settings/system";
 import { currentInstalls, detectEngine, type EngineId, type Found, type Install, startInstall, subscribeInstalls } from "./engines";
@@ -19,9 +20,9 @@ function detectAll(): FoundAll {
 }
 
 const PLACES = {
-  rizin: { kind: "file", prompt: "Choose the rizin program", key: "rizinPath" },
-  ghidra: { kind: "folder", prompt: "Choose your Ghidra folder", key: "ghidraDir" },
-  java: { kind: "folder", prompt: "Choose your Java home folder", key: "javaHome" },
+  rizin: { kind: "file", prompt: "setup.locate.rizin", key: "rizinPath" },
+  ghidra: { kind: "folder", prompt: "setup.locate.ghidra", key: "ghidraDir" },
+  java: { kind: "folder", prompt: "setup.locate.java", key: "javaHome" },
 } as const;
 
 /** Detection on this Mac plus the live state of installs, which keep running when the screen changes. */
@@ -41,7 +42,7 @@ export function useEngines(): Engines {
 
   const locate = async (id: EngineId): Promise<void> => {
     const place = PLACES[id];
-    const path = await pickPath(place.kind, place.prompt);
+    const path = await pickPath(place.kind, t(place.prompt));
     if (!path) return;
     saveSettings({ ...currentSettings(), [place.key]: path });
     adoptToolchain();

@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import { MONO, useTheme } from "../theme";
 import { Icon } from "../components/ui";
 import { Button } from "../components/kit";
+import { t } from "../i18n";
 import type { SlicePrompt } from "../chat/useChat";
 import { useCommand } from "../lib/shortcuts";
 import { useBench } from "../workbench/parts";
@@ -62,24 +63,24 @@ function SliceDialog({ prompt, onBack }: { readonly prompt: SlicePrompt; readonl
   const chosen = choice.slices.find((slice) => slice.arch === choice.chosen)?.name ?? choice.chosen;
   return (
     <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, backgroundColor: "rgba(0,0,0,0.45)" }}>
-      <div role="dialog" aria-label="Choose a version" style={{ display: "flex", flexDirection: "column", gap: 14, width: "100%", maxWidth: 440, padding: 20, borderRadius: 16, backgroundColor: p.raised, boxShadow: SHADOW }}>
+      <div role="dialog" aria-label={t("slice.title")} style={{ display: "flex", flexDirection: "column", gap: 14, width: "100%", maxWidth: 440, padding: 20, borderRadius: 16, backgroundColor: p.raised, boxShadow: SHADOW }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <div style={{ fontSize: 16, lineHeight: lineHeight(16), fontWeight: 600 }}>{choice.title}</div>
           <div style={{ color: p.muted }}>{choice.note}</div>
         </div>
-        <div role="radiogroup" aria-label="Version" style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <div role="radiogroup" aria-label={t("slice.version")} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {choice.slices.map((slice) => (
             <SliceRow key={slice.arch} slice={slice} on={slice.arch === choice.chosen} onPick={() => prompt.pick(slice.arch)} />
           ))}
         </div>
         <div onClick={prompt.toggleMatch} role="checkbox" aria-checked={choice.matchThisMac} style={{ display: "flex", alignItems: "center", gap: 10, paddingLeft: 2, paddingRight: 2, color: p.text3, cursor: "pointer" }}>
           <Checkbox on={choice.matchThisMac} />
-          <div>Always open the one that matches this Mac</div>
+          <div>{t("slice.matchThisMac")}</div>
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 2 }}>
-          <Button label="Cancel" tone="outline" onClick={cancel} />
-          <div onClick={prompt.open} role="button" aria-label={`Open ${chosen}`} style={{ display: "flex", alignItems: "center", gap: 8, height: 32, paddingLeft: 14, paddingRight: 12, borderRadius: 8, backgroundColor: p.text, color: p.win, fontWeight: 600, cursor: "pointer", hover: HOVER }}>
-            <div>{`Open ${chosen}`}</div>
+          <Button label={t("slice.cancel")} tone="outline" onClick={cancel} />
+          <div onClick={prompt.open} role="button" aria-label={t("slice.open", { name: chosen })} style={{ display: "flex", alignItems: "center", gap: 8, height: 32, paddingLeft: 14, paddingRight: 12, borderRadius: 8, backgroundColor: p.text, color: p.win, fontWeight: 600, cursor: "pointer", hover: HOVER }}>
+            <div>{t("slice.open", { name: chosen })}</div>
             <div style={{ fontSize: 11.5, fontWeight: 500, opacity: 0.55 }}>↩</div>
           </div>
         </div>

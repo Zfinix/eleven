@@ -5,10 +5,11 @@ import { join } from "node:path";
 
 import { findOnPath } from "../agents/detect";
 import { pathSetting } from "../settings/store";
+import { listOf, type PlainId, t, thisDevice } from "../i18n";
 import { errorMessage, isRecord } from "../lib/guards";
 import { engineArrived } from "../analysis/engines";
 import { adoptToolchain, enginesDir } from "../engine/toolchain";
-import { OS, THIS_DEVICE, unzip } from "../lib/platform";
+import { OS, unzip } from "../lib/platform";
 import { ghidraHome, javaCheck, jdkHome } from "./checks";
 import { buildDecompiler, hasDecompiler } from "./decompiler";
 import { run, start } from "../lib/process";
@@ -37,18 +38,22 @@ export type RowState = "ready" | "missing" | "installing" | "failed";
 export type Engine = {
   readonly id: EngineId;
   readonly name: string;
-  readonly tag: string | null;
+  readonly tag: PlainId | null;
   readonly megabytes: number;
-  readonly about: string;
+  readonly about: PlainId;
   readonly logo: string | null;
   readonly needs: readonly EngineId[];
 };
 
 export const ENGINES: readonly Engine[] = [
-  { id: "rizin", name: "Rizin", tag: "Fastest to start", megabytes: 38, about: "Opens most apps in seconds", logo: "rizin.svg", needs: ["rizin"] },
-  { id: "ghidra", name: "Ghidra 12.1", tag: null, megabytes: 512, about: "Slower, with the clearest readable code", logo: "ghidra.png", needs: ["ghidra", "java"] },
-  { id: "java", name: "Java 21", tag: null, megabytes: 196, about: "Ghidra runs on it. Eleven installs its own copy", logo: "java.svg", needs: ["java"] },
+  { id: "rizin", name: "Rizin", tag: "setup.engine.rizin.tag", megabytes: 38, about: "setup.engine.rizin", logo: "rizin.svg", needs: ["rizin"] },
+  { id: "ghidra", name: "Ghidra 12.1", tag: null, megabytes: 512, about: "setup.engine.ghidra", logo: "ghidra.png", needs: ["ghidra", "java"] },
+  { id: "java", name: "Java 21", tag: null, megabytes: 196, about: "setup.engine.java", logo: "java.svg", needs: ["java"] },
 ];
+
+export function engineNames(ids: readonly EngineId[]): string {
+  return listOf(ids.map((id) => engineNamed(id).name));
+}
 
 export function engineNamed(id: EngineId): Engine {
   const engine = ENGINES.find((item) => item.id === id);
@@ -88,7 +93,7 @@ export function detectEngine(id: EngineId): Found {
     case "ghidra": {
       const home = ghidraHome();
       if (!home) return { found: false, where: "" };
-      return hasDecompiler(home) ? { found: true, where: tilde(home) } : { found: false, where: tilde(home), repair: `Found, but its decompiler for ${THIS_DEVICE} is missing. Repair builds it` };
+      return hasDecompiler(home) ? { found: true, where: tilde(home) } : { found: false, where: tilde(home), repair: t("setup.engine.repairNeeded", { device: thisDevice() }) };
     }
     case "java": {
       const home = jdkHome();
@@ -166,7 +171,7 @@ async function downloadTo(id: EngineId, url: string, file: string): Promise<void
     for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
       await out.write(chunk.value);
       received += chunk.value.length;
-      setInstall(id, { phase: "running", progress: total > 0 ? Math.min(0.99, received / total) : null, note: "Downloading" });
+      setInstall(id, { phase: "running", progress: total > 0 ? Math.min(0.99, received / total) : null, note: t("setup.note.downloading") });
     }
   } finally {
     await out.close();
@@ -178,10 +183,10 @@ async function installJava(): Promise<void> {
   const dir = enginesDir();
   mkdirSync(dir, { recursive: true });
   const file = join(dir, OS === "windows" ? "java-download.zip" : "java-download.tar.gz");
-  setInstall("java", { phase: "running", progress: null, note: "Starting" });
+  setInstall("java", { phase: "running", progress: null, note: t("setup.note.starting") });
   try {
     await downloadTo("java", TEMURIN, file);
-    setInstall("java", { phase: "running", progress: null, note: "Unpacking" });
+    setInstall("java", { phase: "running", progress: null, note: t("setup.note.unpacking") });
     if (OS === "windows") await unzip(file, dir);
     else await run("tar", ["-xzf", file, "-C", dir], { timeout: 300000, maxBuffer: 1 << 24 });
   } finally {
@@ -196,19 +201,19 @@ async function installGhidra(): Promise<void> {
   const home = ghidraHome();
   if (!home) throw new Error("Ghidra didn't unpack. Try again.");
   if (hasDecompiler(home)) return;
-  setInstall("ghidra", { phase: "running", progress: null, note: `Building the decompiler for ${THIS_DEVICE}` });
+  setInstall("ghidra", { phase: "running", progress: null, note: t("setup.note.building", { device: thisDevice() }) });
   await buildDecompiler(home);
 }
 
 async function downloadGhidra(): Promise<void> {
-  setInstall("ghidra", { phase: "running", progress: null, note: "Finding the latest release" });
+  setInstall("ghidra", { phase: "running", progress: null, note: t("setup.note.finding") });
   const url = await ghidraAsset();
   const dir = enginesDir();
   mkdirSync(dir, { recursive: true });
   const file = join(dir, "ghidra-download.zip");
   try {
     await downloadTo("ghidra", url, file);
-    setInstall("ghidra", { phase: "running", progress: null, note: "Unpacking" });
+    setInstall("ghidra", { phase: "running", progress: null, note: t("setup.note.unpacking") });
     await unzip(file, dir);
   } finally {
     rmSync(file, { force: true });
@@ -219,7 +224,7 @@ async function installEngine(id: EngineId): Promise<void> {
   switch (id) {
     case "rizin":
       if (OS !== "mac") throw new Error("Rizin comes with Eleven. Reinstall Eleven to get it back.");
-      return brewInstall("rizin", "rizin", "Starting");
+      return brewInstall("rizin", "rizin", t("setup.note.starting"));
     case "ghidra":
       return installGhidra();
     case "java":

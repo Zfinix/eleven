@@ -3,6 +3,7 @@ import { type ReactElement, useEffect, useRef, useState } from "react";
 import { Composer } from "../chat/Composer";
 import type { Chat } from "../chat/useChat";
 import { Icon } from "../components/ui";
+import { t } from "../i18n";
 import { useTheme } from "../theme";
 import { glass, HOVER, lineHeight, PROBLEM_WASH } from "./look";
 import { OutlineButton, Percent, PrimaryButton, Progress, StepHeading } from "./SetupParts";
@@ -49,8 +50,8 @@ function Idea({ text, on, onUse }: { readonly text: string; readonly on: boolean
 }
 
 export function tryTitle(isReady: boolean, waiting: boolean): string {
-  if (isReady) return "You're ready";
-  return waiting ? "Waiting on the install" : "Almost there";
+  if (isReady) return t("setup.try.ready");
+  return waiting ? t("setup.try.waiting") : t("setup.try.almost");
 }
 
 /** The real home composer with a sample app attached; a send waits for any install still running. */
@@ -104,7 +105,7 @@ export function TryStep({ chat, engines, setup, onSent }: { readonly chat: Chat;
   };
   return (
     <>
-      <StepHeading title={tryTitle(go, waiting !== null)} detail={`Ask your first question. ${SAMPLE_APP.name} is attached to get you started, or drop your own app on the box.`} />
+      <StepHeading title={tryTitle(go, waiting !== null)} detail={t("setup.try.detail", { app: SAMPLE_APP.name })} />
       <Composer place="landing" target={chat.target} agents={agents} thread={{ ...thread, send }} onAttach={chat.openFile} onDetach={chat.detach} onPickAgent={chat.pickAgent} slot={strip && <StripView strip={strip} onAct={act} />} seed={seed} queued={waiting !== null} blocked={strip?.blocks === true} />
       <div style={{ display: "grid", gridTemplateColumns: 3, gap: 10 }}>
         {IDEAS.map((text) => <Idea key={text} text={text} on={seed.text === text} onUse={() => setSeed({ text })} />)}

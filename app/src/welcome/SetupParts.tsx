@@ -1,6 +1,7 @@
 import type { ReactElement, ReactNode } from "react";
 
 import { Icon } from "../components/ui";
+import { t } from "../i18n";
 import { MONO, type Palette, useTheme } from "../theme";
 import { glass, HOVER, lineHeight } from "./look";
 import { type StepId, STEPS } from "./steps";
@@ -55,13 +56,13 @@ export function Progress({ progress }: { readonly progress: number | null }): Re
 }
 
 export function percentLabel(progress: number | null): string {
-  return progress === null ? "Working" : `${Math.round(progress * 100)}%`;
+  return progress === null ? t("setup.working") : `${Math.round(progress * 100)}%`;
 }
 
 export function ReadyMark(): ReactElement {
   const { p } = useTheme();
   return (
-    <div role="img" aria-label="Ready" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: 11, flexShrink: 0, backgroundColor: "rgba(152,195,121,0.14)", pointerEvents: "none" }}>
+    <div role="img" aria-label={t("setup.ready")} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: 11, flexShrink: 0, backgroundColor: "rgba(152,195,121,0.14)", pointerEvents: "none" }}>
       <Icon name="check" size={12} color={p.string} />
     </div>
   );
@@ -89,17 +90,17 @@ export function StepNav({ current, onGo }: { readonly current: StepId; readonly 
   const { p } = useTheme();
   const at = STEPS.findIndex((step) => step.id === current);
   return (
-    <div role="tablist" aria-label="Setup steps" style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+    <div role="tablist" aria-label={t("setup.steps")} style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
       {STEPS.map((step, index) => {
         const on = index === at;
         const done = index < at;
         const c = pillColors(p, on, done);
         return (
-          <div key={step.id} onClick={() => onGo(step.id)} role="tab" aria-selected={on} aria-label={step.label} style={{ display: "flex", alignItems: "center", gap: 8, height: 28, paddingLeft: 6, paddingRight: 12, borderRadius: 14, backgroundColor: c.bg, color: c.fg, cursor: "pointer", hover: HOVER }}>
+          <div key={step.id} onClick={() => onGo(step.id)} role="tab" aria-selected={on} aria-label={t(step.label)} style={{ display: "flex", alignItems: "center", gap: 8, height: 28, paddingLeft: 6, paddingRight: 12, borderRadius: 14, backgroundColor: c.bg, color: c.fg, cursor: "pointer", hover: HOVER }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, borderRadius: 9, backgroundColor: c.dotBg, color: c.dotFg, fontSize: 11, fontWeight: 600, pointerEvents: "none" }}>
               {done ? <Icon name="check" size={11} color={c.dotFg} /> : <div>{String(index + 1)}</div>}
             </div>
-            <div>{step.label}</div>
+            <div>{t(step.label)}</div>
           </div>
         );
       })}

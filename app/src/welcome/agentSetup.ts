@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { findOnPath, type NativeCommand } from "../agents/detect";
 import { binaryInstalled, readyToRun, resolveLaunch } from "../agents/launch";
 import type { AgentEntry } from "../agents/registry";
-import { runInTerminal as openTerminal, THIS_DEVICE } from "../lib/platform";
+import { t, thisDevice } from "../i18n";
+import { runInTerminal as openTerminal } from "../lib/platform";
 
 const HOME = homedir();
 
@@ -54,12 +55,12 @@ function loginCommand(login: Login): string | null {
 function missingDetail(agent: AgentEntry): string {
   switch (agent.distribution.kind) {
     case "npx":
-      return `Needs Node.js, which isn't on ${THIS_DEVICE}`;
+      return t("setup.agent.needsNode", { device: thisDevice() });
     case "uvx":
-      return `Needs uv, which isn't on ${THIS_DEVICE}`;
+      return t("setup.agent.needsUv", { device: thisDevice() });
     case "binary":
     case "command":
-      return `Not found on ${THIS_DEVICE}`;
+      return t("setup.agent.notFound", { device: thisDevice() });
     default: {
       const unhandled: never = agent.distribution;
       return unhandled;
@@ -74,10 +75,11 @@ export function agentStatus(agent: AgentEntry, facts: AgentFacts): AgentStatus {
   if (agent.distribution.kind === "binary" && !facts.native && !facts.downloaded) return facts.failed ? { kind: "failed" } : { kind: "install" };
   if (!readyToRun(agent, facts.native)) return { kind: "unavailable", detail: missingDetail(agent) };
   const login = LOGINS[agent.id];
-  const where = facts.native ? `On ${THIS_DEVICE}` : null;
-  if (!login) return { kind: "ready", detail: where ?? "Ready" };
-  if (login.signedIn()) return { kind: "ready", detail: where ? `${where}, signed in` : "Signed in" };
-  return loginCommand(login) ? { kind: "signin" } : { kind: "ready", detail: where ?? "Ready" };
+  const here = facts.native !== null;
+  const ready = here ? t("setup.agent.status.here", { device: thisDevice() }) : t("setup.ready");
+  if (!login) return { kind: "ready", detail: ready };
+  if (login.signedIn()) return { kind: "ready", detail: here ? t("setup.agent.status.hereSignedIn", { device: thisDevice() }) : t("setup.agent.status.signedIn") };
+  return loginCommand(login) ? { kind: "signin" } : { kind: "ready", detail: ready };
 }
 
 export function agentDetail(status: AgentStatus): string {
@@ -86,13 +88,13 @@ export function agentDetail(status: AgentStatus): string {
     case "unavailable":
       return status.detail;
     case "install":
-      return "Not installed";
+      return t("setup.agent.status.missing");
     case "installing":
-      return "Installing";
+      return t("setup.agent.status.installing");
     case "failed":
-      return "The download stopped. Check your connection, then try again.";
+      return t("setup.engine.stopped");
     case "signin":
-      return "Installed. Sign in to use it.";
+      return t("setup.agent.status.signIn");
   }
 }
 

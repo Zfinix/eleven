@@ -3,13 +3,13 @@ import { type ReactElement, useState } from "react";
 import type { AgentEntry } from "../agents/registry";
 import { AgentLogo, Icon } from "../components/ui";
 import type { Chat } from "../chat/useChat";
+import { t, thisDevice } from "../i18n";
 import { useSettings } from "../settings/store";
 import { useTheme } from "../theme";
 import { agentDetail, type AgentStatus } from "./agentSetup";
 import { glass, HOVER, lineHeight } from "./look";
 import { Note, OutlineButton, Panel, Percent, PrimaryButton, Progress, StepHeading } from "./SetupParts";
 import type { AgentSetup } from "./useAgentSetup";
-import { THIS_DEVICE } from "../lib/platform";
 
 const FEW = 6;
 
@@ -20,17 +20,17 @@ function Trailing({ status, agent, setup }: { readonly status: AgentStatus; read
       return (
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, fontSize: 12, color: p.string }}>
           <Icon name="check" size={13} color={p.string} />
-          <div>Ready</div>
+          <div>{t("setup.ready")}</div>
         </div>
       );
     case "install":
-      return <OutlineButton label="Install" onClick={() => setup.install(agent)} />;
+      return <OutlineButton label={t("setup.install")} onClick={() => setup.install(agent)} />;
     case "failed":
-      return <OutlineButton label="Try again" onClick={() => setup.install(agent)} />;
+      return <OutlineButton label={t("setup.tryAgain")} onClick={() => setup.install(agent)} />;
     case "installing":
       return <Percent progress={null} />;
     case "signin":
-      return <PrimaryButton label="Sign in" onClick={() => setup.signIn(agent)} />;
+      return <PrimaryButton label={t("setup.signIn")} onClick={() => setup.signIn(agent)} />;
     case "unavailable":
       return null;
   }
@@ -69,13 +69,13 @@ function hint(agent: AgentEntry, status: AgentStatus): string | null {
   switch (status.kind) {
     case "install":
     case "failed":
-      return `${agent.name} isn't installed yet. Install it, or pick one that's ready.`;
+      return t("setup.agent.notInstalled", { name: agent.name });
     case "signin":
-      return "Sign in opens your browser, then brings you back here.";
+      return t("setup.agent.signInHint");
     case "installing":
-      return `You can keep going while ${agent.name} installs.`;
+      return t("setup.agent.keepGoing", { name: agent.name });
     case "unavailable":
-      return `${agent.name} can't run on ${THIS_DEVICE} yet. ${status.detail}. Pick one that's ready.`;
+      return t("setup.agent.unavailable", { name: agent.name, device: thisDevice(), detail: status.detail });
     case "ready":
       return null;
   }
@@ -91,12 +91,12 @@ export function AgentStep({ chat, setup }: { readonly chat: Chat; readonly setup
   const warning = hint(selected, setup.status(selected));
   return (
     <>
-      <StepHeading title="Pick your agent" detail="It reads the code with you and can move around the window for you. Every agent gets the same tools, and you can switch any time." />
-      <Panel label="Agent">
+      <StepHeading title={t("setup.agent.title")} detail={t("setup.agent.detail")} />
+      <Panel label={t("setup.step.agent")}>
         {shown.map((agent, index) => <Row key={agent.id} agent={agent} chat={chat} setup={setup} first={index === 0} />)}
         {list.length > FEW && (
-          <div onClick={() => setAll(!all)} role="button" aria-label={all ? "Show fewer" : "Show all agents"} style={{ display: "flex", alignItems: "center", height: 40, paddingLeft: 16, paddingRight: 16, borderTopWidth: 1, borderColor: g.line, color: p.muted, cursor: "pointer", hover: HOVER }}>
-            {all ? "Show fewer" : `All ${list.length} agents`}
+          <div onClick={() => setAll(!all)} role="button" aria-label={all ? t("setup.agent.fewer") : t("setup.agent.showAll")} style={{ display: "flex", alignItems: "center", height: 40, paddingLeft: 16, paddingRight: 16, borderTopWidth: 1, borderColor: g.line, color: p.muted, cursor: "pointer", hover: HOVER }}>
+            {all ? t("setup.agent.fewer") : t("setup.agent.all", { count: list.length })}
           </div>
         )}
       </Panel>
