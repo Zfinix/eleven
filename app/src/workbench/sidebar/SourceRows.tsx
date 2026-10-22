@@ -4,6 +4,7 @@ import type { ReactElement, ReactNode } from "react";
 
 import { type MenuEntry, menuOn } from "../../components/ContextMenu";
 import { Icon } from "../../components/ui";
+import { t } from "../../i18n";
 import { ASSETS } from "../../lib/assets";
 import { useTheme } from "../../theme";
 import { ELLIPSIS, HOVER } from "../parts";
@@ -65,7 +66,7 @@ export function TreeFile({ name, ext, depth, count, on, dim = false, italic = fa
     <div {...menuOn(menu, onClick)} role="treeitem" aria-selected={on} aria-label={name} style={{ ...ROW, gap: 7, paddingLeft: treeIndent(depth) + PAST_CHEVRON, ...(on ? { backgroundColor: p.sel } : {}) }}>
       <img src={join(ASSETS, "icons", `${logoFor(ext)}.svg`)} objectFit="contain" style={{ width: 14, height: 14, flexShrink: 0, opacity: dim ? 0.6 : 1, pointerEvents: "none" }} />
       <div style={{ flexGrow: 1, minWidth: 0, fontSize: 12.5, color: on ? p.text : p.text3, pointerEvents: "none", ...(italic ? { fontStyle: "italic" } : {}), ...ELLIPSIS }}>{name}</div>
-      {recreated && <div aria-label="Recreated" style={{ display: "flex", flexShrink: 0, pointerEvents: "none" }}><Icon name="spark" size={11} color={p.data} /></div>}
+      {recreated && <div aria-label={t("workbench.side.recreated")} style={{ display: "flex", flexShrink: 0, pointerEvents: "none" }}><Icon name="spark" size={11} color={p.data} /></div>}
       {mark}
       {count && <div style={{ flexShrink: 0, fontSize: 11.5, color: p.faint, pointerEvents: "none" }}>{count}</div>}
     </div>

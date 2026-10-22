@@ -1,5 +1,6 @@
 import { type ReactElement, useMemo, useState } from "react";
 
+import { t } from "../../i18n";
 import { useBench } from "../parts";
 import { lazyRows } from "./lazyRows";
 import { useFolders } from "./memory";
@@ -26,16 +27,16 @@ export function Resources(): ReactElement | null {
   const tab = pane?.tabs[pane.active];
   const shown = all ? tree : tree.slice(0, SHOWN);
   return (
-    <SideSection id="resources" title="Resources" count={`${paths.length.toLocaleString()} ${paths.length === 1 ? "file" : "files"}`}>
+    <SideSection id="resources" title={t("workbench.side.resources")} count={paths.length === 1 ? t("workbench.side.oneFile") : t("workbench.side.files", { count: paths.length.toLocaleString() })}>
       {shown.map(({ node, open }) => node.folder
         ? <TreeFolder key={node.path} name={node.name} open={open} depth={node.depth} onClick={() => folders.toggle(`res:${node.path}`)} />
         : <TreeFile key={node.full} name={node.name} ext={node.ext} depth={node.depth} count="" on={tab?.kind === "resource" && tab.file === node.full}
           onClick={() => wb.open({ kind: "resource", file: node.full }, true)}
           menu={() => [
-            { kind: "action", label: "Open", icon: "source", run: () => wb.open({ kind: "resource", file: node.full }, false) },
-            { kind: "action", label: "Open in split", icon: "split", run: () => wb.openSplit({ kind: "resource", file: node.full }) },
+            { kind: "action", label: t("workbench.side.open"), icon: "source", run: () => wb.open({ kind: "resource", file: node.full }, false) },
+            { kind: "action", label: t("workbench.side.openInSplit"), icon: "split", run: () => wb.openSplit({ kind: "resource", file: node.full }) },
           ]} />)}
-      {tree.length > SHOWN && <TreeMore label={all ? "Show fewer" : `${(tree.length - SHOWN).toLocaleString()} more`} onClick={() => setAll(!all)} />}
+      {tree.length > SHOWN && <TreeMore label={all ? t("workbench.side.showFewer") : t("workbench.side.more", { count: (tree.length - SHOWN).toLocaleString() })} onClick={() => setAll(!all)} />}
     </SideSection>
   );
 }

@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 
 import { showing } from "./state";
 import { Tooltip } from "../components/kit";
+import { t } from "../i18n";
 import { useTheme } from "../theme";
 import { pageLabel } from "../gpu/models/facts";
 import { CommandKeys, Icon } from "../components/ui";
@@ -44,10 +45,10 @@ export function Header(): ReactElement {
     : tab?.kind === "shader" && !hasCodeBench(bench) ? [shortName(tab.name)] : null;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 4, height: 44, flexShrink: 0, paddingLeft: 10, paddingRight: 8 }}>
-      {!s.sidebarOpen && <IconButton icon="sidebar" label="Show sidebar" iconSize={16} onClick={() => wb.patch({ sidebarOpen: true })} />}
-      <IconButton icon="back" label="Back" color={s.at > 0 ? p.text3 : p.faint} onClick={wb.back} />
-      <IconButton icon="forward" label="Forward" color={s.at < s.trail.length - 1 ? p.text3 : p.faint} onClick={wb.forward} />
-      <div role="navigation" aria-label="Where you are" style={{ display: "flex", alignItems: "center", gap: 6, flexGrow: 1, flexShrink: 1, minWidth: 0, paddingLeft: 6, color: p.muted, whiteSpace: "nowrap", overflow: "hidden" }}>
+      {!s.sidebarOpen && <IconButton icon="sidebar" label={t("workbench.chrome.showSidebar")} iconSize={16} onClick={() => wb.patch({ sidebarOpen: true })} />}
+      <IconButton icon="back" label={t("command.back")} color={s.at > 0 ? p.text3 : p.faint} onClick={wb.back} />
+      <IconButton icon="forward" label={t("command.forward")} color={s.at < s.trail.length - 1 ? p.text3 : p.faint} onClick={wb.forward} />
+      <div role="navigation" aria-label={t("workbench.chrome.whereYouAre")} style={{ display: "flex", alignItems: "center", gap: 6, flexGrow: 1, flexShrink: 1, minWidth: 0, paddingLeft: 6, color: p.muted, whiteSpace: "nowrap", overflow: "hidden" }}>
         <div style={{ flexShrink: 0 }}>{program.name}</div>
         {crumbs ? crumbs.map((crumb, ix) => (
           <div key={crumb} style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
@@ -63,21 +64,21 @@ export function Header(): ReactElement {
           </div>
         )}
       </div>
-      <Tooltip label="Find text, numbers or bytes in this file">
+      <Tooltip label={t("workbench.chrome.find.hint")}>
         <div style={{ display: "flex" }}>
-          <Pill icon="search" label="Find" onClick={() => wb.reveal("find")}>
+          <Pill icon="search" label={t("workbench.chrome.find")} onClick={() => wb.reveal("find")}>
             <CommandKeys id="find" />
           </Pill>
         </div>
       </Tooltip>
       {hasCodeBench(bench) && (
-        <Tooltip label="Run this program under the debugger. It stops at your breakpoints.">
+        <Tooltip label={t("workbench.chrome.debug.hint")}>
           <div style={{ display: "flex" }}>
-            <Pill icon="play" label={debugging ? "Debugging" : "Debug"} on={debugging} {...(debugging ? { color: p.string } : {})} onClick={() => wb.toggleTool("debug")} />
+            <Pill icon="play" label={debugging ? t("workbench.chrome.debugging") : t("workbench.chrome.debug")} on={debugging} {...(debugging ? { color: p.string } : {})} onClick={() => wb.toggleTool("debug")} />
           </div>
         </Tooltip>
       )}
-      <Pill icon="spark" label={`Ask ${agentName}`} on={showing(s, "agent")} onClick={() => { wb.patch({ pickerOpen: false }); wb.toggleTool("agent"); }} />
+      <Pill icon="spark" label={t("workbench.chrome.ask", { name: agentName })} on={showing(s, "agent")} onClick={() => { wb.patch({ pickerOpen: false }); wb.toggleTool("agent"); }} />
     </div>
   );
 }

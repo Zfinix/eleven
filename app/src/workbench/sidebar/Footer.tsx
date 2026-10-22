@@ -4,6 +4,7 @@ import { type ReactElement, type ReactNode, useMemo } from "react";
 
 import { activeEngine, chooseEngine, type EngineId, ENGINES, isEnabled } from "../../analysis/engines";
 import { AgentLogo, appIcon, Icon, Popover } from "../../components/ui";
+import { type PlainId, t } from "../../i18n";
 import { comboFor } from "../../keys/keymaps";
 import { ASSETS } from "../../lib/assets";
 import { runCommand } from "../../lib/shortcuts";
@@ -56,13 +57,13 @@ function Check(): ReactElement {
 function agentStatus(kind: "ready" | "working" | "starting" | "idle"): string {
   switch (kind) {
     case "ready":
-      return "Connected";
+      return t("workbench.side.agent.connected");
     case "working":
-      return "Working";
+      return t("workbench.side.agent.working");
     case "starting":
-      return "Starting";
+      return t("workbench.side.agent.starting");
     case "idle":
-      return "Not started";
+      return t("workbench.side.agent.idle");
     default: {
       const unhandled: never = kind;
       return unhandled;
@@ -78,15 +79,15 @@ function AgentsSub({ onDone }: { readonly onDone: () => void }): ReactElement {
   const status = agentStatus(chat.thread.state.agent.kind);
   return (
     <>
-      <Group title="Agents">
+      <Group title={t("workbench.side.agents")}>
         {installed.map((agent) => {
           const on = agent.id === agents.selected.id;
-          return <SideRow key={agent.id} lead={{ kind: "node", node: <AgentLogo icon={agents.icons.get(agent.id) ?? null} size={17} /> }} label={agent.name} note={on ? status : "Ready"} noteColor={on ? p.string : null} on={on} trailing={on ? <Check /> : null} onClick={() => { onDone(); chat.pickAgent(agent.id); }} />;
+          return <SideRow key={agent.id} lead={{ kind: "node", node: <AgentLogo icon={agents.icons.get(agent.id) ?? null} size={17} /> }} label={agent.name} note={on ? status : t("workbench.side.ready")} noteColor={on ? p.string : null} on={on} trailing={on ? <Check /> : null} onClick={() => { onDone(); chat.pickAgent(agent.id); }} />;
         })}
       </Group>
       <Group>
-        <SideRow lead={{ kind: "icon", name: "external" }} label="Browse the agent registry" onClick={() => { onDone(); openLink("https://agentclientprotocol.com"); }} />
-        <SideRow lead={{ kind: "icon", name: "gear" }} label="Agent settings" onClick={() => { onDone(); openSettings("agents"); }} />
+        <SideRow lead={{ kind: "icon", name: "external" }} label={t("workbench.side.agents.registry")} onClick={() => { onDone(); openLink("https://agentclientprotocol.com"); }} />
+        <SideRow lead={{ kind: "icon", name: "gear" }} label={t("workbench.side.agents.settings")} onClick={() => { onDone(); openSettings("agents"); }} />
       </Group>
     </>
   );
@@ -98,7 +99,7 @@ function PlaybooksSub({ onDone }: { readonly onDone: () => void }): ReactElement
   const { program, nameOf, focusAddr } = bench;
   const skills = useMemo(enabledSkills, []);
   return (
-    <Group title={`Run on ${program.name}`}>
+    <Group title={t("workbench.side.playbooks.runOn", { name: program.name })}>
       {skills.map((skill) => (
         <SideRow key={skill.name} lead={{ kind: "node", node: <Icon name="bolt" size={15} color={p.data} /> }} label={playbookTitle(skill.name)} note={skill.description} onClick={() => { onDone(); ask(bench, skillPrompt(skill, `${nameOf(focusAddr)} at ${focusAddr}`)); }} />
       ))}
@@ -113,25 +114,25 @@ function ExportsSub({ onDone }: { readonly onDone: () => void }): ReactElement {
     onDone();
     void (async (): Promise<void> => {
       try {
-        chat.thread.note(`Saved to ${await work}`);
+        chat.thread.note(t("workbench.side.exports.savedTo", { path: await work }));
       } catch (err) {
-        chat.thread.note(`Couldn't export. ${err instanceof Error ? err.message : String(err)}`);
+        chat.thread.note(t("workbench.side.exports.failed", { error: err instanceof Error ? err.message : String(err) }));
       }
     })();
   };
   return (
     <>
-      <Group title="This function">
-        <SideRow lead={{ kind: "icon", name: "export-pseudo" }} label="Pseudocode" onClick={() => exported(exportFunction(program, focusAddr, "pseudo", nameOf(focusAddr)))} />
-        <SideRow lead={{ kind: "icon", name: "export-asm" }} label="Assembly" onClick={() => exported(exportFunction(program, focusAddr, "asm", nameOf(focusAddr)))} />
+      <Group title={t("workbench.side.exports.thisFunction")}>
+        <SideRow lead={{ kind: "icon", name: "export-pseudo" }} label={t("workbench.side.exports.pseudocode")} onClick={() => exported(exportFunction(program, focusAddr, "pseudo", nameOf(focusAddr)))} />
+        <SideRow lead={{ kind: "icon", name: "export-asm" }} label={t("workbench.side.exports.assembly")} onClick={() => exported(exportFunction(program, focusAddr, "asm", nameOf(focusAddr)))} />
       </Group>
-      <Group title="Whole file">
-        <SideRow lead={{ kind: "icon", name: "export-all" }} label="All pseudocode" side={`${program.total.toLocaleString()} functions`} onClick={() => exported(exportAllPseudocode(program))} />
-        <SideRow lead={{ kind: "icon", name: "export-objc" }} label="Objective-C classes" onClick={() => exported(exportObjcInventory(program))} />
-        {patches > 0 && <SideRow lead={{ kind: "icon", name: "export-patch" }} label="Patched copy" side={`${patches} ${patches === 1 ? "patch" : "patches"}`} onClick={() => exported(patchBytes(program, []))} />}
+      <Group title={t("workbench.side.exports.wholeFile")}>
+        <SideRow lead={{ kind: "icon", name: "export-all" }} label={t("workbench.side.exports.allPseudocode")} side={t("workbench.side.exports.functions", { count: program.total.toLocaleString() })} onClick={() => exported(exportAllPseudocode(program))} />
+        <SideRow lead={{ kind: "icon", name: "export-objc" }} label={t("workbench.side.exports.objc")} onClick={() => exported(exportObjcInventory(program))} />
+        {patches > 0 && <SideRow lead={{ kind: "icon", name: "export-patch" }} label={t("workbench.side.exports.patched")} side={patches === 1 ? t("workbench.side.exports.onePatch") : t("workbench.side.exports.patches", { count: patches })} onClick={() => exported(patchBytes(program, []))} />}
       </Group>
       <Group>
-        <SideRow lead={{ kind: "icon", name: "export-folder" }} label="Open the exports folder" note="Downloads/Eleven" onClick={() => { onDone(); void openExportsFolder(program); }} />
+        <SideRow lead={{ kind: "icon", name: "export-folder" }} label={t("workbench.side.exports.folder")} note="Downloads/Eleven" onClick={() => { onDone(); void openExportsFolder(program); }} />
       </Group>
     </>
   );
@@ -151,11 +152,11 @@ function EngineSub({ onDone }: { readonly onDone: () => void }): ReactElement {
   const engines = ENGINES.filter((engine) => engine.status === "ready");
   return (
     <>
-      <Group title="Reads the file">
+      <Group title={t("workbench.side.engine.reads")}>
         {engines.map((engine) => {
           const installed = engine.installed();
           const inUse = engine.id === active?.id;
-          const note = !installed ? "Not installed · click to get it" : inUse ? "In use" : isEnabled(engine.id) ? "Ready" : "Turned off · click to use it";
+          const note = !installed ? t("workbench.side.engine.notInstalled") : inUse ? t("workbench.side.engine.inUse") : isEnabled(engine.id) ? t("workbench.side.ready") : t("workbench.side.engine.off");
           const pick = (): void => {
             onDone();
             if (!installed) openLink(engine.repo);
@@ -165,17 +166,19 @@ function EngineSub({ onDone }: { readonly onDone: () => void }): ReactElement {
         })}
       </Group>
       <Group>
-        <SideRow lead={{ kind: "icon", name: "gear" }} label="Engine settings" onClick={() => { onDone(); openSettings("engines"); }} />
+        <SideRow lead={{ kind: "icon", name: "gear" }} label={t("workbench.side.engine.settings")} onClick={() => { onDone(); openSettings("engines"); }} />
       </Group>
     </>
   );
 }
 
-const THEMES: readonly { readonly id: Appearance; readonly label: string; readonly icon: string }[] = [
-  { id: "Dark", label: "Dark", icon: "dark" },
-  { id: "Light", label: "Light", icon: "light" },
-  { id: "System", label: "Match the system", icon: "system" },
+const THEMES: readonly { readonly id: Appearance; readonly label: PlainId; readonly icon: string }[] = [
+  { id: "Dark", label: "home.appearance.dark", icon: "dark" },
+  { id: "Light", label: "home.appearance.light", icon: "light" },
+  { id: "System", label: "workbench.side.theme.system", icon: "system" },
 ];
+
+const APPEARANCE_LABELS: Readonly<Record<Appearance, PlainId>> = { Dark: "home.appearance.dark", Light: "home.appearance.light", System: "home.appearance.system" };
 
 function Stepper({ value, onDown, onUp }: { readonly value: string; readonly onDown: (() => void) | null; readonly onUp: (() => void) | null }): ReactElement {
   const { p } = useTheme();
@@ -186,9 +189,9 @@ function Stepper({ value, onDown, onUp }: { readonly value: string; readonly onD
   );
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 2, padding: 2, borderRadius: 8, backgroundColor: p.fill2 }}>
-      {button("zoom-out", "Smaller", onDown)}
+      {button("zoom-out", t("workbench.side.smaller"), onDown)}
       <div style={{ minWidth: 36, textAlign: "center", fontSize: 12, color: p.text3 }}>{value}</div>
-      {button("zoom-in", "Larger", onUp)}
+      {button("zoom-in", t("workbench.side.larger"), onUp)}
     </div>
   );
 }
@@ -201,13 +204,13 @@ function AppearanceSub(): ReactElement {
   const larger = CODE_FONT_SIZES[at + 1];
   return (
     <>
-      <Group title="Theme">
-        {THEMES.map((theme) => <SideRow key={theme.id} lead={{ kind: "icon", name: theme.icon }} label={theme.label} on={appearance === theme.id} trailing={appearance === theme.id ? <Check /> : null} onClick={() => setAppearance(theme.id)} />)}
+      <Group title={t("workbench.side.theme")}>
+        {THEMES.map((theme) => <SideRow key={theme.id} lead={{ kind: "icon", name: theme.icon }} label={t(theme.label)} on={appearance === theme.id} trailing={appearance === theme.id ? <Check /> : null} onClick={() => setAppearance(theme.id)} />)}
       </Group>
-      <Group title="Code">
+      <Group title={t("workbench.side.code")}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, height: 34, paddingLeft: INSET, paddingRight: INSET - 2 }}>
           <Icon name="text" size={17} />
-          <div style={{ flexGrow: 1 }}>Font size</div>
+          <div style={{ flexGrow: 1 }}>{t("workbench.side.fontSize")}</div>
           <Stepper value={`${settings.codeFontSize} pt`} onDown={smaller ? () => update({ codeFontSize: smaller }) : null} onUp={larger ? () => update({ codeFontSize: larger }) : null} />
         </div>
       </Group>
@@ -272,20 +275,20 @@ function ElevenMenu({ menu, onMenu }: { readonly menu: FooterMenu; readonly onMe
         <div style={{ display: "flex", alignItems: "center", gap: 10, height: 36, paddingLeft: INSET, paddingRight: INSET }}>
           <img src={appIcon(p.icon)} style={{ width: 20, height: 20, borderRadius: 5 }} />
           <div style={{ flexGrow: 1, minWidth: 0, color: p.text3, ...ELLIPSIS }}>{`Eleven ${appVersion()}`}</div>
-          <IconButton icon="more" label="About Eleven" size={24} iconSize={15} onClick={() => { close(); openSettings("about"); }} />
+          <IconButton icon="more" label={t("menu.about")} size={24} iconSize={15} onClick={() => { close(); openSettings("about"); }} />
         </div>
       </Group>
       <Group>
-        <SubRow id="agents" icon="agent" lead={<AgentLogo icon={chat.agents.icons.get(chat.agents.selected.id) ?? null} size={17} />} label="Agents" side={chat.agents.selected.name} menu={menu} onMenu={onMenu} />
-        <SubRow id="playbooks" icon="plan" label="Playbooks" side="" menu={menu} onMenu={onMenu} />
-        <SubRow id="exports" icon="download" label="Exports" side="" menu={menu} onMenu={onMenu} />
-        <SubRow id="engine" icon="engine" label="Engine" side={activeEngine()?.name ?? "None"} menu={menu} onMenu={onMenu} />
-        <SubRow id="appearance" icon="dark" label="Appearance" side={appearance} menu={menu} onMenu={onMenu} />
-        <SideRow lead={{ kind: "icon", name: "gear" }} label="Settings" combo={comboFor("settings", keymap, settings.shortcuts)} onClick={() => { close(); runCommand("settings"); }} />
+        <SubRow id="agents" icon="agent" lead={<AgentLogo icon={chat.agents.icons.get(chat.agents.selected.id) ?? null} size={17} />} label={t("workbench.side.agents")} side={chat.agents.selected.name} menu={menu} onMenu={onMenu} />
+        <SubRow id="playbooks" icon="plan" label={t("workbench.side.playbooks")} side="" menu={menu} onMenu={onMenu} />
+        <SubRow id="exports" icon="download" label={t("workbench.side.exports")} side="" menu={menu} onMenu={onMenu} />
+        <SubRow id="engine" icon="engine" label={t("workbench.side.engine")} side={activeEngine()?.name ?? t("workbench.side.noEngine")} menu={menu} onMenu={onMenu} />
+        <SubRow id="appearance" icon="dark" label={t("workbench.side.appearance")} side={t(APPEARANCE_LABELS[appearance])} menu={menu} onMenu={onMenu} />
+        <SideRow lead={{ kind: "icon", name: "gear" }} label={t("command.settings")} combo={comboFor("settings", keymap, settings.shortcuts)} onClick={() => { close(); runCommand("settings"); }} />
       </Group>
       <Group>
-        <SideRow lead={{ kind: "icon", name: "folder" }} label="Open a file" combo={comboFor("open", keymap, settings.shortcuts)} onClick={() => { close(); runCommand("open"); }} />
-        <SideRow lead={{ kind: "icon", name: "download" }} label="Save project" combo={comboFor("save", keymap, settings.shortcuts)} onClick={() => { close(); runCommand("save"); }} />
+        <SideRow lead={{ kind: "icon", name: "folder" }} label={t("command.open")} combo={comboFor("open", keymap, settings.shortcuts)} onClick={() => { close(); runCommand("open"); }} />
+        <SideRow lead={{ kind: "icon", name: "download" }} label={t("command.save")} combo={comboFor("save", keymap, settings.shortcuts)} onClick={() => { close(); runCommand("save"); }} />
       </Group>
     </Card>
   );
@@ -306,7 +309,7 @@ export function Footer({ menu, onMenu }: { readonly menu: FooterMenu; readonly o
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 4, paddingTop: 8, flexShrink: 0, position: "relative" }}>
       <div style={{ display: "flex", flexGrow: 1, minWidth: 0, position: "relative" }}>
-        <div onClick={() => onMenu({ open: !menu.open, sub: null })} role="button" aria-expanded={menu.open} aria-label="Eleven menu" style={{ display: "flex", alignItems: "center", gap: 10, flexGrow: 1, minWidth: 0, height: 36, paddingLeft: INSET, paddingRight: INSET, borderRadius: 8, cursor: "pointer", hover: HOVER, ...(menu.open ? { backgroundColor: p.sel } : {}) }}>
+        <div onClick={() => onMenu({ open: !menu.open, sub: null })} role="button" aria-expanded={menu.open} aria-label={t("workbench.side.menu")} style={{ display: "flex", alignItems: "center", gap: 10, flexGrow: 1, minWidth: 0, height: 36, paddingLeft: INSET, paddingRight: INSET, borderRadius: 8, cursor: "pointer", hover: HOVER, ...(menu.open ? { backgroundColor: p.sel } : {}) }}>
           <img src={appIcon(p.icon)} style={{ width: 22, height: 22, borderRadius: 6, pointerEvents: "none" }} />
           <div style={{ flexGrow: 1, minWidth: 0, color: p.text3, pointerEvents: "none" }}>Eleven</div>
           <Icon name="disclosure" size={12} color={p.faint} />
@@ -317,7 +320,7 @@ export function Footer({ menu, onMenu }: { readonly menu: FooterMenu; readonly o
           </Popover>
         )}
       </div>
-      <IconButton icon="search" label="Search everything" tip={false} size={32} iconSize={17} onClick={() => wb.patch({ paletteOpen: true, paletteQuery: "" })} />
+      <IconButton icon="search" label={t("command.palette")} tip={false} size={32} iconSize={17} onClick={() => wb.patch({ paletteOpen: true, paletteQuery: "" })} />
       <IconButton icon="gear" tip={false} size={32} iconSize={17} onClick={() => runCommand("settings")} />
     </div>
   );

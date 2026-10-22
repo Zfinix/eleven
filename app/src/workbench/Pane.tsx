@@ -4,6 +4,7 @@ import { chatTitle } from "../chat/useChat";
 import { Tooltip } from "../components/kit";
 import { CodeView } from "../components/code";
 import { DALVIK } from "../engine/jadx";
+import { type PlainId, t } from "../i18n";
 import { useTheme } from "../theme";
 import { Icon, Spacer } from "../components/ui";
 import { type MenuEntry, openMenu } from "../components/ContextMenu";
@@ -30,17 +31,19 @@ import { TabBar } from "./TabBar";
 import { fillsSpace, ToolBody } from "./Tools";
 import { showAddress } from "../settings/look";
 
-const MODES: readonly { readonly mode: CodeMode; readonly label: string; readonly icon: string; readonly tip: string }[] = [
-  { mode: "asm", label: "Listing", icon: "assembly", tip: "The machine instructions in order, with labels and references" },
-  { mode: "pseudo", label: "Pseudocode", icon: "pseudocode", tip: "The function rebuilt as C-like code. Easiest to read, but a guess." },
-  { mode: "graph", label: "Graph", icon: "graph", tip: "The function's branches and loops as connected blocks" },
-  { mode: "hex", label: "Hex", icon: "hex", tip: "The raw bytes in the file at this address" },
+type Mode = { readonly mode: CodeMode; readonly label: PlainId; readonly icon: string; readonly tip: PlainId };
+
+const MODES: readonly Mode[] = [
+  { mode: "asm", label: "workbench.chrome.listing", icon: "assembly", tip: "workbench.chrome.tip.listing" },
+  { mode: "pseudo", label: "workbench.chrome.mode.pseudo", icon: "pseudocode", tip: "workbench.chrome.tip.pseudo" },
+  { mode: "graph", label: "workbench.chrome.mode.graph", icon: "graph", tip: "workbench.chrome.tip.graph" },
+  { mode: "hex", label: "workbench.chrome.mode.hex", icon: "hex", tip: "workbench.chrome.tip.hex" },
 ];
 
 /** Android methods come from jadx (Java) and apktool (smali); there are no blocks or file bytes to show. */
-const DALVIK_MODES: readonly { readonly mode: CodeMode; readonly label: string; readonly icon: string; readonly tip: string }[] = [
-  { mode: "asm", label: "Smali", icon: "assembly", tip: "The method's Dalvik instructions as smali, the way apktool prints them" },
-  { mode: "pseudo", label: "Java", icon: "pseudocode", tip: "The method decompiled to Java by jadx" },
+const DALVIK_MODES: readonly Mode[] = [
+  { mode: "asm", label: "workbench.chrome.mode.smali", icon: "assembly", tip: "workbench.chrome.tip.smali" },
+  { mode: "pseudo", label: "workbench.chrome.mode.java", icon: "pseudocode", tip: "workbench.chrome.tip.java" },
 ];
 
 type LanguageMark = { readonly icon: string } | { readonly logo: string };
@@ -50,6 +53,11 @@ const LANGUAGE_MARK: Readonly<Record<CodeLanguage, LanguageMark>> = {
   Python: { logo: "lang-python" }, TypeScript: { logo: "lang-typescript" }, Java: { logo: "lang-java" }, "C#": { logo: "lang-csharp" }, Zig: { logo: "lang-zig" },
 };
 
+/** A language's name as shown; only the engine's own pseudocode is a word to translate. */
+function languageName(language: CodeLanguage): string {
+  return language === "Pseudocode" ? t("workbench.chrome.mode.pseudo") : language;
+}
+
 /** Which language the pseudocode view shows: the engine's own pseudocode, or the agent's rewrite in another language. */
 function LanguagePicker(): ReactElement {
   const { p } = useTheme();
@@ -57,12 +65,12 @@ function LanguagePicker(): ReactElement {
   const current = settings.codeLanguage;
   const entries = CODE_LANGUAGES.map((language): MenuEntry => {
     const mark = language === current ? { icon: "check" } : LANGUAGE_MARK[language];
-    return { kind: "action", label: language, ...mark, run: () => update({ codeLanguage: language }) };
+    return { kind: "action", label: languageName(language), ...mark, run: () => update({ codeLanguage: language }) };
   });
   return (
-    <Tooltip label="Rewrite this function in another language with the chat's agent">
-      <div onClick={(event) => openMenu(event.x ?? 0, event.y ?? 0, entries)} role="button" aria-label={`Language: ${current}`} style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, height: 26, paddingLeft: 9, paddingRight: 7, borderRadius: 7, backgroundColor: p.fill, fontSize: 12, color: p.text3, cursor: "pointer", hover: HOVER }}>
-        <div style={{ whiteSpace: "nowrap", pointerEvents: "none" }}>{current}</div>
+    <Tooltip label={t("workbench.chrome.rewriteHint")}>
+      <div onClick={(event) => openMenu(event.x ?? 0, event.y ?? 0, entries)} role="button" aria-label={t("workbench.chrome.language", { name: languageName(current) })} style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, height: 26, paddingLeft: 9, paddingRight: 7, borderRadius: 7, backgroundColor: p.fill, fontSize: 12, color: p.text3, cursor: "pointer", hover: HOVER }}>
+        <div style={{ whiteSpace: "nowrap", pointerEvents: "none" }}>{languageName(current)}</div>
         <Icon name="updown" size={12} color={p.muted} />
       </div>
     </Tooltip>
@@ -89,7 +97,7 @@ function GoTo({ addr }: { readonly addr: string }): ReactElement {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, flexGrow: 0, flexShrink: 1, flexBasis: 260, minWidth: 120, height: 26, paddingLeft: 8, paddingRight: 8, borderWidth: 1, borderColor: p.line2, borderRadius: 7, backgroundColor: p.deep }}>
       <div style={{ fontSize: 11, color: p.faint, ...MONO_STYLE }}>G</div>
-      <input {...TYPING} value={draft} placeholder={showAddress(addr)} aria-label="Go to address or symbol" onChange={(e) => setDraft(e.value ?? "")} onSubmit={go} style={{ flexGrow: 1, minWidth: 0, fontSize: 12, color: p.text3, ...MONO_STYLE }} />
+      <input {...TYPING} value={draft} placeholder={showAddress(addr)} aria-label={t("command.goto")} onChange={(e) => setDraft(e.value ?? "")} onSubmit={go} style={{ flexGrow: 1, minWidth: 0, fontSize: 12, color: p.text3, ...MONO_STYLE }} />
     </div>
   );
 }
@@ -105,18 +113,18 @@ function ModeBar({ pane, addr, view, width }: { readonly pane: number; readonly 
       <GoTo addr={addr} />
       <Spacer />
       {view === "pseudo" && <LanguagePicker />}
-      <div role="radiogroup" aria-label="View" style={{ display: "flex", flexShrink: 0, gap: 2, padding: 2, borderRadius: 8, backgroundColor: p.fill }}>
+      <div role="radiogroup" aria-label={t("workbench.chrome.view")} style={{ display: "flex", flexShrink: 0, gap: 2, padding: 2, borderRadius: 8, backgroundColor: p.fill }}>
         {modes.map((m) => (
-          <Tooltip key={m.mode} label={words ? m.tip : `${m.label}: ${m.tip}`}>
+          <Tooltip key={m.mode} label={words ? t(m.tip) : t("workbench.chrome.modeTip", { name: t(m.label), tip: t(m.tip) })}>
             <div style={{ display: "flex" }}>
-              <SegItem label={m.label} name={`${m.label} view`} icon={m.icon} words={words} on={m.mode === view} onBg={p.sel2} padding={words ? 9 : 6} onClick={() => wb.setView(pane, m.mode)} />
+              <SegItem label={t(m.label)} name={t("workbench.chrome.viewNamed", { name: t(m.label) })} icon={m.icon} words={words} on={m.mode === view} onBg={p.sel2} padding={words ? 9 : 6} onClick={() => wb.setView(pane, m.mode)} />
             </div>
           </Tooltip>
         ))}
       </div>
-      {view === "asm" && <IconButton icon="split" label="Pseudocode beside it, lines linked" on={wb.s.linked} color={wb.s.linked ? p.text : p.muted} size={26} iconSize={15} onClick={() => wb.besidePseudo(addr)} />}
-      {view === "asm" && program.arch !== DALVIK && <IconButton icon="hex" label="Show bytes" on={wb.s.showBytes} color={wb.s.showBytes ? p.text : p.muted} size={26} iconSize={15} onClick={() => wb.patch({ showBytes: !wb.s.showBytes })} />}
-      <IconButton icon="bookmark" on={marked} color={marked ? p.data : p.muted} label="Bookmark" size={26} iconSize={15} onClick={() => wb.toggleBookmark({ addr, label: nameOf(addr) })} />
+      {view === "asm" && <IconButton icon="split" label={t("workbench.chrome.beside")} on={wb.s.linked} color={wb.s.linked ? p.text : p.muted} size={26} iconSize={15} onClick={() => wb.besidePseudo(addr)} />}
+      {view === "asm" && program.arch !== DALVIK && <IconButton icon="hex" label={t("workbench.chrome.showBytes")} on={wb.s.showBytes} color={wb.s.showBytes ? p.text : p.muted} size={26} iconSize={15} onClick={() => wb.patch({ showBytes: !wb.s.showBytes })} />}
+      <IconButton icon="bookmark" on={marked} color={marked ? p.data : p.muted} label={t("command.bookmark")} size={26} iconSize={15} onClick={() => wb.toggleBookmark({ addr, label: nameOf(addr) })} />
     </div>
   );
 }
@@ -133,9 +141,9 @@ function ModelBar({ name, page, width }: { readonly name: string; readonly page:
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, height: 34, flexShrink: 0, paddingLeft: 10, paddingRight: 8, overflow: "hidden" }}>
       <Spacer />
-      <div role="radiogroup" aria-label="Model view" style={{ display: "flex", flexShrink: 0, gap: 2, padding: 2, borderRadius: 8, backgroundColor: p.fill }}>
+      <div role="radiogroup" aria-label={t("workbench.chrome.modelView")} style={{ display: "flex", flexShrink: 0, gap: 2, padding: 2, borderRadius: 8, backgroundColor: p.fill }}>
         {pages.map((m) => (
-          <SegItem key={m} label={pageLabel(m)} name={`${pageLabel(m)} view`} icon={pageIcon(m)} words={words} on={m === page} onBg={p.sel2} padding={words ? 9 : 6} onClick={() => wb.open({ kind: "model", name, page: m }, false)} />
+          <SegItem key={m} label={pageLabel(m)} name={t("workbench.chrome.viewNamed", { name: pageLabel(m) })} icon={pageIcon(m)} words={words} on={m === page} onBg={p.sel2} padding={words ? 9 : 6} onClick={() => wb.open({ kind: "model", name, page: m }, false)} />
         ))}
       </div>
     </div>
@@ -147,7 +155,7 @@ function ThreadView(): ReactElement {
   return (
     <div style={{ display: "flex", justifyContent: "center", flexGrow: 1, minHeight: 0 }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16, flexGrow: 1, minHeight: 0, maxWidth: 720, paddingTop: 24, paddingLeft: 4, paddingRight: 4 }}>
-        <div style={{ paddingLeft: 16, fontSize: 17, fontWeight: 600 }}>{`${chatTitle(chat) ?? "New chat"} · ${chat.agents.selected.name}`}</div>
+        <div style={{ paddingLeft: 16, fontSize: 17, fontWeight: 600 }}>{`${chatTitle(chat) ?? t("workbench.chrome.newChat")} · ${chat.agents.selected.name}`}</div>
         <LiveThread chatId={chat.tabs.find((tab) => tab.active)?.id ?? null} />
       </div>
     </div>
@@ -222,7 +230,7 @@ export function Pane({ index }: { readonly index: number }): ReactElement {
   const pane = wb.s.panes[index];
   const tab = pane?.tabs[pane.active];
   return (
-    <div ref={ref} role="region" aria-label="Editor" style={{ display: "flex", flexDirection: "column", flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, minHeight: 0 }}>
+    <div ref={ref} role="region" aria-label={t("workbench.chrome.editor")} style={{ display: "flex", flexDirection: "column", flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, minHeight: 0 }}>
       <TabBar pane={index} />
       {tab?.kind === "fn" && <ModeBar pane={index} addr={tab.addr} view={tab.view} width={width} />}
       {tab?.kind === "model" && <ModelBar name={tab.name} page={tab.page} width={width} />}

@@ -2,6 +2,7 @@ import { type ReactElement, useState } from "react";
 
 import { pageCount, pageIcon, pageLabel, pagesOf, tensorGroups } from "../../gpu/models/facts";
 import type { ModelInfo } from "../../gpu/types";
+import { t } from "../../i18n";
 import { GpuSection } from "../GpuTabs";
 import { useBench } from "../parts";
 import { Faint, SideRow, SideSection } from "./parts";
@@ -29,7 +30,7 @@ function useModelTab(): { readonly page: string | null; readonly tensor: string 
 export function Kernels(): ReactElement {
   return (
     <GpuSection frame={(count, body) => (
-      <SideSection id="gpu" title="Kernels" count={count > 0 ? `${count}` : ""}>{body}</SideSection>
+      <SideSection id="gpu" title={t("workbench.side.kernels")} count={count > 0 ? `${count}` : ""}>{body}</SideSection>
     )} />
   );
 }
@@ -40,8 +41,8 @@ export function InThisModel(): ReactElement {
   const model = useModel();
   const here = useModelTab();
   return (
-    <SideSection id="model" title="In this model" count="">
-      {!model && <Faint text={gpuData.kind === "loading" ? "Reading the model…" : "Eleven can't read this kind of model yet."} />}
+    <SideSection id="model" title={t("workbench.side.inThisModel")} count="">
+      {!model && <Faint text={gpuData.kind === "loading" ? t("workbench.side.readingModel") : t("workbench.side.cantReadModel")} />}
       {model && pagesOf(model).map((page) => (
         <SideRow key={page} lead={{ kind: "icon", name: pageIcon(page) }} label={pageLabel(page)} side={pageCount(model, page)} on={here.page === page} onClick={() => wb.open({ kind: "model", name: model.name, page }, false)} />
       ))}
@@ -63,7 +64,7 @@ export function Blocks(): ReactElement | null {
     wb.reveal("inspector");
   };
   return (
-    <SideSection id="blocks" title="Blocks" count={blocks > 0 ? `${blocks}` : ""}>
+    <SideSection id="blocks" title={t("workbench.side.blocks")} count={blocks > 0 ? `${blocks}` : ""}>
       {groups.map((g, ix) => {
         const only = g.tensors.length === 1 ? g.tensors[0] : undefined;
         if (only) return <SideRow key={`${g.key}:${ix}`} lead={{ kind: "none" }} label={only.name} side={only.type} mono height={28} on={here.tensor === only.name} onClick={() => pick(only.name)} />;
@@ -71,8 +72,8 @@ export function Blocks(): ReactElement | null {
         return (
           <div key={`${g.key}:${ix}`} style={{ display: "flex", flexDirection: "column" }}>
             <SideRow lead={{ kind: "icon", name: "segments" }} label={g.label} side={`${g.tensors.length}`} mono height={28} on={expanded} onClick={() => setOpen(expanded ? null : g.key)} />
-            {expanded && g.tensors.map((t) => (
-              <SideRow key={t.name} lead={{ kind: "none" }} label={t.name.slice(g.key.length + 1)} side={t.type} mono indent={NEST} height={28} on={here.tensor === t.name} onClick={() => pick(t.name)} />
+            {expanded && g.tensors.map((tensor) => (
+              <SideRow key={tensor.name} lead={{ kind: "none" }} label={tensor.name.slice(g.key.length + 1)} side={tensor.type} mono indent={NEST} height={28} on={here.tensor === tensor.name} onClick={() => pick(tensor.name)} />
             ))}
           </div>
         );

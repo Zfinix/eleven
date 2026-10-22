@@ -5,6 +5,7 @@ import { Icon, Popover, usePopover } from "../../components/ui";
 import type { ProjectEntry } from "../../engine/project";
 import { explainArch } from "../../lib/explain";
 import { formatLabel } from "../../lib/fileIcon";
+import { t } from "../../i18n";
 import { FileIcon } from "../../components/FileIcon";
 import { runCommand } from "../../lib/shortcuts";
 import { comboFor } from "../../keys/keymaps";
@@ -65,10 +66,10 @@ export function ProjectSwitcher(): ReactElement {
   return (
     <div style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", height: 46, paddingRight: 2 }}>
-        <IconButton icon="sidebar" label="Hide sidebar" iconSize={16} onClick={() => wb.patch({ sidebarOpen: false })} />
+        <IconButton icon="sidebar" label={t("workbench.side.hideSidebar")} iconSize={16} onClick={() => wb.patch({ sidebarOpen: false })} />
       </div>
       <div style={{ display: "flex", position: "relative" }}>
-        <div onMouseDown={menu.onTriggerDown} onClick={menu.onTriggerClick} role="button" aria-expanded={menu.open} aria-label="Switch project" style={{ display: "flex", alignItems: "center", gap: 10, flexGrow: 1, minWidth: 0, padding: INSET, borderRadius: 10, cursor: "pointer", hover: HOVER, ...(menu.open ? { backgroundColor: p.sel } : {}) }}>
+        <div onMouseDown={menu.onTriggerDown} onClick={menu.onTriggerClick} role="button" aria-expanded={menu.open} aria-label={t("workbench.side.switchProject")} style={{ display: "flex", alignItems: "center", gap: 10, flexGrow: 1, minWidth: 0, padding: INSET, borderRadius: 10, cursor: "pointer", hover: HOVER, ...(menu.open ? { backgroundColor: p.sel } : {}) }}>
           <FileGlyph size={34} />
           <div style={{ display: "flex", flexDirection: "column", gap: 2, flexGrow: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 600, fontSize: 15, lineHeight: 20, color: p.text, pointerEvents: "none", ...ELLIPSIS }}>{program.name}</div>
@@ -83,10 +84,10 @@ export function ProjectSwitcher(): ReactElement {
           <Popover side="bottom" align="start" gap={6} onDismiss={menu.dismiss}>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, width: MENU_WIDTH, padding: 6, borderWidth: 1, borderColor: p.line3, borderRadius: 12, backgroundColor: p.raised2 }}>
               <div style={{ display: "flex", flexDirection: "column" }}>
-                <MenuTitle text="Recent projects" />
+                <MenuTitle text={t("workbench.side.recentProjects")} />
                 <ProjectRows onDone={menu.close} />
               </div>
-              <SideRow lead={{ kind: "icon", name: "new" }} label="Open another file…" combo={comboFor("open", settings.keymap ?? "eleven", settings.shortcuts)} onClick={() => { menu.close(); runCommand("open"); }} />
+              <SideRow lead={{ kind: "icon", name: "new" }} label={t("workbench.side.openAnother")} combo={comboFor("open", settings.keymap ?? "eleven", settings.shortcuts)} onClick={() => { menu.close(); runCommand("open"); }} />
             </div>
           </Popover>
         )}

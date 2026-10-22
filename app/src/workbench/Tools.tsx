@@ -3,6 +3,7 @@ import { Fragment, type ReactElement, useRef, useState } from "react";
 
 import { menuOn } from "../components/ContextMenu";
 import { loadProject } from "../engine/project";
+import { t } from "../i18n";
 import { useTheme } from "../theme";
 import { toolMenu } from "./actions";
 import { AgentTab } from "./AgentPanel";
@@ -81,7 +82,7 @@ export function DockTabs({ zone, trailing }: { readonly zone: Zone; readonly tra
   };
   const marker = <div style={{ width: 2, height: 18, flexShrink: 0, borderRadius: 1, backgroundColor: p.link }} />;
   return (
-    <div role="tablist" aria-label={zone === "right" ? "Right panel" : "Details"} style={{ position: "relative", display: "flex", alignItems: "center", gap: 2, height: 34, flexShrink: 0, paddingLeft: 8, paddingRight: 8 }}>
+    <div role="tablist" aria-label={zone === "right" ? t("workbench.chrome.rightPanel") : t("workbench.chrome.details")} style={{ position: "relative", display: "flex", alignItems: "center", gap: 2, height: 34, flexShrink: 0, paddingLeft: 8, paddingRight: 8 }}>
       {order.map((tab) => {
         const on = active === tab;
         const keep = (node: PublicInstance | null): void => {
@@ -113,9 +114,9 @@ export function BottomDock(): ReactElement {
   const { wb } = useBench();
   const tool = wb.s.bottom;
   return (
-    <div role="region" aria-label="Details" style={{ position: "relative", display: "flex", flexDirection: "column", height: wb.s.sizes.details, flexShrink: 0, borderTopWidth: 1, borderColor: p.fill }}>
+    <div role="region" aria-label={t("workbench.chrome.details")} style={{ position: "relative", display: "flex", flexDirection: "column", height: wb.s.sizes.details, flexShrink: 0, borderTopWidth: 1, borderColor: p.fill }}>
       <ResizeHandle edge="details" />
-      <DockTabs zone="bottom" trailing={<IconButton icon="arrow-down" label="Hide details" size={24} iconSize={12} onClick={() => wb.patch({ bottomOpen: false })} />} />
+      <DockTabs zone="bottom" trailing={<IconButton icon="arrow-down" label={t("workbench.chrome.hideDetails")} size={24} iconSize={12} onClick={() => wb.patch({ bottomOpen: false })} />} />
       <div style={fillsSpace(tool) ? { display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0 } : { display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0, overflow: "scroll", paddingTop: 4, paddingLeft: 8, paddingRight: 8, paddingBottom: 10 }}>
         <ToolBody tool={tool} />
       </div>
