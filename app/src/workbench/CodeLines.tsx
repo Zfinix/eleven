@@ -20,6 +20,7 @@ import { arrowSvg, LANE_WIDTH, laneCount, type LanePiece, layoutJumps, piecesByL
 import type { HexRow } from "./model";
 import { type Bench, useBench } from "./parts";
 import { DALVIK } from "../engine/jadx";
+import { t } from "../i18n";
 import { formatOperand, isOperandFormat, type Lookup, type Symbolic } from "../engine/operands";
 import type { LineRange } from "./state";
 import { lineAddress, splitWords, type Subject, type Token, wordAddress } from "./subject";
@@ -118,7 +119,7 @@ function Breakpoint({ addr, paused }: { readonly addr: string | null; readonly p
   const on = addr !== null && wb.s.breakpoints.has(addr);
   if (addr === null) return <div style={{ width: 22, flexShrink: 0 }} />;
   return (
-    <div onClick={() => wb.toggleBreakpoint(addr)} role="button" aria-label={`Breakpoint at ${addr}`} aria-selected={on} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 22, flexShrink: 0, cursor: "pointer", hover: { opacity: 0.72 } }}>
+    <div onClick={() => wb.toggleBreakpoint(addr)} role="button" aria-label={t("workbench.view.code.breakpointAt", { addr })} aria-selected={on} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 22, flexShrink: 0, cursor: "pointer", hover: { opacity: 0.72 } }}>
       {paused ? <Icon name="play" size={11} color={on ? p.error : p.data} /> : <div style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: on ? p.error : "transparent", pointerEvents: "none" }} />}
     </div>
   );
@@ -232,7 +233,7 @@ function Line({ fn, view, text, number, focused, margin, found = "no", spans = n
     if (event.isRightClick) menuFor(cellUnder(run, event), event);
   };
   const row = (
-    <div role="row" aria-label={`Line ${number}`} aria-selected={picked} style={{ display: "flex", userSelect: "text", fontFamily: look.family, fontSize: look.size, lineHeight: look.lineHeight, ...lineTint(found, picked, ranged, p), ...(paused ? { backgroundColor: p.sel2 } : {}) }}>
+    <div role="row" aria-label={t("workbench.view.line", { number })} aria-selected={picked} style={{ display: "flex", userSelect: "text", fontFamily: look.family, fontSize: look.size, lineHeight: look.lineHeight, ...lineTint(found, picked, ranged, p), ...(paused ? { backgroundColor: p.sel2 } : {}) }}>
       {view === "asm" && <Breakpoint addr={here} paused={paused} />}
       {gutter ? <div {...subjectMenu(bench, subject(null), (event) => pick(null, event))} style={{ position: "relative", display: "flex", justifyContent: "flex-end", width: GUTTER_WIDTH, flexShrink: 0, paddingRight: 16, color: picked ? p.text : p.gutter, userSelect: "none" }}>{ask?.pinned && <PinDot />}{String(number)}</div> : <div {...subjectMenu(bench, subject(null), (event) => pick(null, event))} style={{ width: 16, flexShrink: 0 }} />}
       {margin}
@@ -244,8 +245,8 @@ function Line({ fn, view, text, number, focused, margin, found = "no", spans = n
             const { cell } = chunk;
             const target = cell.opens ?? "";
             return (
-              <Tooltip key={ix} label={`Go to ${cell.text}`} side="top">
-                <div {...subjectMenu(bench, subject(cell.token), () => openFn(target, false))} role="link" aria-label={`Open ${cell.text}`} style={{ color: cell.color, whiteSpace: "nowrap", textDecoration: "underline", cursor: "pointer" }}>{cell.text}</div>
+              <Tooltip key={ix} label={t("workbench.view.code.goTo", { name: cell.text })} side="top">
+                <div {...subjectMenu(bench, subject(cell.token), () => openFn(target, false))} role="link" aria-label={t("workbench.view.open", { name: cell.text })} style={{ color: cell.color, whiteSpace: "nowrap", textDecoration: "underline", cursor: "pointer" }}>{cell.text}</div>
               </Tooltip>
             );
           }
@@ -345,12 +346,12 @@ function Lines({ fn, view, lines, focusLine }: { readonly fn: string; readonly v
 }
 
 /** A function boundary in the listing: its label, or a step to the function before or after it. */
-function Boundary({ fn, lead }: { readonly fn: string; readonly lead: string }): ReactElement {
+function Boundary({ fn, lead }: { readonly fn: string; readonly lead: "\u2191" | "\u2193" | "" }): ReactElement {
   const { p } = useTheme();
   const { nameOf, openFn } = useBench();
   const look = useCodeLook();
   return (
-    <div onClick={() => openFn(fn, false)} role="button" aria-label={`${lead} ${nameOf(fn)}`} style={{ display: "flex", gap: 10, flexShrink: 0, paddingTop: 4, paddingBottom: 4, paddingLeft: 22, fontFamily: look.family, fontSize: look.size, lineHeight: look.lineHeight, color: p.faint, cursor: "pointer", hover: { opacity: 0.72 } }}>
+    <div onClick={() => openFn(fn, false)} role="button" aria-label={lead === "\u2191" ? t("workbench.view.code.previous", { name: nameOf(fn) }) : lead === "\u2193" ? t("workbench.view.code.next", { name: nameOf(fn) }) : nameOf(fn)} style={{ display: "flex", gap: 10, flexShrink: 0, paddingTop: 4, paddingBottom: 4, paddingLeft: 22, fontFamily: look.family, fontSize: look.size, lineHeight: look.lineHeight, color: p.faint, cursor: "pointer", hover: { opacity: 0.72 } }}>
       <div>{lead}</div>
       <div style={{ color: p.call }}>{`${nameOf(fn)}:`}</div>
       <div>{fn}</div>
