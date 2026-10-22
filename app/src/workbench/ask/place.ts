@@ -1,4 +1,5 @@
 import type { Syntax } from "../../components/code";
+import { t } from "../../i18n";
 import type { Bench } from "../parts";
 import type { LineRange, UiState, Workbench } from "../state";
 
@@ -33,6 +34,11 @@ export function sourcePlace(file: string, syntax: Syntax): AskPlace {
 
 export function rangeText(range: Pick<LineRange, "from" | "to">): string {
   return range.from === range.to ? `line ${range.from}` : `lines ${range.from}–${range.to}`;
+}
+
+/** rangeText for the reader, in their language; rangeText stays English for prompts. */
+export function rangeLabel(range: Pick<LineRange, "from" | "to">): string {
+  return range.from === range.to ? t("ask.range.line", { number: range.from }) : t("ask.range.lines", { from: range.from, to: range.to });
 }
 
 /** The lines the Ask bar is for: a picked range, or one line picked by its number or the space around its code. */

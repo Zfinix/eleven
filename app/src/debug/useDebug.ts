@@ -19,7 +19,10 @@ export type DebugStatus =
   | { readonly kind: "running" }
   | { readonly kind: "stopped"; readonly reason: string; readonly thread: number; readonly frames: readonly StackFrame[]; readonly scopes: readonly LoadedScope[]; readonly threads: readonly Thread[] }
   | { readonly kind: "exited"; readonly code: number | null }
-  | { readonly kind: "error"; readonly message: string };
+  | { readonly kind: "error"; readonly message: string; readonly problem: DebugProblem | null };
+
+/** A problem Eleven recognised, so the view can say it in the reader's language while an agent still reads `message`. */
+export type DebugProblem = "noDebugger" | "protected";
 
 export type Debug = {
   readonly status: DebugStatus;
@@ -72,10 +75,14 @@ function exitCode(body: unknown): number | null {
   return isRecord(body) && typeof body.exitCode === "number" ? body.exitCode : null;
 }
 
-function startProblem(err: unknown): string {
+const NO_DEBUGGER = "Eleven needs lldb-dap to debug. Install Xcode's command line tools, or choose lldb-dap in Settings.";
+
+const PROTECTED = "macOS won't let the debugger run this program. System programs and apps with hardened runtime are protected. Try a copy you built, or one re-signed without hardened runtime.";
+
+function startProblem(err: unknown): DebugStatus {
   const message = err instanceof Error ? err.message : String(err);
-  if (/permission denied|not allowed|operation not permitted/i.test(message)) return "macOS won't let the debugger run this program. System programs and apps with hardened runtime are protected. Try a copy you built, or one re-signed without hardened runtime.";
-  return message;
+  if (/permission denied|not allowed|operation not permitted/i.test(message)) return { kind: "error", message: PROTECTED, problem: "protected" };
+  return { kind: "error", message, problem: null };
 }
 
 const SETTLE_MS = 15_000;
@@ -161,7 +168,7 @@ export function useDebug(): Debug {
     if (now.current.kind === "starting" || now.current.kind === "running") return;
     const adapter = findLldbDap();
     if (!adapter) {
-      set({ kind: "error", message: "Eleven needs lldb-dap to debug. Install Xcode's command line tools, or choose lldb-dap in Settings." });
+      set({ kind: "error", message: NO_DEBUGGER, problem: "noDebugger" });
       return;
     }
     set({ kind: "starting" });
@@ -191,7 +198,7 @@ export function useDebug(): Debug {
         await started;
         if (client.current === dap) set({ kind: "running" });
       } catch (err) {
-        if (client.current === dap) set({ kind: "error", message: startProblem(err) });
+        if (client.current === dap) set(startProblem(err));
       }
     })();
   };
@@ -224,7 +231,7 @@ export function useDebug(): Debug {
       : verb === "in" ? dap.stepIn(thread)
       : verb === "out" ? dap.stepOut(thread)
       : dap.next(thread, "instruction");
-    void call.catch((err: unknown) => set({ kind: "error", message: err instanceof Error ? err.message : String(err) }));
+    void call.catch((err: unknown) => set({ kind: "error", message: err instanceof Error ? err.message : String(err), problem: null }));
   };
 
   const stop = (): void => {

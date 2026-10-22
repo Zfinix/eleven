@@ -6,13 +6,14 @@ import { ask } from "./actions";
 import { tokenize } from "../components/code";
 import { type Syntax as Colors, syntaxFor, useCodeLook } from "../settings/look";
 import { useSettings } from "../settings/store";
+import { type PlainId, t } from "../i18n";
 import { classifyFunctions, diffStats, lineDiff, reviewRows, type DiffOp, type FnMatch, type FnStatus, type ReviewRow, type Span } from "./diff";
 import { HOVER, MONO_STYLE, TextButton, useBench } from "./parts";
 import type { Program } from "./model";
 
 const ASK_CHARS = 4000;
 
-const STATUS_LABEL: Readonly<Record<FnStatus, string>> = { added: "added", removed: "removed", both: "in both" };
+const STATUS_LABEL: Readonly<Record<FnStatus, PlainId>> = { added: "workbench.view.diff.added", removed: "workbench.view.diff.removed", both: "workbench.view.diff.both" };
 
 const MAX_ROWS = 300;
 
@@ -70,7 +71,7 @@ function FoldRow({ count, width, onOpen }: { readonly count: number; readonly wi
   return (
     <div onClick={onOpen} role="button" style={{ display: "flex", alignItems: "center", cursor: "pointer", backgroundColor: p.fill, color: p.muted, marginTop: 2, marginBottom: 2, userSelect: "none", hover: { opacity: 0.72 } }}>
       <div style={{ width: width * 2 + 18, flexShrink: 0, display: "flex", justifyContent: "center" }}>⋯</div>
-      <div>{`${count} unchanged lines`}</div>
+      <div>{t("workbench.view.diff.unchanged", { count })}</div>
     </div>
   );
 }
@@ -88,7 +89,7 @@ function DiffLines({ name, left, right, program, compare }: { readonly name: str
   const rows = useMemo(() => reviewRows(lines, opened), [lines, opened]);
   if (old === null || next === null) {
     const failed = before.kind === "failed" ? before.message : after.kind === "failed" ? after.message : null;
-    return <div style={{ marginTop: 8, color: failed ? p.error : p.muted }}>{failed ? `Couldn't read both sides. ${failed}` : "Reading both sides…"}</div>;
+    return <div style={{ marginTop: 8, color: failed ? p.error : p.muted }}>{failed ? t("workbench.view.diff.readFailed", { error: failed }) : t("workbench.view.diff.reading")}</div>;
   }
   const { added, removed } = diffStats(lines);
   const identical = added === 0 && removed === 0;
@@ -99,11 +100,11 @@ function DiffLines({ name, left, right, program, compare }: { readonly name: str
   return (
     <div style={{ display: "flex", flexDirection: "column", marginTop: 8 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-        <div style={{ flexShrink: 1, minWidth: 0, color: p.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{identical ? "These two are identical." : `${name} changed.`}</div>
+        <div style={{ flexShrink: 1, minWidth: 0, color: p.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{identical ? t("workbench.view.diff.identical") : t("workbench.view.diff.changed", { name })}</div>
         {!identical && <div style={{ flexShrink: 0, color: p.string, ...MONO_STYLE }}>{`+${added}`}</div>}
         {!identical && <div style={{ flexShrink: 0, color: p.error, ...MONO_STYLE }}>{`-${removed}`}</div>}
         <div style={{ flexGrow: 1 }} />
-        <TextButton label="Ask AI what changed" tone="outline" onClick={askChange} />
+        <TextButton label={t("workbench.view.diff.ask")} tone="outline" onClick={askChange} />
       </div>
       {!identical && (
         <div style={{ display: "flex", flexDirection: "column", userSelect: "text", fontFamily: look.family, fontSize: look.size, lineHeight: look.lineHeight }}>
@@ -128,8 +129,8 @@ export function DiffView(): ReactElement {
   if (!compare) {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 10, padding: 16 }}>
-        <div style={{ color: p.muted, maxWidth: 520 }}>{`Pick another build of ${program.name} to see what changed: which functions were added or removed, and the lines that differ in the ones that stayed.`}</div>
-        <TextButton label="Choose a binary to compare" tone="primary" onClick={openCompare} />
+        <div style={{ color: p.muted, maxWidth: 520 }}>{t("workbench.view.diff.intro", { name: program.name })}</div>
+        <TextButton label={t("workbench.view.diff.choose")} tone="primary" onClick={openCompare} />
       </div>
     );
   }
@@ -139,23 +140,23 @@ export function DiffView(): ReactElement {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: 12, paddingRight: 12, height: 36, flexShrink: 0 }}>
-        <div style={{ flexGrow: 1, color: p.muted }}>{`${program.name} vs ${compare.name}: ${added} added, ${removed} removed`}</div>
-        <TextButton label="Pick another" tone="outline" onClick={openCompare} />
+        <div style={{ flexGrow: 1, color: p.muted }}>{t("workbench.view.diff.summary", { left: program.name, right: compare.name, added, removed })}</div>
+        <TextButton label={t("workbench.view.diff.pickAnother")} tone="outline" onClick={openCompare} />
       </div>
       <div style={{ display: "flex", flexGrow: 1, minHeight: 0 }}>
         <div style={{ width: 280, flexShrink: 0, overflow: "scroll", paddingLeft: 6, paddingRight: 6, paddingBottom: 8 }}>
           {matches.slice(0, MAX_ROWS).map((match) => (
             <div key={`${match.name}:${match.status}`} onClick={() => setSelected(match)} role="option" style={{ ...row, ...(selected?.name === match.name && selected.status === match.status ? { backgroundColor: p.sel } : {}) }}>
               <div style={{ flexGrow: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: p.text }}>{match.name}</div>
-              <div style={{ flexShrink: 0, fontSize: 11, color: statusColor(match.status, p) }}>{STATUS_LABEL[match.status]}</div>
+              <div style={{ flexShrink: 0, fontSize: 11, color: statusColor(match.status, p) }}>{t(STATUS_LABEL[match.status])}</div>
             </div>
           ))}
-          {matches.length > MAX_ROWS && <div style={{ paddingLeft: 8, paddingTop: 6, fontSize: 11.5, color: p.faint }}>{`Showing the first ${MAX_ROWS} of ${matches.length}. Added and removed are listed first.`}</div>}
+          {matches.length > MAX_ROWS && <div style={{ paddingLeft: 8, paddingTop: 6, fontSize: 11.5, color: p.faint }}>{t("workbench.view.diff.capped", { shown: MAX_ROWS, count: matches.length })}</div>}
         </div>
         <div style={{ flexGrow: 1, minWidth: 0, overflow: "scroll", paddingLeft: 12, paddingRight: 12, paddingBottom: 12, borderLeftWidth: 1, borderColor: p.fill }}>
-          {!selected && <div style={{ marginTop: 8, color: p.muted }}>Pick a function to see what changed.</div>}
-          {selected?.status === "added" && <div style={{ marginTop: 8, color: p.muted }}>{`${selected.name} is new in ${compare.name}.`}</div>}
-          {selected?.status === "removed" && <div style={{ marginTop: 8, color: p.muted }}>{`${selected.name} is gone from ${compare.name}.`}</div>}
+          {!selected && <div style={{ marginTop: 8, color: p.muted }}>{t("workbench.view.diff.pickFunction")}</div>}
+          {selected?.status === "added" && <div style={{ marginTop: 8, color: p.muted }}>{t("workbench.view.diff.isNew", { name: selected.name, binary: compare.name })}</div>}
+          {selected?.status === "removed" && <div style={{ marginTop: 8, color: p.muted }}>{t("workbench.view.diff.isGone", { name: selected.name, binary: compare.name })}</div>}
           {selected?.status === "both" && selected.left && selected.right && (
             <DiffLines key={selected.name} name={selected.name} left={selected.left} right={selected.right} program={program} compare={compare} />
           )}

@@ -10,6 +10,7 @@ import { MODEL_FILE, readModel } from "./models";
 import type { LoadedBy, ModelInfo, Recording, ShaderLibrary } from "./types";
 import type { GpuSource } from "./source";
 import { runSync } from "../lib/process";
+import { t } from "../i18n";
 
 const MAX_FILES = 40;
 const MAX_DEPTH = 6;
@@ -96,8 +97,9 @@ export class LiveSource implements GpuSource {
     const loaders = await findLoaders(prepareTarget(exe).path, name);
     const first = loaders[0];
     if (!first) return null;
-    const others = loaders.length > 1 ? ` Also loaded in ${loaders.length - 1} other place${loaders.length > 2 ? "s" : ""}.` : "";
-    return { symbol: objcName(first.name), note: `Looks it up by name: "${name}".${others}` };
+    const others = loaders.length - 1;
+    const note = others === 0 ? t("gpu.loadedBy.byName", { name }) : others === 1 ? t("gpu.loadedBy.byNameOther", { name }) : t("gpu.loadedBy.byNameOthers", { name, count: others });
+    return { symbol: objcName(first.name), note };
   }
 
   async listModels(): Promise<readonly ModelInfo[]> {

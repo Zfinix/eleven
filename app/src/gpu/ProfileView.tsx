@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 
 import { useTheme } from "../theme";
+import { t } from "../i18n";
 import { useCodeLook } from "../settings/look";
 import { Icon } from "../components/ui";
 import { text } from "./look";
@@ -31,11 +32,11 @@ function Advice({ span }: { readonly span: Span }): ReactElement {
     <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, flexBasis: 350, minWidth: 0, padding: 14, borderWidth: 1, borderColor: p.line3, borderRadius: 10, backgroundColor: p.raised }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
         <Icon name="bolt" size={15} color={p.data} />
-        <div style={{ fontWeight: 500 }}>What the numbers say</div>
+        <div style={{ fontWeight: 500 }}>{t("gpu.profile.advice")}</div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10, color: p.text2 }}>
         {span.advice.map((paragraph) => <div key={paragraph} style={{ lineHeight: 20 }}>{paragraph}</div>)}
-        {span.advice.length === 0 && <div style={{ color: p.muted }}>This part of the frame looks fine.</div>}
+        {span.advice.length === 0 && <div style={{ color: p.muted }}>{t("gpu.profile.fine")}</div>}
       </div>
     </div>
   );
@@ -55,7 +56,7 @@ export function ProfileView({ recording, span, onPick, onAsk }: {
         <div style={{ fontWeight: 600, ...text(18) }}>{recording.title}</div>
         <div style={{ flexGrow: 1, paddingBottom: 2.3, color: p.muted }}>{recording.source}</div>
         <div onClick={onAsk} role="button" style={{ display: "flex", alignItems: "center", height: 28, paddingLeft: 10, paddingRight: 10, borderWidth: 1, borderColor: p.line3, borderRadius: 8, backgroundColor: p.sel, color: p.text, cursor: "pointer", hover: { opacity: 0.72 } }}>
-          <div>Ask AI what's slow</div>
+          <div>{t("gpu.profile.ask")}</div>
         </div>
       </div>
       <Timeline recording={recording} selected={span.id} onPick={onPick} />

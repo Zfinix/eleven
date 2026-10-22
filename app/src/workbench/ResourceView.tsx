@@ -7,6 +7,7 @@ import { plistXml } from "../engine/apple";
 import { Button, ErrorCard } from "../components/kit";
 import { useLoaded } from "../lib/useLoaded";
 import { useTheme } from "../theme";
+import { t } from "../i18n";
 import { ask } from "./actions";
 import { useBench } from "./parts";
 import { SourceLines } from "./SourceView";
@@ -61,7 +62,7 @@ function Loaded({ file, read }: { readonly file: string; readonly read: Read }):
     case "image":
       return (
         <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0 }}>
-          <Card title={name} detail={`Image, ${sizeText(read.size)}`} />
+          <Card title={name} detail={t("workbench.view.resource.image", { size: sizeText(read.size) })} />
           <div style={{ display: "flex", flexGrow: 1, minHeight: 0, alignItems: "center", justifyContent: "center", padding: 24 }}>
             <img src={read.path} objectFit="contain" style={{ width: "100%", height: "100%" }} />
           </div>
@@ -70,10 +71,10 @@ function Loaded({ file, read }: { readonly file: string; readonly read: Read }):
     case "native":
       return (
         <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0 }}>
-          <Card title={name} detail={`Native library${abiOf(file) ? ` for ${abiOf(file)}` : ""}, ${sizeText(read.size)}. Open it to read its functions and code. The app stays in your projects.`}>
+          <Card title={name} detail={abiOf(file) ? t("workbench.view.resource.nativeFor", { abi: abiOf(file), size: sizeText(read.size) }) : t("workbench.view.resource.native", { size: sizeText(read.size) })}>
             <>
-              <Button label="Open library" tone="primary" icon="library" onClick={() => void bench.chat.choose(read.path)} />
-              <Button label={`Ask ${agent}`} tone="ask" onClick={() => ask(bench, `What does ${name}, a native library in ${bench.program.name}, do? It's unpacked at ${read.path}.`)} />
+              <Button label={t("workbench.view.resource.openLibrary")} tone="primary" icon="library" onClick={() => void bench.chat.choose(read.path)} />
+              <Button label={t("workbench.view.resource.ask", { agent })} tone="ask" onClick={() => ask(bench, `What does ${name}, a native library in ${bench.program.name}, do? It's unpacked at ${read.path}.`)} />
             </>
           </Card>
           <SourceLines source={{ text: read.text, starts: [] }} syntax="code" />
@@ -82,8 +83,8 @@ function Loaded({ file, read }: { readonly file: string; readonly read: Read }):
     case "hermes":
       return (
         <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0 }}>
-          <Card title={name} detail={`The app's JavaScript, compiled to Hermes bytecode (${sizeText(read.size)}). This is where a React Native app's own code lives. Eleven can't decompile Hermes yet.`}>
-            <Button label={`Ask ${agent} to read it`} tone="ask" onClick={() => ask(bench, `${bench.program.name} is a React Native app. Its JavaScript is compiled to Hermes bytecode at ${read.path}. Read it and tell me what the app does.`)} />
+          <Card title={name} detail={t("workbench.view.resource.hermes", { size: sizeText(read.size) })}>
+            <Button label={t("workbench.view.resource.askRead", { agent })} tone="ask" onClick={() => ask(bench, `${bench.program.name} is a React Native app. Its JavaScript is compiled to Hermes bytecode at ${read.path}. Read it and tell me what the app does.`)} />
           </Card>
           <SourceLines source={{ text: read.text, starts: [] }} syntax="code" />
         </div>
@@ -91,7 +92,7 @@ function Loaded({ file, read }: { readonly file: string; readonly read: Read }):
     case "binary":
       return (
         <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0 }}>
-          <Card title={name} detail={`Binary file, ${sizeText(read.size)}. The first ${sizeText(Math.min(HEAD, read.size))} are shown below.`} />
+          <Card title={name} detail={t("workbench.view.resource.binary", { size: sizeText(read.size), head: sizeText(Math.min(HEAD, read.size)) })} />
           <SourceLines source={{ text: read.text, starts: [] }} syntax="code" />
         </div>
       );
@@ -110,9 +111,9 @@ export function ResourceView({ file }: { readonly file: string }): ReactElement 
   const read = useLoaded(() => (files ? readResource(files, file) : Promise.reject(new Error("This file has no app resources."))), `${program.id}:res:${file}`);
   switch (read.kind) {
     case "loading":
-      return <div style={{ padding: 16, color: p.muted }}>{`Reading ${file}…`}</div>;
+      return <div style={{ padding: 16, color: p.muted }}>{t("workbench.view.reading", { file })}</div>;
     case "failed":
-      return <div style={{ padding: 16 }}><ErrorCard title={`Couldn't open ${file}`} detail="The rest of the app still reads. Try another file." raw={read.message} /></div>;
+      return <div style={{ padding: 16 }}><ErrorCard title={t("workbench.view.openFailed", { file })} detail={t("workbench.view.openFailed.file")} raw={read.message} /></div>;
     case "ready":
       return <Loaded file={file} read={read.value} />;
     default: {

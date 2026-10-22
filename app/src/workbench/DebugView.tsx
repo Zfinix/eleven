@@ -2,12 +2,13 @@ import { useCommand } from "../lib/shortcuts";
 import { type ReactElement, useEffect, useRef, useState } from "react";
 
 import { useTheme } from "../theme";
-import { type Debug, useDebug, type DebugStatus, type LoadedScope, type OutputLine } from "../debug/useDebug";
+import { type Debug, type DebugProblem, useDebug, type DebugStatus, type LoadedScope, type OutputLine } from "../debug/useDebug";
 import type { StackFrame, Thread, Variable } from "../debug/dap";
 import { ask } from "./actions";
 import { claimDebugStart } from "../debug/live";
 import { TYPING } from "../lib/shortcuts";
 import { useSettings } from "../settings/store";
+import { type PlainId, t } from "../i18n";
 import { Dot } from "../components/ui";
 import { HOVER, IconButton, MONO_STYLE, SegItem, TextButton, useBench } from "./parts";
 
@@ -15,13 +16,15 @@ type Stopped = Extract<DebugStatus, { kind: "stopped" }>;
 
 type Page = "stack" | "threads" | "registers" | "breakpoints" | "output";
 
-const PAGES: readonly { readonly page: Page; readonly label: string }[] = [
-  { page: "stack", label: "Stack" },
-  { page: "threads", label: "Threads" },
-  { page: "registers", label: "Registers" },
-  { page: "breakpoints", label: "Breakpoints" },
-  { page: "output", label: "Output" },
+const PAGES: readonly { readonly page: Page; readonly label: PlainId }[] = [
+  { page: "stack", label: "debug.page.stack" },
+  { page: "threads", label: "debug.page.threads" },
+  { page: "registers", label: "debug.page.registers" },
+  { page: "breakpoints", label: "debug.page.breakpoints" },
+  { page: "output", label: "debug.page.output" },
 ];
+
+const PROBLEM: Readonly<Record<DebugProblem, PlainId>> = { noDebugger: "debug.problem.noDebugger", protected: "debug.problem.protected" };
 
 function useVarLimit(): number {
   return Number(useSettings().settings.variableLimit.replace(",", ""));
@@ -51,8 +54,8 @@ function Frames({ frames }: { readonly frames: readonly StackFrame[] }): ReactEl
   const { program, openFn } = useBench();
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <Heading text="Call stack" />
-      {frames.length === 0 && <div style={{ color: p.muted }}>No frames.</div>}
+      <Heading text={t("debug.callStack")} />
+      {frames.length === 0 && <div style={{ color: p.muted }}>{t("debug.noFrames")}</div>}
       {frames.map((frame, ix) => {
         const fn = frame.pc ? owner(program.functions, frame.pc) : null;
         return (
@@ -94,13 +97,13 @@ function Scopes({ scopes, load }: { readonly scopes: readonly LoadedScope[]; rea
   const limit = useVarLimit();
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {scopes.length === 0 && <div style={{ color: p.muted }}>Nothing here.</div>}
+      {scopes.length === 0 && <div style={{ color: p.muted }}>{t("debug.nothingHere")}</div>}
       {scopes.map((scope) => (
         <div key={scope.name} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <Heading text={scope.name} />
-          {scope.vars.length === 0 && <div style={{ color: p.muted }}>Nothing here.</div>}
+          {scope.vars.length === 0 && <div style={{ color: p.muted }}>{t("debug.nothingHere")}</div>}
           {scope.vars.slice(0, limit).map((v, ix) => <VarRow key={`${v.name}:${ix}`} v={v} load={load} depth={0} />)}
-          {scope.vars.length > limit && <div style={{ fontSize: 11.5, color: p.faint }}>{`${(scope.vars.length - limit).toLocaleString()} more`}</div>}
+          {scope.vars.length > limit && <div style={{ fontSize: 11.5, color: p.faint }}>{t("debug.more", { count: (scope.vars.length - limit).toLocaleString() })}</div>}
         </div>
       ))}
     </div>
@@ -111,11 +114,11 @@ function Threads({ threads, current }: { readonly threads: readonly Thread[]; re
   const { p } = useTheme();
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      {threads.length === 0 && <div style={{ color: p.muted }}>No threads.</div>}
+      {threads.length === 0 && <div style={{ color: p.muted }}>{t("debug.noThreads")}</div>}
       {threads.map((thread) => (
         <div key={thread.id} style={{ display: "flex", gap: 10, fontSize: 12, ...MONO_STYLE }}>
           <div style={{ flexGrow: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: thread.id === current ? p.text : p.text3 }}>{thread.name}</div>
-          <div style={{ flexShrink: 0, color: p.faint }}>{thread.id === current ? "stopped here" : ""}</div>
+          <div style={{ flexShrink: 0, color: p.faint }}>{thread.id === current ? t("debug.stoppedHere") : ""}</div>
         </div>
       ))}
     </div>
@@ -138,7 +141,7 @@ function Output({ lines }: { readonly lines: readonly OutputLine[] }): ReactElem
   };
   return (
     <div style={{ display: "flex", flexDirection: "column", userSelect: "text", fontSize: 12, ...MONO_STYLE }}>
-      {lines.length === 0 && <div style={{ color: p.muted }}>Nothing printed yet. What the program prints, and what you evaluate below, shows here.</div>}
+      {lines.length === 0 && <div style={{ color: p.muted }}>{t("debug.noOutput")}</div>}
       {lines.map((line, ix) => <div key={ix} style={{ color: color(line) }}>{line.kind === "asked" ? `› ${line.text}` : line.text}</div>)}
     </div>
   );
@@ -150,8 +153,8 @@ function Breakpoints(): ReactElement {
   const addrs = [...wb.s.breakpoints.keys()];
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <Heading text="Saved with the project. Changes apply right away, even while running." />
-      {addrs.length === 0 && <div style={{ color: p.muted }}>None yet. Click the left edge of a line in the listing to add one.</div>}
+      <Heading text={t("debug.breakpoints.saved")} />
+      {addrs.length === 0 && <div style={{ color: p.muted }}>{t("debug.breakpoints.none")}</div>}
       {addrs.map((addr) => {
         const fn = owner(program.functions, addr);
         return (
@@ -161,7 +164,7 @@ function Breakpoints(): ReactElement {
               <div style={{ flexShrink: 0, color: p.text }}>{addr}</div>
               <div style={{ flexGrow: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: p.faint }}>{fn ? nameOf(fn) : ""}</div>
             </div>
-            <IconButton icon="close" label="Remove breakpoint" size={22} iconSize={10} onClick={() => wb.toggleBreakpoint(addr)} />
+            <IconButton icon="close" label={t("debug.breakpoints.remove")} size={22} iconSize={10} onClick={() => wb.toggleBreakpoint(addr)} />
           </div>
         );
       })}
@@ -177,19 +180,19 @@ function Toolbar({ debug, onAsk }: { readonly debug: Debug; readonly onAsk: (() 
   const step = stopped ? p.link : p.faint;
   const noop = (): void => undefined;
   return (
-    <div role="toolbar" aria-label="Debugger controls" style={{ display: "flex", alignItems: "center", alignSelf: "flex-start", gap: 2, padding: 3, borderRadius: 10, backgroundColor: p.fill }}>
+    <div role="toolbar" aria-label={t("debug.controls")} style={{ display: "flex", alignItems: "center", alignSelf: "flex-start", gap: 2, padding: 3, borderRadius: 10, backgroundColor: p.fill }}>
       {stopped
-        ? <IconButton icon="debug-continue" label="Continue" color={p.link} onClick={debug.cont} />
-        : <IconButton icon="debug-pause" label="Pause" color={status.kind === "running" ? p.link : p.faint} onClick={debug.pause} />}
+        ? <IconButton icon="debug-continue" label={t("debug.continue")} color={p.link} onClick={debug.cont} />
+        : <IconButton icon="debug-pause" label={t("debug.pause")} color={status.kind === "running" ? p.link : p.faint} onClick={debug.pause} />}
       <div style={{ width: 8 }} />
-      <IconButton icon="debug-step-over" label="Step over" color={step} onClick={stopped ? debug.stepOver : noop} />
-      <IconButton icon="debug-step-into" label="Step into" color={step} onClick={stopped ? debug.stepIn : noop} />
-      <IconButton icon="debug-step-out" label="Step out" color={step} onClick={stopped ? debug.stepOut : noop} />
-      <IconButton icon="debug-step-instruction" label="Step one instruction" color={step} onClick={stopped ? debug.stepInstruction : noop} />
+      <IconButton icon="debug-step-over" label={t("debug.stepOver")} color={step} onClick={stopped ? debug.stepOver : noop} />
+      <IconButton icon="debug-step-into" label={t("debug.stepInto")} color={step} onClick={stopped ? debug.stepIn : noop} />
+      <IconButton icon="debug-step-out" label={t("debug.stepOut")} color={step} onClick={stopped ? debug.stepOut : noop} />
+      <IconButton icon="debug-step-instruction" label={t("debug.stepInstruction")} color={step} onClick={stopped ? debug.stepInstruction : noop} />
       <div style={{ width: 8 }} />
-      <IconButton icon="debug-restart" label="Restart" color={live ? p.string : p.faint} onClick={live ? debug.restart : noop} />
-      <IconButton icon="debug-stop" label="Stop" color={live ? p.error : p.faint} onClick={live ? debug.stop : noop} />
-      {onAsk && <IconButton icon="agent" label="Ask AI why it stopped" onClick={onAsk} />}
+      <IconButton icon="debug-restart" label={t("debug.restart")} color={live ? p.string : p.faint} onClick={live ? debug.restart : noop} />
+      <IconButton icon="debug-stop" label={t("debug.stop")} color={live ? p.error : p.faint} onClick={live ? debug.stop : noop} />
+      {onAsk && <IconButton icon="agent" label={t("debug.askWhy")} onClick={onAsk} />}
     </div>
   );
 }
@@ -197,9 +200,9 @@ function Toolbar({ debug, onAsk }: { readonly debug: Debug; readonly onAsk: (() 
 function Header({ status, name }: { readonly status: DebugStatus; readonly name: string }): ReactElement {
   const { p } = useTheme();
   const [color, title, detail] =
-    status.kind === "stopped" ? [p.data, "Paused", `${status.reason}, ${status.frames[0]?.name ?? name}`]
-    : status.kind === "running" ? [p.string, "Running", name]
-    : [p.faint, "Starting", name];
+    status.kind === "stopped" ? [p.data, t("debug.status.paused"), `${status.reason}, ${status.frames[0]?.name ?? name}`]
+    : status.kind === "running" ? [p.string, t("debug.status.running"), name]
+    : [p.faint, t("debug.status.starting"), name];
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <Dot color={color} size={8} />
@@ -219,7 +222,7 @@ function Evaluate({ debug }: { readonly debug: Debug }): ReactElement {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, height: 32, paddingLeft: 10, paddingRight: 10, borderWidth: 1, borderColor: p.line3, borderRadius: 9, backgroundColor: p.deep }}>
       <div style={{ color: p.faint, ...MONO_STYLE }}>›</div>
-      <input {...TYPING} value={text} placeholder="Evaluate, like x0 or *(int *)$sp" aria-label="Evaluate an expression" onChange={(e) => setText(e.value ?? "")} onSubmit={run} style={{ flexGrow: 1, minWidth: 0, height: 30, fontSize: 12, color: p.text, ...MONO_STYLE }} />
+      <input {...TYPING} value={text} placeholder={t("debug.evaluate.placeholder")} aria-label={t("debug.evaluate")} onChange={(e) => setText(e.value ?? "")} onSubmit={run} style={{ flexGrow: 1, minWidth: 0, height: 30, fontSize: 12, color: p.text, ...MONO_STYLE }} />
     </div>
   );
 }
@@ -229,7 +232,7 @@ function Session({ debug, page, setPage, onAsk }: { readonly debug: Debug; reado
   const { program } = useBench();
   const { status } = debug;
   const stopped = status.kind === "stopped" ? status : null;
-  const waiting = <div style={{ color: p.muted }}>Pause the program to see this.</div>;
+  const waiting = <div style={{ color: p.muted }}>{t("debug.pauseToSee")}</div>;
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12, paddingBottom: 8 }}>
@@ -305,27 +308,27 @@ export function DebugView(): ReactElement {
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "scroll", padding: 16, gap: 12 }}>
       {status.kind === "idle" && (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 10 }}>
-          <div style={{ color: p.muted, maxWidth: 520 }}>{breaking ? `Run ${program.name} under the debugger and stop when it reaches ${breakFn}. It runs the file as it is on disk, so it has to be a native ${program.arch} program.` : `Run ${program.name} under the debugger. It stops at your breakpoints, and it has to be a native ${program.arch} program.`}</div>
-          <TextButton label={breaking ? `Debug, breaking at ${breakFn}` : "Debug"} tone="primary" onClick={start} />
+          <div style={{ color: p.muted, maxWidth: 520 }}>{breaking ? t("debug.intro.breaking", { name: program.name, fn: breakFn, arch: program.arch }) : t("debug.intro", { name: program.name, arch: program.arch })}</div>
+          <TextButton label={breaking ? t("debug.start.breaking", { fn: breakFn }) : t("debug.start")} tone="primary" onClick={start} />
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-            <div style={{ color: p.muted }}>Or attach to a running process</div>
-            <input {...TYPING} value={pid} placeholder="pid" aria-label="Process id" onChange={(e) => setPid(e.value ?? "")} onSubmit={attach} style={{ width: 80, height: 28, paddingLeft: 10, paddingRight: 10, borderWidth: 1, borderColor: p.line3, borderRadius: 7, backgroundColor: p.deep, fontSize: 12.5, color: p.text, ...MONO_STYLE }} />
-            <TextButton label="Attach" tone="outline" onClick={attach} />
+            <div style={{ color: p.muted }}>{t("debug.attach.hint")}</div>
+            <input {...TYPING} value={pid} placeholder={t("debug.attach.pid")} aria-label={t("debug.attach.processId")} onChange={(e) => setPid(e.value ?? "")} onSubmit={attach} style={{ width: 80, height: 28, paddingLeft: 10, paddingRight: 10, borderWidth: 1, borderColor: p.line3, borderRadius: 7, backgroundColor: p.deep, fontSize: 12.5, color: p.text, ...MONO_STYLE }} />
+            <TextButton label={t("debug.attach")} tone="outline" onClick={attach} />
           </div>
           <div style={{ marginTop: 8, alignSelf: "stretch" }}><Breakpoints /></div>
         </div>
       )}
       {status.kind === "exited" && (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 10 }}>
-          <div style={{ color: p.muted }}>{status.code === null ? "The program finished." : `The program exited with code ${status.code}.`}</div>
-          <TextButton label="Run again" tone="primary" onClick={debug.retry} />
+          <div style={{ color: p.muted }}>{status.code === null ? t("debug.finished") : t("debug.exited", { code: status.code })}</div>
+          <TextButton label={t("debug.runAgain")} tone="primary" onClick={debug.retry} />
           {debug.output.length > 0 && <div style={{ alignSelf: "stretch" }}><Output lines={debug.output} /></div>}
         </div>
       )}
       {status.kind === "error" && (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 10 }}>
-          <div style={{ color: p.error, maxWidth: 520 }}>{status.message}</div>
-          <TextButton label="Try again" tone="outline" onClick={debug.retry} />
+          <div style={{ color: p.error, maxWidth: 520 }}>{status.problem ? t(PROBLEM[status.problem]) : status.message}</div>
+          <TextButton label={t("debug.tryAgain")} tone="outline" onClick={debug.retry} />
         </div>
       )}
     </div>

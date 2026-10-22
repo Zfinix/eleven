@@ -7,6 +7,7 @@ import { useLoaded } from "../lib/useLoaded";
 import { syntaxFor, useCodeLook } from "../settings/look";
 import { useSettings } from "../settings/store";
 import { useTheme } from "../theme";
+import { t } from "../i18n";
 import type { SourceText } from "./model";
 import { HOVER, useBench } from "./parts";
 import { RecoveredView } from "./RecoveredView";
@@ -22,9 +23,9 @@ function SourceLine({ text, number, addr, syntax, label, row }: { readonly text:
   const look = useCodeLook();
   const parts = text.length === 0 ? [] : tokenize(text, syntax, p, syntaxFor(settings.colorScheme, p));
   const pick = row ? { onClick: row.pick } : {};
-  const link = addr === null ? pick : { onClick: () => openFn(addr, false), role: "link", "aria-label": `Open ${nameOf(addr)}` };
+  const link = addr === null ? pick : { onClick: () => openFn(addr, false), role: "link", "aria-label": t("workbench.view.open", { name: nameOf(addr) }) };
   const line = (
-    <div role="row" aria-label={`Line ${number}`} aria-selected={row?.picked ?? false} style={{ display: "flex", height: look.lineHeight, flexShrink: 0, fontFamily: look.family, fontSize: look.size, lineHeight: look.lineHeight, ...(row?.picked ? { backgroundColor: p.sel2 } : {}) }}>
+    <div role="row" aria-label={t("workbench.view.line", { number })} aria-selected={row?.picked ?? false} style={{ display: "flex", height: look.lineHeight, flexShrink: 0, fontFamily: look.family, fontSize: look.size, lineHeight: look.lineHeight, ...(row?.picked ? { backgroundColor: p.sel2 } : {}) }}>
       <div {...pick} style={{ position: "relative", display: "flex", justifyContent: "flex-end", width: 50, flexShrink: 0, paddingRight: 16, color: row?.picked ? p.text : p.gutter, userSelect: "none" }}>{row?.pinned && <PinDot />}{String(number)}</div>
       <div {...link} style={{ display: "flex", whiteSpace: "nowrap", userSelect: "text", ...(addr === null ? {} : { cursor: "pointer", hover: HOVER }) }}>
         {parts.map((part, ix) => <div key={ix} style={{ color: part.kind === "text" ? part.color : p.call, whiteSpace: "nowrap", pointerEvents: "none" }}>{part.text}</div>)}
@@ -68,9 +69,9 @@ function DecompiledFile({ file, read }: { readonly file: string; readonly read: 
   const source = useLoaded(() => read(file), `${program.id}:${file}`);
   switch (source.kind) {
     case "loading":
-      return <div style={{ padding: 16, color: p.muted }}>{`Reading ${file}…`}</div>;
+      return <div style={{ padding: 16, color: p.muted }}>{t("workbench.view.reading", { file })}</div>;
     case "failed":
-      return <div style={{ padding: 16 }}><ErrorCard title={`Couldn't open ${file}`} detail="The rest of the app still reads. Try a function inside it instead." raw={source.message} /></div>;
+      return <div style={{ padding: 16 }}><ErrorCard title={t("workbench.view.openFailed", { file })} detail={t("workbench.view.openFailed.function")} raw={source.message} /></div>;
     case "ready":
       return <SourceLines source={source.value} ask={sourcePlace(file, "c")} />;
     default: {
