@@ -65,3 +65,12 @@ test("an emoji in a string literal does not shift the columns after it", () => {
   ];
   expect(chunksOf(emoji).map((chunk) => chunk.kind)).toEqual(["text", "own", "text"]);
 });
+
+test("a tab keeps its own element, since it can draw wider than one column", () => {
+  const tabbed = [
+    { text: "mov", color: "#kw", token: { text: "mov", addr: null }, opens: null },
+    { text: "\t", color: "#p", token: null, opens: null },
+    { text: "x0, x1", color: "#p", token: null, opens: null },
+  ];
+  expect(chunksOf(tabbed).map((chunk) => chunk.kind)).toEqual(["text", "own", "text"]);
+});

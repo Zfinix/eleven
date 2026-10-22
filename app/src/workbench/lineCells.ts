@@ -40,10 +40,9 @@ export type Chunk =
   | { readonly kind: "text"; readonly cells: readonly Cell[] }
   | { readonly kind: "own"; readonly cell: Cell };
 
-/** Only ASCII has one advance per UTF-16 unit, which is what a click's column arithmetic assumes. */
+/** Only printable ASCII has one advance per UTF-16 unit, which is what a click's column arithmetic assumes. A tab can draw wider. */
 function fixedWidth(text: string): boolean {
-  // eslint-disable-next-line no-control-regex
-  return /^[\x20-\x7e\t]*$/.test(text);
+  return /^[\x20-\x7e]*$/.test(text);
 }
 
 /**
@@ -54,15 +53,17 @@ function fixedWidth(text: string): boolean {
  */
 export function chunksOf(cells: readonly Cell[]): readonly Chunk[] {
   const chunks: Chunk[] = [];
+  let run: Cell[] = [];
   for (const cell of cells) {
-    if (cell.opens || !fixedWidth(cell.text)) {
-      chunks.push({ kind: "own", cell });
+    if (!cell.opens && fixedWidth(cell.text)) {
+      run.push(cell);
       continue;
     }
-    const last = chunks.at(-1);
-    if (last?.kind === "text") chunks[chunks.length - 1] = { kind: "text", cells: [...last.cells, cell] };
-    else chunks.push({ kind: "text", cells: [cell] });
+    if (run.length > 0) chunks.push({ kind: "text", cells: run });
+    run = [];
+    chunks.push({ kind: "own", cell });
   }
+  if (run.length > 0) chunks.push({ kind: "text", cells: run });
   return chunks;
 }
 
