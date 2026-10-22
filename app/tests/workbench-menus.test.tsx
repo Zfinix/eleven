@@ -41,11 +41,6 @@ function rightClickId(id: number): void {
   settle();
 }
 
-function rightClickText(text: string): void {
-  const element = screen.ui.renderer.findByText(text);
-  if (!element) throw new Error(`no "${text}" on screen`);
-  rightClickId(element.id);
-}
 
 function rightClickLabel(label: string): void {
   const id = screen.labelled(label);
@@ -61,7 +56,7 @@ test("menus: a data label in pseudocode can be renamed, and the rename undone", 
   await screen.until(() => screen.labelled("entry") !== null, 20_000);
   screen.clickLabel("entry");
   await screen.until(() => screen.text().includes("DAT_10000c024"), 20_000);
-  rightClickText("DAT_10000c024");
+  screen.rightClickWord("DAT_10000c024");
   await screen.until(() => menuLabels().includes("Rename DAT_10000c024"), 5_000);
   expect(menuLabels()).toContain("References to DAT_10000c024");
   expect(menuLabels()).toContain("Go to 0x10000c024");
@@ -104,7 +99,7 @@ test("menus: an assembly line takes a comment that shows at the end of the line"
   await screen.until(() => screen.labelled("Listing view") !== null, 10_000);
   screen.clickLabel("Listing view");
   await screen.until(() => screen.text().includes("pacibsp"), 10_000);
-  rightClickText("pacibsp");
+  screen.rightClickWord("pacibsp");
   await screen.until(() => menuLabels().includes("Comment this line"), 5_000);
   expect(menuLabels()).toContain("Change type");
   screen.clickLabel("Comment this line");

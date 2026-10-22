@@ -65,6 +65,22 @@ export class Screen {
     throw new Error(`timed out; screen shows: ${this.texts().slice(0, 50).join(" | ")}`);
   }
 
+  /** Right-clicks a word where it is drawn, even inside a longer line of code, the way a person would. */
+  rightClickWord(word: string): void {
+    const renderer = this.ui.renderer;
+    const element = renderer.findByText(word);
+    if (!element?.text) throw new Error(`no "${word}" on screen`);
+    renderer.scrollIntoView(element.id);
+    renderer.dispatchNativeEvents();
+    renderer.flush();
+    const box = renderer.getElementBounds(element.id);
+    if (!box) throw new Error(`"${word}" has no box`);
+    const advance = box.width / element.text.length;
+    renderer.nativeSimulateClick(box.x + (element.text.indexOf(word) + word.length / 2) * advance, box.y + box.height / 2, 2);
+    renderer.dispatchNativeEvents();
+    renderer.flush();
+  }
+
   labelled(label: string): number | null {
     return byLabel(this.ui.renderer.toJSON(), label);
   }
