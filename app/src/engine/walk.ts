@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { isRecord } from "../lib/guards";
@@ -122,18 +122,28 @@ async function saved(file: string): Promise<string | null> {
 
 const running = new Map<string, Promise<Walk | null>>();
 
+async function remember(file: string, walk: Walk): Promise<void> {
+  const body = JSON.stringify({ steps: walk.steps.map((step) => ({ block: step.block, values: Object.fromEntries(step.values.map((v) => [v.name, v.value])), note: step.note })), result: walk.result });
+  const temp = `${file}.${process.pid}.tmp`;
+  try {
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(temp, body);
+    await rename(temp, file);
+  } catch {
+    await rm(temp, { force: true }).catch(() => undefined);
+  }
+}
+
 /** The path the agent works out for these inputs, saved so the same walk opens instantly; null when its reply had no usable steps. */
 export async function walkPath(req: WalkRequest, onProgress: (progress: RewriteProgress) => void): Promise<Walk | null> {
   const starts = req.blocks.map((block) => block.start);
   const file = walkFile(req);
-  const known = await saved(file);
-  if (known !== null) return parseWalk(known, starts);
   const pending = running.get(file) ?? (async (): Promise<Walk | null> => {
+    const known = await saved(file);
+    const cached = known === null ? null : parseWalk(known, starts);
+    if (cached) return cached;
     const walk = parseWalk(await askWarm(req, walkPrompt(req), onProgress), starts);
-    if (walk) {
-      await mkdir(dirname(file), { recursive: true });
-      await writeFile(file, JSON.stringify({ steps: walk.steps.map((step) => ({ block: step.block, values: Object.fromEntries(step.values.map((v) => [v.name, v.value])), note: step.note })), result: walk.result }));
-    }
+    if (walk) await remember(file, walk);
     return walk;
   })();
   running.set(file, pending);
