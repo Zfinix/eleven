@@ -6,7 +6,7 @@ import { type Span, useSpans } from "../components/highlight";
 import { ErrorCard, Tooltip } from "../components/kit";
 import { groups, openMenu } from "../components/ContextMenu";
 import { Icon } from "../components/ui";
-import { LIGHT, type Palette, useTheme } from "../theme";
+import { LIGHT, type Palette, scrollbar, useTheme } from "../theme";
 import { useListWindow } from "../lib/useListWindow";
 import { useLoaded } from "../lib/useLoaded";
 import { showAddress, syntaxFor, useCodeLook } from "../settings/look";
@@ -335,7 +335,7 @@ function Lines({ fn, view, lines, focusLine }: { readonly fn: string; readonly v
   return (
     <>
       {wb.s.finding && <FindBar count={find.count} problem={find.problem} />}
-      <virtual-list ref={list} itemCount={lines.length} windowStart={shown.start} estimatedItemHeight={lineHeight} onVisibleRange={shown.onVisibleRange} {...(lit ? { highlight: { query: lit, wholeWord: true, color: p.sel2 } } : {})} style={{ flexGrow: 1, minHeight: 0, paddingTop: 10, paddingBottom: 28, fontFamily: look.family, fontSize: look.size, lineHeight }}>
+      <virtual-list ref={list} itemCount={lines.length} windowStart={shown.start} estimatedItemHeight={lineHeight} onVisibleRange={shown.onVisibleRange} {...(lit ? { highlight: { query: lit, wholeWord: true, color: p.sel2 } } : {})} style={{ flexGrow: 1, minHeight: 0, paddingTop: 10, paddingBottom: 28, fontFamily: look.family, fontSize: look.size, lineHeight, ...scrollbar(p) }}>
         {lines.slice(shown.start, shown.end).map((line, ix) => (
           <Line key={shown.start + ix} fn={fn} view={view} text={line} number={shown.start + ix + 1} focused={shown.start + ix === focusLine} margin={margin(shown.start + ix)} found={found(shown.start + ix)} spans={painted?.[shown.start + ix] ?? null} bytes={bytesOf(shown.start + ix)} ask={askRow(shown.start + ix + 1)} />
         ))}

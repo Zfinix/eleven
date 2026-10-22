@@ -18,7 +18,7 @@ function sources(dir: string, base = ""): readonly string[] {
 test("every scrolling view draws a scrollbar", () => {
   const missing = sources(SRC).flatMap((file) => readFileSync(join(SRC, file), "utf8").split("\n").flatMap((line, ix) => {
     const scrolls = /overflow[XY]?: "scroll"/.test(line) || line.includes("<virtual-list");
-    const exempt = NO_THUMB.has(file) || NO_THUMB.has(`${file}:${ix + 1}`) || file === "workbench/CodeLines.tsx";
+    const exempt = NO_THUMB.has(file) || NO_THUMB.has(`${file}:${ix + 1}`);
     return scrolls && !exempt && !line.includes("scrollbar(") ? [`${file}:${ix + 1}`] : [];
   }));
   expect(missing).toEqual([]);
