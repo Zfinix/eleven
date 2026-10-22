@@ -9,7 +9,7 @@ import { swiftTypes } from "../engine/swiftTypes";
 import { useListWindow } from "../lib/useListWindow";
 import { useLoaded } from "../lib/useLoaded";
 import { useSettings } from "../settings/store";
-import { onGlass, scrollbar, ThemeContext, useTheme } from "../theme";
+import { onGlass, ThemeContext, useTheme } from "../theme";
 import { useBench } from "./parts";
 import { ResizeHandle } from "./Resize";
 import { Footer, type FooterMenu } from "./sidebar/Footer";
@@ -92,7 +92,6 @@ function useFolderMemory(hasSources: boolean | null): FolderState & { readonly f
 
 /** The sections, then one row per function or class, so only rows near the viewport are built. */
 function NavList({ view, flipped, hasSources }: { readonly view: FnView; readonly flipped: ReadonlySet<string>; readonly hasSources: boolean | null }): ReactElement {
-  const { p } = useTheme();
   const { program, wb, nameOf, chat } = useBench();
   const { open } = useSectionOpen("functions");
   const language = useLanguage();
@@ -125,7 +124,7 @@ function NavList({ view, flipped, hasSources }: { readonly view: FnView; readonl
     return after[ix - fixed.length - rows.length];
   };
   return (
-    <virtual-list itemCount={total} windowStart={shown.start} estimatedItemHeight={28} onVisibleRange={shown.onVisibleRange} style={{ ...scrollbar(p), flexGrow: 1, minHeight: 0, marginTop: 8, paddingTop: 6 }}>
+    <virtual-list itemCount={total} windowStart={shown.start} estimatedItemHeight={28} onVisibleRange={shown.onVisibleRange} style={{ flexGrow: 1, minHeight: 0, marginTop: 8, paddingTop: 6 }}>
       {Array.from({ length: shown.end - shown.start }, (_, i) => itemAt(shown.start + i))}
     </virtual-list>
   );

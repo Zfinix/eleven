@@ -4,8 +4,8 @@ import { join } from "node:path";
 
 const SRC = join(import.meta.dir, "..", "src");
 
-/** Tab strips scroll sideways without a thumb, the way macOS draws them. */
-const NO_THUMB = new Set(["workbench/TabBar.tsx", "home/Canvas.tsx:72"]);
+/** Tab strips scroll sideways without a thumb, the way macOS draws them, and sidebars never show one. */
+const NO_THUMB = new Set(["workbench/TabBar.tsx", "home/Canvas.tsx:72", "home/Sidebar.tsx", "settings/Nav.tsx", "workbench/Nav.tsx"]);
 
 function sources(dir: string, base = ""): readonly string[] {
   return readdirSync(join(dir, base), { withFileTypes: true }).flatMap((entry) => {

@@ -3,7 +3,7 @@ import type { ReactElement } from "react";
 import { Icon, Row } from "../components/ui";
 import { t } from "../i18n";
 import { TYPING } from "../lib/shortcuts";
-import { scrollbar, useTheme } from "../theme";
+import { useTheme } from "../theme";
 import { inks } from "./controls";
 import { NAV_GROUPS, type Page, pageIcon, pageTitle } from "./pages";
 
@@ -43,7 +43,7 @@ export function Nav({ page, query, shown, badges, onQuery, onOpen, onBack }: {
         <Icon name="search" size={14} color={p.faint} />
         <input {...TYPING} aria-label={t("settings.search")} value={query} placeholder={t("settings.searchPlaceholder")} onChange={(e) => onQuery(e.value ?? "")} style={{ flexGrow: 1, minWidth: 0, color: p.text, backgroundColor: p.card }} />
       </Row>
-      <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 14, flexGrow: 1, minHeight: 0, overflowY: "scroll", ...scrollbar(p) }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 14, flexGrow: 1, minHeight: 0, overflowY: "scroll" }}>
         {groups.map((group) => (
           <div key={group.join()} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             {group.map((item) => <NavRow key={item} page={item} active={!searching && item === page} badge={badges.has(item)} onOpen={onOpen} />)}

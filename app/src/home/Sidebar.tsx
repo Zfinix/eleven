@@ -10,7 +10,7 @@ import { comboFor, comboKeys } from "../keys/keymaps";
 import { FileIcon } from "../components/FileIcon";
 import { type PlainId, t } from "../i18n";
 import { useSettings } from "../settings/store";
-import { type Appearance, onGlass, scrollbar, ThemeContext, useTheme } from "../theme";
+import { type Appearance, onGlass, ThemeContext, useTheme } from "../theme";
 import { appIcon, CommandKeys, Dot, Icon, MenuSurface, Popover, Row, usePopover } from "../components/ui";
 
 const APPEARANCES: readonly Appearance[] = ["Dark", "Light", "System"];
@@ -250,7 +250,7 @@ export function Sidebar({ projects, project, chats, threads, current, running, a
       <div style={{ height: 46, flexShrink: 0 }} />
       <ActionRow icon="new-chat" label={t("home.newChat")} command="thread" onClick={onNewThread} />
       <ActionRow icon="folder" label={t("home.open")} command="open" onClick={onOpen} />
-      <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0, overflowY: "scroll", ...scrollbar(p), paddingTop: 14 }}>
+      <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0, overflowY: "scroll", paddingTop: 14 }}>
         <SectionLabel text={t("home.projects")} first>
           {projects.length > 0 && (
             <div onClick={onSeeAll} role="button" aria-label={t("home.seeAllProjects")} style={{ fontSize: 12, color: p.faint, cursor: "pointer", hover: { opacity: 0.72 } }}>{t("home.seeAll")}</div>
