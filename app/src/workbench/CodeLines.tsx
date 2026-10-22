@@ -4,6 +4,7 @@ import { type ReactElement, type RefObject, useEffect, useMemo, useRef } from "r
 import { colorize, type Syntax, tokenize } from "../components/code";
 import { type Span, useSpans } from "../components/highlight";
 import { ErrorCard, Tooltip } from "../components/kit";
+import { groups, openMenu } from "../components/ContextMenu";
 import { Icon } from "../components/ui";
 import { LIGHT, type Palette, useTheme } from "../theme";
 import { useListWindow } from "../lib/useListWindow";
@@ -12,7 +13,8 @@ import { showAddress, syntaxFor, useCodeLook } from "../settings/look";
 import { useSettings } from "../settings/store";
 import { useCommand } from "../lib/shortcuts";
 import { copyText } from "../settings/actions";
-import { goTo, isFunction, subjectMenu } from "./actions";
+import { goTo, isFunction, menuGroups, subjectMenu } from "./actions";
+import { type Cell, cellAt, chunksOf, lineText, spansOf } from "./lineCells";
 import { currentMatch, FindBar, lineMatcher } from "./Find";
 import { arrowSvg, LANE_WIDTH, laneCount, type LanePiece, layoutJumps, piecesByLine } from "./arrows";
 import type { HexRow } from "./model";
@@ -33,6 +35,7 @@ function isPicked(selected: Subject | null, fn: string, view: View, number: numb
   return selected.number === number || (selected.number < 0 && addr !== null && selected.addr === addr);
 }
 
+const GUTTER_WIDTH = 50;
 const SYMBOL = /(?:\b(?:DAT|FUN|LAB|PTR|sym|reloc|fcn)[._][\w.$]+)|(?:\b_[A-Za-z][\w$]{2,})|(?:\b0x[0-9a-f]{5,}\b)/gi;
 
 /** In linked view, a line matches the line picked in the other view when they name the same symbol or address. */
@@ -151,6 +154,7 @@ function lookupIn(bench: Bench): Lookup {
 
 function Line({ fn, view, text, number, focused, margin, found = "no", spans = null, bytes = null, ask = null }: { readonly fn: string; readonly view: View; readonly text: string; readonly number: number; readonly focused: boolean; readonly margin: ReactElement | null; readonly found?: Found; readonly spans?: readonly Span[] | null; readonly bytes?: string | null; readonly ask?: AskRow | null }): ReactElement {
   const { p } = useTheme();
+  const { renderer } = useGpuix();
   const bench = useBench();
   const { addrOf, nameOf, openFn, wb } = bench;
   const { settings } = useSettings();
@@ -185,34 +189,68 @@ function Line({ fn, view, text, number, focused, margin, found = "no", spans = n
     wb.select(subject(token));
   };
   const word = (text: string): Token => ({ text, addr: addrOf(text) ?? wordAddress(text) });
-  const lit = highlightedWord(wb.s.selected, fn);
-  const glow = (text: string): StyleDesc => (lit !== null && text === lit ? { backgroundColor: p.sel2, borderRadius: 3 } : {});
+  // One element for the whole line, not one per word: a word div with its own
+  // menu handlers cost about 20 elements a line, which was a third of the
+  // frame budget with the listing open. Colours ride along as `spans`, and a
+  // click finds its word by column, exact because the code font is monospace.
+  const cells: readonly Cell[] = parts.flatMap((part): readonly Cell[] => {
+    if (part.kind === "text") {
+      return splitWords(part.text).map(({ text: piece, word: isWord }) => {
+        const token = isWord ? word(piece) : null;
+        const renamed = token?.addr && !addrOf(token.text) ? wb.s.names.get(token.addr) : undefined;
+        const shown = here !== null && token?.addr === here ? `${showAddress(here, settings)}${piece.endsWith(":") ? ":" : ""}` : piece;
+        return { text: renamed ?? shown, color: renamed ? p.data : part.color, token, opens: null };
+      });
+    }
+    const target = addrOf(part.text);
+    const token = target ? { text: part.text, addr: target } : word(part.text);
+    return [{ text: target ? nameOf(target) : part.text, color: target ? p.link : p.call, token, opens: target }];
+  });
+  // Links keep an element each so they can carry a label, a tooltip and their
+  // own click; everything else merges into one. A line has one or two links,
+  // so a row costs a handful of elements instead of one per word.
+  const chunks = chunksOf(cells);
+  /** The cell under a click, by column: text width over character count is the advance, so no measuring. */
+  const cellUnder = (run: readonly Cell[], event: EventPayload): Cell | null => {
+    const id = event.elementId;
+    const box = id === undefined ? null : renderer?.getElementBounds?.(id);
+    const drawn = lineText(run);
+    if (!box || drawn.length === 0 || box.width <= 0) return run[0] ?? null;
+    const advance = box.width / drawn.length;
+    return cellAt(run, Math.floor(((event.x ?? 0) - box.x) / advance)) ?? run[0] ?? null;
+  };
+  const menuFor = (cell: Cell | null, event: EventPayload): void => {
+    if (cell) wb.select(subject(cell.token));
+    openMenu(event.x ?? 0, event.y ?? 0, groups(...menuGroups(bench, subject(cell?.token ?? null))));
+  };
+  const onRunClick = (run: readonly Cell[]) => (event: EventPayload): void => {
+    const cell = cellUnder(run, event);
+    if (event.modifiers?.ctrl) return menuFor(cell, event);
+    pick(cell?.token ?? null, event);
+  };
+  const onRunMenu = (run: readonly Cell[]) => (event: EventPayload): void => {
+    if (event.isRightClick) menuFor(cellUnder(run, event), event);
+  };
   const row = (
     <div role="row" aria-label={`Line ${number}`} aria-selected={picked} style={{ display: "flex", userSelect: "text", fontFamily: look.family, fontSize: look.size, lineHeight: look.lineHeight, ...lineTint(found, picked, ranged, p), ...(paused ? { backgroundColor: p.sel2 } : {}) }}>
       {view === "asm" && <Breakpoint addr={here} paused={paused} />}
-      {gutter ? <div {...subjectMenu(bench, subject(null), (event) => pick(null, event))} style={{ position: "relative", display: "flex", justifyContent: "flex-end", width: 50, flexShrink: 0, paddingRight: 16, color: picked ? p.text : p.gutter, userSelect: "none" }}>{ask?.pinned && <PinDot />}{String(number)}</div> : <div {...subjectMenu(bench, subject(null), (event) => pick(null, event))} style={{ width: 16, flexShrink: 0 }} />}
+      {gutter ? <div {...subjectMenu(bench, subject(null), (event) => pick(null, event))} style={{ position: "relative", display: "flex", justifyContent: "flex-end", width: GUTTER_WIDTH, flexShrink: 0, paddingRight: 16, color: picked ? p.text : p.gutter, userSelect: "none" }}>{ask?.pinned && <PinDot />}{String(number)}</div> : <div {...subjectMenu(bench, subject(null), (event) => pick(null, event))} style={{ width: 16, flexShrink: 0 }} />}
       {margin}
       {bytes !== null && <div style={{ width: 104, flexShrink: 0, color: p.faint, whiteSpace: "nowrap", overflow: "hidden" }}>{bytes}</div>}
       <div style={{ display: "flex", whiteSpace: "nowrap" }}>
-        {parts.length === 0 && <div {...subjectMenu(bench, subject(null), (event) => pick(null, event))}> </div>}
-        {parts.map((part, ix) => {
-          if (part.kind === "text") {
-            return splitWords(part.text).map(({ text: piece, word: isWord }, n) => {
-              const token = isWord ? word(piece) : null;
-              const renamed = token?.addr && !addrOf(token.text) ? wb.s.names.get(token.addr) : undefined;
-              const shown = here !== null && token?.addr === here ? `${showAddress(here, settings)}${piece.endsWith(":") ? ":" : ""}` : piece;
-              return <div key={`${ix}.${n}`} {...subjectMenu(bench, subject(token), (event) => pick(token, event))} style={{ color: renamed ? p.data : part.color, whiteSpace: "nowrap", ...glow(piece) }}>{renamed ?? shown}</div>;
-            });
+        {chunks.length === 0 && <div {...subjectMenu(bench, subject(null), (event) => pick(null, event))}> </div>}
+        {chunks.map((chunk, ix) => {
+          if (chunk.kind === "link") {
+            const { cell } = chunk;
+            const target = cell.opens ?? "";
+            return (
+              <Tooltip key={ix} label={`Go to ${cell.text}`} side="top">
+                <div {...subjectMenu(bench, subject(cell.token), () => openFn(target, false))} role="link" aria-label={`Open ${cell.text}`} style={{ color: cell.color, whiteSpace: "nowrap", textDecoration: "underline", cursor: "pointer" }}>{cell.text}</div>
+              </Tooltip>
+            );
           }
-          const target = addrOf(part.text);
-          if (!target) return <div key={ix} {...subjectMenu(bench, subject(word(part.text)), (event) => pick(word(part.text), event))} style={{ color: p.call, whiteSpace: "nowrap", ...glow(part.text) }}>{part.text}</div>;
-          const token = { text: part.text, addr: target };
           return (
-            <Tooltip key={ix} label={`Go to ${nameOf(target)}`} side="top">
-              <div {...subjectMenu(bench, subject(token), () => openFn(target, false))} role="link" aria-label={`Open ${nameOf(target)}`} style={{ color: p.link, whiteSpace: "nowrap", textDecoration: "underline", cursor: "pointer", ...glow(part.text) }}>
-                {nameOf(target)}
-              </div>
-            </Tooltip>
+            <div key={ix} onClick={onRunClick(chunk.cells)} onAuxClick={onRunMenu(chunk.cells)} spans={spansOf(chunk.cells, p.text3)} style={{ color: p.text3, whiteSpace: "nowrap" }}>{lineText(chunk.cells)}</div>
           );
         })}
         {comment && <div style={{ color: p.comment, whiteSpace: "nowrap" }}>{`   ; ${comment}`}</div>}
@@ -288,10 +326,16 @@ function Lines({ fn, view, lines, focusLine }: { readonly fn: string; readonly v
     return hex.kind === "ready" ? instructionBytes(hex.value, at, next) : "";
   };
   const found = (index: number): Found => (index === find.current ? "current" : find.matches.has(index) ? "match" : "no");
+  // The picked name lights up through one search over the list. Declaring a
+  // highlight per row instead makes the native search resolve every row
+  // separately, which took the whole view from milliseconds to seconds.
+  const litWord = highlightedWord(wb.s.selected, fn);
+  const litAddr = wb.s.selected?.kind === "line" ? (wb.s.selected.token?.addr ?? null) : null;
+  const lit = litWord && litAddr && !bench.addrOf(litWord) ? (wb.s.names.get(litAddr) ?? litWord) : litWord;
   return (
     <>
       {wb.s.finding && <FindBar count={find.count} problem={find.problem} />}
-      <virtual-list ref={list} itemCount={lines.length} windowStart={shown.start} estimatedItemHeight={lineHeight} onVisibleRange={shown.onVisibleRange} style={{ flexGrow: 1, minHeight: 0, paddingTop: 10, paddingBottom: 28, fontFamily: look.family, fontSize: look.size, lineHeight }}>
+      <virtual-list ref={list} itemCount={lines.length} windowStart={shown.start} estimatedItemHeight={lineHeight} onVisibleRange={shown.onVisibleRange} {...(lit ? { highlight: { query: lit, wholeWord: true, color: p.sel2 } } : {})} style={{ flexGrow: 1, minHeight: 0, paddingTop: 10, paddingBottom: 28, fontFamily: look.family, fontSize: look.size, lineHeight }}>
         {lines.slice(shown.start, shown.end).map((line, ix) => (
           <Line key={shown.start + ix} fn={fn} view={view} text={line} number={shown.start + ix + 1} focused={shown.start + ix === focusLine} margin={margin(shown.start + ix)} found={found(shown.start + ix)} spans={painted?.[shown.start + ix] ?? null} bytes={bytesOf(shown.start + ix)} ask={askRow(shown.start + ix + 1)} />
         ))}

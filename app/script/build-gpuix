@@ -2,6 +2,8 @@
 # Builds GPUIX from the Zfinix fork (the branch Eleven needs, ahead of npm) and
 # installs it over node_modules/@gpuix, so every OS ships the same GPUIX.
 # --js-only skips the Rust build, for typechecking.
+# --dev builds with test-support, which the test renderer needs. The shipping
+# build leaves it out, and without it no Eleven test can open a test root.
 set -euo pipefail
 
 app_dir="$(cd "$(dirname "$0")/.." && pwd)"
@@ -19,6 +21,8 @@ js_only="${1:-}"
 (cd "$gpuix" && bun install --frozen-lockfile)
 if [ "$js_only" = "--js-only" ]; then
   (cd "$gpuix/packages/native" && bun run build:js)
+elif [ "$js_only" = "--dev" ]; then
+  (cd "$gpuix/packages/native" && bun run build)
 else
   (cd "$gpuix/packages/native" && bun run build:release)
 fi
@@ -38,5 +42,7 @@ copy_package "$gpuix/packages/react" "$modules/react" dist jsx-runtime.js jsx-ru
 [ "$js_only" = "--js-only" ] && { echo "installed GPUIX JavaScript from $gpuix"; exit 0; }
 mkdir -p "$modules/native-$platform"
 cp "$gpuix/packages/native/gpuix-native.$platform.node" "$modules/native-$platform/"
+# macOS refuses to dlopen a copied binary whose signature no longer covers it.
+[ "$(uname -s)" = "Darwin" ] && codesign --force --sign - "$modules/native-$platform/gpuix-native.$platform.node" 2>/dev/null
 [ -f "$modules/native-$platform/package.json" ] || printf '{ "name": "@gpuix/native-%s", "version": "0.0.0", "main": "gpuix-native.%s.node" }\n' "$platform" "$platform" > "$modules/native-$platform/package.json"
 echo "installed GPUIX from $gpuix for $platform"
