@@ -19,6 +19,7 @@ import { type Camera, centerOn, fitCamera, panBy, type Size, visibleRect, zoomAt
 import { highlightedWord } from "./CodeLines";
 import { splitWords, type Subject, type Token, wordAddress } from "./subject";
 import { MOD } from "../lib/platform";
+import { t } from "../i18n";
 
 const PADDING = 24;
 const FONT_SIZE = 11.5;
@@ -49,7 +50,7 @@ function Instruction({ fn, addr, text }: { readonly fn: string; readonly addr: s
         const target = addrOf(piece);
         const token = { text: piece, addr: target ?? wordAddress(piece) };
         const glow = lit === piece ? { backgroundColor: p.sel2, borderRadius: 3 } : {};
-        if (target) return <div key={ix} {...subjectMenu(bench, subject(token), () => openFn(target, false))} role="link" aria-label={`Open ${nameOf(target)}`} style={{ color: p.link, textDecoration: "underline", cursor: "pointer", ...glow }}>{nameOf(target)}</div>;
+        if (target) return <div key={ix} {...subjectMenu(bench, subject(token), () => openFn(target, false))} role="link" aria-label={t("workbench.graph.open", { name: nameOf(target) })} style={{ color: p.link, textDecoration: "underline", cursor: "pointer", ...glow }}>{nameOf(target)}</div>;
         return <div key={ix} {...subjectMenu(bench, subject(token), () => wb.select(subject(token)))} style={{ color: p.text3, ...glow }}>{piece}</div>;
       })}
       {comment && <div style={{ color: p.comment }}>{`  ; ${comment}`}</div>}
@@ -74,11 +75,11 @@ function BlockBox({ fn, placed, entry, group, zoom, text, onPinch }: { readonly 
     else wb.patch({ selected: subject, blockPicks: [] });
   };
   return (
-    <div {...subjectMenu(bench, subject, click)} onPinch={onPinch} aria-label={group ? `Group ${group.label}` : `Block ${start}`} style={{ userSelect: "text", position: "absolute", left: (placed.x + PADDING) * zoom, top: (placed.y + PADDING) * zoom, width: BLOCK_WIDTH * zoom, height: placed.height * zoom, display: "flex", flexDirection: "column", overflow: "hidden", paddingTop: 8 * zoom, paddingBottom: 8 * zoom, paddingLeft: 10 * zoom, paddingRight: 10 * zoom, borderWidth: color || gathered ? 2 : 1, borderColor: edge, borderRadius: 9 * zoom, backgroundColor: group ? p.raised2 : p.raised, fontSize: text.size * zoom, lineHeight: text.lineHeight * zoom }}>
+    <div {...subjectMenu(bench, subject, click)} onPinch={onPinch} aria-label={group ? t("workbench.graph.group", { name: group.label }) : t("workbench.graph.block", { address: start })} style={{ userSelect: "text", position: "absolute", left: (placed.x + PADDING) * zoom, top: (placed.y + PADDING) * zoom, width: BLOCK_WIDTH * zoom, height: placed.height * zoom, display: "flex", flexDirection: "column", overflow: "hidden", paddingTop: 8 * zoom, paddingBottom: 8 * zoom, paddingLeft: 10 * zoom, paddingRight: 10 * zoom, borderWidth: color || gathered ? 2 : 1, borderColor: edge, borderRadius: 9 * zoom, backgroundColor: group ? p.raised2 : p.raised, fontSize: text.size * zoom, lineHeight: text.lineHeight * zoom }}>
       <div style={{ color: color ?? p.link, marginBottom: 2 * zoom, overflow: "hidden", whiteSpace: "nowrap" }}>{group ? group.label : shownStart}</div>
-      {group && <div style={{ color: p.faint }}>{`${group.blocks.length} blocks folded · ${shownStart}`}</div>}
+      {group && <div style={{ color: p.faint }}>{t("workbench.graph.folded", { count: group.blocks.length, address: shownStart })}</div>}
       {placed.lines.map((line, ix) => <Instruction key={ix} fn={fn} addr={placed.addrs[ix] ?? start} text={line} />)}
-      {placed.hidden > 0 && <div style={{ color: p.faint }}>{placed.hidden === 1 ? "1 more line" : `${placed.hidden} more lines`}</div>}
+      {placed.hidden > 0 && <div style={{ color: p.faint }}>{placed.hidden === 1 ? t("workbench.graph.oneMoreLine") : t("workbench.graph.moreLines", { count: placed.hidden })}</div>}
     </div>
   );
 }
@@ -138,7 +139,7 @@ function Minimap({ layout, view, onJump, onPinch }: { readonly layout: Layout; r
       }}
       onMouseUp={() => setDragging(false)}
       onPinch={onPinch}
-      role="img" aria-label="Graph overview" style={{ position: "absolute", right: 14, bottom: 14, width, height, borderWidth: 1, borderColor: p.sel2, borderRadius: 8, backgroundColor: p.raised2, overflow: "hidden", cursor: dragging ? "grabbing" : "grab", boxShadow: shadow }}>
+      role="img" aria-label={t("workbench.graph.overview")} style={{ position: "absolute", right: 14, bottom: 14, width, height, borderWidth: 1, borderColor: p.sel2, borderRadius: 8, backgroundColor: p.raised2, overflow: "hidden", cursor: dragging ? "grabbing" : "grab", boxShadow: shadow }}>
       <svg source={mapSvg(layout, scale, width, height)} style={{ position: "absolute", top: 0, left: 0, width, height, color: p.line3, pointerEvents: "none" }} />
       <div style={{ position: "absolute", left: Math.max(0, view.x * scale), top: Math.max(0, view.y * scale), width: Math.min(width, view.width * scale), height: Math.min(height, view.height * scale), borderWidth: 1, borderColor: p.link, borderRadius: 3, pointerEvents: "none" }} />
     </div>
@@ -162,24 +163,24 @@ function GraphTools({ fn, layout, blocks, zoom, onZoom, onFit, onPinch }: {
     void (async (): Promise<void> => {
       try {
         const path = await exportGraphPdf(program, nameOf(fn), graphPdf(layout, blocks, `${nameOf(fn)} · ${fn}`));
-        wb.notify(`Saved the graph to ${path}`, null);
+        wb.notify(t("workbench.graph.saved", { path }), null);
       } catch (err) {
-        wb.notify(`Couldn't save the graph. ${errorMessage(err)}`, null);
+        wb.notify(t("workbench.graph.saveFailed", { message: errorMessage(err) }), null);
       }
     })();
   };
   return (
     <div onPinch={onPinch} style={{ position: "absolute", top: 10, right: 14, display: "flex", alignItems: "center", gap: 6 }}>
-      {picks.length > 0 && <div style={{ fontSize: 12, color: p.muted }}>{`${picks.length} picked · Shift-click to add`}</div>}
-      {picks.length > 1 && <Button label={`Group ${picks.length} blocks`} tone="primary" size="small" onClick={() => groupBlocks(bench, fn, picks)} />}
-      <div role="group" aria-label="Zoom" style={{ display: "flex", alignItems: "center", gap: 2, padding: 2, borderWidth: 1, borderColor: p.line2, borderRadius: 8, backgroundColor: p.raised }}>
-        <IconButton icon="zoom-out" label={`Zoom out (${MOD.replace("+", "")} and scroll)`} size={24} iconSize={13} radius={6} onClick={() => onZoom(1 / ZOOM_STEP)} />
-        <Tooltip label="Fit the whole graph">
-          <div onClick={onFit} role="button" aria-label="Fit the whole graph" style={{ minWidth: 40, textAlign: "center", fontSize: 12, color: p.text3, cursor: "pointer", hover: HOVER }}>{`${Math.round(zoom * 100)}%`}</div>
+      {picks.length > 0 && <div style={{ fontSize: 12, color: p.muted }}>{t("workbench.graph.picked", { count: picks.length })}</div>}
+      {picks.length > 1 && <Button label={t("workbench.groupBlocks", { count: picks.length })} tone="primary" size="small" onClick={() => groupBlocks(bench, fn, picks)} />}
+      <div role="group" aria-label={t("workbench.graph.zoom")} style={{ display: "flex", alignItems: "center", gap: 2, padding: 2, borderWidth: 1, borderColor: p.line2, borderRadius: 8, backgroundColor: p.raised }}>
+        <IconButton icon="zoom-out" label={t("workbench.graph.zoomOut", { key: MOD.replace("+", "") })} size={24} iconSize={13} radius={6} onClick={() => onZoom(1 / ZOOM_STEP)} />
+        <Tooltip label={t("workbench.graph.fit")}>
+          <div onClick={onFit} role="button" aria-label={t("workbench.graph.fit")} style={{ minWidth: 40, textAlign: "center", fontSize: 12, color: p.text3, cursor: "pointer", hover: HOVER }}>{`${Math.round(zoom * 100)}%`}</div>
         </Tooltip>
-        <IconButton icon="zoom-in" label={`Zoom in (${MOD.replace("+", "")} and scroll)`} size={24} iconSize={13} radius={6} onClick={() => onZoom(ZOOM_STEP)} />
+        <IconButton icon="zoom-in" label={t("workbench.graph.zoomIn", { key: MOD.replace("+", "") })} size={24} iconSize={13} radius={6} onClick={() => onZoom(ZOOM_STEP)} />
       </div>
-      <Button label="Export PDF" tone="outline" size="small" icon="external" onClick={exportPdf} />
+      <Button label={t("workbench.graph.exportPdf")} tone="outline" size="small" icon="external" onClick={exportPdf} />
     </div>
   );
 }
@@ -283,7 +284,7 @@ function FlowGraph({ fn, dossier, assembly }: { readonly fn: string; readonly do
   }));
   return (
     <div style={{ position: "relative", display: "flex", flexGrow: 1, minHeight: 0 }}>
-      <div ref={canvas.box} {...canvas.handlers} role="application" aria-label="Control flow graph" style={{ position: "relative", flexGrow: 1, minWidth: 0, overflow: "hidden", backgroundColor: p.deep, cursor: canvas.dragging ? "grabbing" : "grab" }}>
+      <div ref={canvas.box} {...canvas.handlers} role="application" aria-label={t("workbench.graph.label")} style={{ position: "relative", flexGrow: 1, minWidth: 0, overflow: "hidden", backgroundColor: p.deep, cursor: canvas.dragging ? "grabbing" : "grab" }}>
         <div style={{ position: "absolute", left: canvas.camera.x, top: canvas.camera.y, width: content.width * zoom, height: content.height * zoom, fontFamily: text.family, fontSize: text.size * zoom, pointerEvents: "none" }}>
           <Edges layout={layout} zoom={zoom} />
           {layout.blocks.map((placed) => <BlockBox key={placed.block.start} fn={fn} placed={placed} entry={placed.block.start === entry} group={groupAt(placed.block.start)} zoom={zoom} text={text} onPinch={canvas.handlers.onPinch} />)}
@@ -305,8 +306,8 @@ export function Graph({ addr }: { readonly addr: string }): ReactElement {
     return { dossier, assembly };
   };
   const graph = useLoaded(load, `${program.name}:${addr}:graph:${wb.s.revision}`);
-  if (graph.kind === "loading") return <div style={{ padding: 16, color: p.muted }}>Drawing the graph…</div>;
-  if (graph.kind === "failed") return <div style={{ padding: 16 }}><ErrorCard title="Couldn't draw the graph" detail={`${program.engine} didn't return this function's blocks. The assembly view still works.`} raw={graph.message} /></div>;
-  if (!graph.value) return <div style={{ padding: 16, color: p.muted }}>{program.arch === DALVIK ? "Graphs aren't available for Android apps yet. The Java and bytecode views show the whole method." : "The graph shows once Ghidra has finished reading this file."}</div>;
+  if (graph.kind === "loading") return <div style={{ padding: 16, color: p.muted }}>{t("workbench.graph.drawing")}</div>;
+  if (graph.kind === "failed") return <div style={{ padding: 16 }}><ErrorCard title={t("workbench.graph.failed")} detail={t("workbench.graph.failedDetail", { engine: program.engine })} raw={graph.message} /></div>;
+  if (!graph.value) return <div style={{ padding: 16, color: p.muted }}>{program.arch === DALVIK ? t("workbench.graph.android") : t("workbench.graph.waiting")}</div>;
   return <FlowGraph fn={addr} dossier={graph.value.dossier} assembly={graph.value.assembly} />;
 }

@@ -8,6 +8,7 @@ import { TYPING, useCommand } from "../lib/shortcuts";
 import { useTheme } from "../theme";
 import { runCommand } from "./actions";
 import { HOVER, MONO_STYLE, TextButton, useBench } from "./parts";
+import { t } from "../i18n";
 
 const TOAST_MS = 5000;
 
@@ -23,14 +24,14 @@ export function CommentBar({ addr }: { readonly addr: string }): ReactElement {
     close();
     if (text === before) return;
     wb.setComment(addr, text);
-    wb.notify(text ? `Commented ${addr}` : `Removed the comment at ${addr}`, () => wb.setComment(addr, before));
+    wb.notify(text ? t("workbench.annotate.commented", { address: addr }) : t("workbench.annotate.uncommented", { address: addr }), () => wb.setComment(addr, before));
   };
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 8, paddingBottom: 8, paddingLeft: 12, paddingRight: 12, borderTopWidth: 1, borderColor: p.fill, backgroundColor: p.raised }}>
-      <div style={{ color: p.muted, whiteSpace: "nowrap" }}>{`Comment at ${addr}`}</div>
-      <input autoFocus value={wb.s.commentDraft} placeholder="What happens here?" aria-label="Comment" {...TYPING} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onChange={(e) => wb.patch({ commentDraft: e.value ?? "" })} onSubmit={save} style={{ flexGrow: 1, height: 28, paddingLeft: 10, paddingRight: 10, borderRadius: 7, backgroundColor: p.deep, fontSize: 12.5, color: p.text, ...MONO_STYLE, ...fieldLook(p, focused, false) }} />
-      <TextButton label="Save" tone="primary" onClick={save} />
-      <TextButton label="Cancel" tone="ghost" onClick={close} />
+      <div style={{ color: p.muted, whiteSpace: "nowrap" }}>{t("workbench.annotate.commentAt", { address: addr })}</div>
+      <input autoFocus value={wb.s.commentDraft} placeholder={t("workbench.annotate.commentPlaceholder")} aria-label={t("workbench.annotate.comment")} {...TYPING} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onChange={(e) => wb.patch({ commentDraft: e.value ?? "" })} onSubmit={save} style={{ flexGrow: 1, height: 28, paddingLeft: 10, paddingRight: 10, borderRadius: 7, backgroundColor: p.deep, fontSize: 12.5, color: p.text, ...MONO_STYLE, ...fieldLook(p, focused, false) }} />
+      <TextButton label={t("workbench.save")} tone="primary" onClick={save} />
+      <TextButton label={t("workbench.cancel")} tone="ghost" onClick={close} />
     </div>
   );
 }
@@ -49,10 +50,10 @@ export function LabelBar({ fn, start }: { readonly fn: string; readonly start: s
   };
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 8, paddingBottom: 8, paddingLeft: 12, paddingRight: 12, borderTopWidth: 1, borderColor: p.fill, backgroundColor: p.raised }}>
-      <div style={{ color: p.muted, whiteSpace: "nowrap" }}>Name this group</div>
-      <input autoFocus value={wb.s.labelDraft} placeholder="Parse the flags" aria-label="Group name" {...TYPING} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onChange={(e) => wb.patch({ labelDraft: e.value ?? "" })} onSubmit={save} style={{ flexGrow: 1, height: 28, paddingLeft: 10, paddingRight: 10, borderRadius: 7, backgroundColor: p.deep, fontSize: 12.5, color: p.text, ...fieldLook(p, focused, false) }} />
-      <TextButton label="Save" tone="primary" onClick={save} />
-      <TextButton label="Cancel" tone="ghost" onClick={close} />
+      <div style={{ color: p.muted, whiteSpace: "nowrap" }}>{t("workbench.annotate.nameGroup")}</div>
+      <input autoFocus value={wb.s.labelDraft} placeholder={t("workbench.annotate.groupPlaceholder")} aria-label={t("workbench.annotate.groupName")} {...TYPING} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onChange={(e) => wb.patch({ labelDraft: e.value ?? "" })} onSubmit={save} style={{ flexGrow: 1, height: 28, paddingLeft: 10, paddingRight: 10, borderRadius: 7, backgroundColor: p.deep, fontSize: 12.5, color: p.text, ...fieldLook(p, focused, false) }} />
+      <TextButton label={t("workbench.save")} tone="primary" onClick={save} />
+      <TextButton label={t("workbench.cancel")} tone="ghost" onClick={close} />
     </div>
   );
 }
@@ -78,7 +79,7 @@ export function UndoToast(): ReactElement | null {
         <div style={{ flexGrow: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{toast.text}</div>
         {undo && (
           <div onClick={() => { undo(); wb.patch({ toast: null }); }} role="button" style={{ color: p.link, cursor: "pointer", hover: HOVER }}>
-            <div>Undo</div>
+            <div>{t("workbench.undo")}</div>
           </div>
         )}
       </div>
@@ -114,19 +115,19 @@ export function useSubjectCommands(): void {
 export function OpeningProgress({ since }: { readonly since: number }): ReactElement {
   const { program } = useBench();
   const now = useNow(true);
-  const [step, setStep] = useState("Ghidra is finding functions");
+  const [step, setStep] = useState<string | null>(null);
   useEffect(() => onReaStep(setStep), []);
   return (
     <div style={{ position: "absolute", left: 16, right: 16, bottom: 16, display: "flex", justifyContent: "flex-end" }}>
       <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, maxWidth: 520 }}>
         <StepProgress
-          title={`Analyzing ${program.name}`}
+          title={t("workbench.annotate.analyzing", { name: program.name })}
           steps={[
-            { label: "Read the file", state: "done" },
-            { label: `${step} · ${seconds(now - since)}`, state: "now" },
-            { label: "Ready", state: "next" },
+            { label: t("workbench.annotate.readFile"), state: "done" },
+            { label: `${step ?? t("workbench.annotate.findingFunctions")} · ${seconds(now - since)}`, state: "now" },
+            { label: t("workbench.annotate.ready"), state: "next" },
           ]}
-          note="Next time this file opens from cache."
+          note={t("workbench.annotate.cacheNote")}
         />
       </div>
     </div>

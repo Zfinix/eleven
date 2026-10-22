@@ -5,6 +5,7 @@ import { askQuietly, type QuietAsk, type RewriteProgress } from "../engine/rewri
 import type { SwiftType } from "../engine/swiftTypes";
 import { errorMessage, isRecord, stringField } from "../lib/guards";
 import { cacheRoot } from "../lib/platform";
+import { t } from "../i18n";
 import type { Fn, TableRow } from "./model";
 import { originOf } from "./sidebar/model";
 import { type SourceFiles, stemOf, traceStatic } from "./sources";
@@ -42,16 +43,16 @@ export function failureReason(message: string): FailReason {
 
 /** What happened and what to do, in one or two plain sentences, for the card under Source files. */
 export function failureText(reason: FailReason, agent: string, left: number): string {
-  const rest = `the other ${left.toLocaleString()} ${left === 1 ? "function" : "functions"}`;
+  const rest = left === 1 ? t("workbench.arrange.otherOne") : t("workbench.arrange.others", { count: left.toLocaleString() });
   switch (reason) {
     case "signin":
-      return `${agent} needs you to sign in again, so it couldn\u2019t place ${rest}. The files the binary places are kept.`;
+      return t("workbench.arrange.signin", { agent, rest });
     case "limit":
-      return `${agent} has reached its usage limit for now, so it couldn\u2019t place ${rest}. Try another agent, or again later.`;
+      return t("workbench.arrange.limit", { agent, rest });
     case "stopped":
-      return `${agent} stopped before it finished, so it couldn\u2019t place ${rest}. Try again to place them.`;
+      return t("workbench.arrange.stopped", { agent, rest });
     case "offline":
-      return `Eleven can\u2019t reach ${agent}, so it couldn\u2019t place ${rest}. Check your connection, then try again.`;
+      return t("workbench.arrange.offline", { agent, rest });
     default: {
       const unhandled: never = reason;
       return unhandled;
@@ -273,14 +274,14 @@ export async function arrange(input: {
 }): Promise<ArrangeResult> {
   const { ask, functions, sources, onStep } = input;
   const paths = sources.paths.length;
-  const found = `Found ${paths.toLocaleString()} file ${paths === 1 ? "path" : "paths"} and ${input.types.length.toLocaleString()} Swift types`;
-  onStep([{ label: found, done: true }, { label: "Placing functions next to them", done: false }]);
+  const found = t(paths === 1 ? "workbench.arrange.foundOne" : "workbench.arrange.found", { paths: paths.toLocaleString(), types: input.types.length.toLocaleString() });
+  onStep([{ label: found, done: true }, { label: t("workbench.arrange.placing"), done: false }]);
   const base = arrangeFromEvidence(functions, input.strings, input.types, sources);
   input.onEvidence?.(base);
   const placedCount = base.files.reduce((sum, file) => sum + file.fns.length, 0);
   const evidenceSteps: readonly ArrangeStep[] = [
     { label: found, done: true },
-    { label: `Placed ${placedCount.toLocaleString()} functions next to them`, done: true },
+    { label: t("workbench.arrange.placed", { count: placedCount.toLocaleString() }), done: true },
   ];
   const leftFns = base.unplaced.flatMap((addr) => functions.find((fn) => fn.addr === addr) ?? []).filter((fn) => !/^(?:thunk_)?(?:FUN|sub|fcn)_/.test(fn.name));
   const askFns = leftFns.length >= MIN_FNS_FOR_AGENT ? leftFns.slice(0, MAX_FOR_AGENT) : [];
@@ -288,13 +289,13 @@ export async function arrange(input: {
   let result = base;
   let agentFailed: string | null = null;
   if (askFns.length > 0 || askFolders) {
-    onStep([...evidenceSteps, { label: askFns.length > 0 ? `${ask.agent.name} is grouping the last ${askFns.length.toLocaleString()}` : `${ask.agent.name} is sorting files into folders`, done: false }]);
+    onStep([...evidenceSteps, { label: askFns.length > 0 ? t("workbench.arrange.grouping", { agent: ask.agent.name, count: askFns.length.toLocaleString() }) : t("workbench.arrange.sorting", { agent: ask.agent.name }), done: false }]);
     try {
       const reply = await askQuietly(ask, arrangePrompt(input.binaryName, base.files, askFns), input.onProgress ?? (() => {}));
       const answer = agentAnswer(reply, new Set(askFns.map((fn) => fn.addr)), new Set(base.files.map((file) => file.path.split("/").pop() ?? file.path)));
       const merged = merge(base, answer.groups);
       result = { ...merged, files: refolder(merged.files, answer.folders).slice().sort((x, y) => x.path.localeCompare(y.path)) };
-      onStep([...evidenceSteps, { label: `${ask.agent.name} sorted the rest`, done: true }]);
+      onStep([...evidenceSteps, { label: t("workbench.arrange.sorted", { agent: ask.agent.name }), done: true }]);
     } catch (err) {
       agentFailed = errorMessage(err);
     }

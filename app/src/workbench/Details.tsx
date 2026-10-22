@@ -15,6 +15,7 @@ import { TerminalView } from "../terminal/TerminalView";
 import { dirname } from "node:path";
 import { showAddress } from "../settings/look";
 import { MOD, OS } from "../lib/platform";
+import { t } from "../i18n";
 
 function RefRow({ addr, at }: { readonly addr: string; readonly at: string }): ReactElement {
   const { p } = useTheme();
@@ -43,15 +44,15 @@ function ReferencesTo({ addr }: { readonly addr: string }): ReactElement {
   return (
     <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <Heading text={`References to ${nameOf(addr)}`} />
-        <div onClick={() => wb.patch({ refsOf: null })} role="button" style={{ fontSize: 11.5, color: p.link, cursor: "pointer", hover: HOVER }}>Show callers and calls instead</div>
+        <Heading text={t("workbench.action.referencesTo", { name: nameOf(addr) })} />
+        <div onClick={() => wb.patch({ refsOf: null })} role="button" style={{ fontSize: 11.5, color: p.link, cursor: "pointer", hover: HOVER }}>{t("workbench.details.showCallers")}</div>
       </div>
-      {refs.kind === "loading" && <div style={{ color: p.muted }}>Finding references…</div>}
-      {refs.kind === "failed" && <ErrorCard title="Couldn't find references" detail="REA couldn't list what points here. Try again after the file finishes loading." raw={refs.message} />}
-      {refs.kind === "ready" && refs.value.length === 0 && <div style={{ color: p.muted }}>Nothing refers to this directly. It may be reached through a pointer or a computed address.</div>}
+      {refs.kind === "loading" && <div style={{ color: p.muted }}>{t("workbench.details.findingRefs")}</div>}
+      {refs.kind === "failed" && <ErrorCard title={t("workbench.details.refsFailed")} detail={t("workbench.details.refsFailedDetail")} raw={refs.message} />}
+      {refs.kind === "ready" && refs.value.length === 0 && <div style={{ color: p.muted }}>{t("workbench.details.noRefs")}</div>}
       {refs.kind === "ready" && refs.value.map((ref) => (
         <div key={ref.from} {...subjectMenu(bench, ref.fn ? { kind: "line", fn: ref.fn, view: "asm", number: -1, text: "", addr: ref.from, token: null } : { kind: "bytes", fn: "", addr: ref.from, bytes: [] }, () => goTo(bench, ref.from))} role="button" style={row}>
-          <div style={{ flexGrow: 1 }}>{ref.fn ? nameOf(ref.fn) : "Data"}</div>
+          <div style={{ flexGrow: 1 }}>{ref.fn ? nameOf(ref.fn) : t("workbench.details.data")}</div>
           <div style={{ color: p.faint }}>{showAddress(ref.from)}</div>
         </div>
       ))}
@@ -65,18 +66,18 @@ export function References(): ReactElement {
   const refs = useLoaded<Refs>(() => program.refs(focusAddr), `${program.name}:${focusAddr}:refs`);
   if (wb.s.refsOf) return <ReferencesTo addr={wb.s.refsOf} />;
   if (refs.kind !== "ready") {
-    if (refs.kind === "failed") return <ErrorCard title="Couldn't find references" detail={`${program.engine} couldn't list the callers. Try again after the file finishes loading.`} raw={refs.message} />;
-    return <div style={{ marginTop: 4, color: p.muted }}>Finding references…</div>;
+    if (refs.kind === "failed") return <ErrorCard title={t("workbench.details.refsFailed")} detail={t("workbench.details.callersFailed", { engine: program.engine })} raw={refs.message} />;
+    return <div style={{ marginTop: 4, color: p.muted }}>{t("workbench.details.findingRefs")}</div>;
   }
   return (
     <div style={{ display: "grid", gridTemplateColumns: 2, gap: 24 }}>
       <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <Heading text="Called by" />
+        <Heading text={t("workbench.calledBy")} />
         {refs.value.callers.map((c) => <RefRow key={c.addr} addr={c.addr} at={c.at} />)}
-        {refs.value.callers.length === 0 && <div style={{ marginTop: 2, marginLeft: 4, marginRight: 4, color: p.muted }}>{nameOf(focusAddr) === "entry" ? "Nothing calls this. It's where the program starts." : "Nothing calls this directly. It may be reached through a pointer."}</div>}
+        {refs.value.callers.length === 0 && <div style={{ marginTop: 2, marginLeft: 4, marginRight: 4, color: p.muted }}>{nameOf(focusAddr) === "entry" ? t("workbench.details.entry") : t("workbench.details.noCallers")}</div>}
       </div>
       <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <Heading text="Calls" />
+        <Heading text={t("workbench.calls")} />
         {refs.value.callees.map((addr) => <RefRow key={addr} addr={addr} at={addr} />)}
       </div>
     </div>
@@ -99,26 +100,26 @@ export function Patches(): ReactElement {
   const writeCopy = (): void => {
     void (async (): Promise<void> => {
       try {
-        chat.thread.note(`Wrote a patched copy to ${await patchBytes(program, [])}`);
+        chat.thread.note(t("workbench.patched", { path: await patchBytes(program, []) }));
       } catch (err) {
-        chat.thread.note(`Couldn't patch. ${err instanceof Error ? err.message : String(err)}`);
+        chat.thread.note(t("workbench.patchFailed", { message: err instanceof Error ? err.message : String(err) }));
       }
     })();
   };
   if (patches.length === 0) {
-    return <div style={{ marginTop: 4, color: p.muted }}>{`No patches yet. Open a function, then pick "Patch bytes here" in ${MOD}K.`}</div>;
+    return <div style={{ marginTop: 4, color: p.muted }}>{t("workbench.details.noPatches", { key: `${MOD}K` })}</div>;
   }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-        <div style={{ flexGrow: 1, color: p.muted }}>{`${patches.length} ${patches.length === 1 ? "patch" : "patches"}, saved with this file. The binary is never changed in place.`}</div>
-        <TextButton label="Write patched copy" tone="primary" onClick={writeCopy} />
+        <div style={{ flexGrow: 1, color: p.muted }}>{patches.length === 1 ? t("workbench.details.onePatch") : t("workbench.details.patches", { count: patches.length })}</div>
+        <TextButton label={t("workbench.details.writeCopy")} tone="primary" onClick={writeCopy} />
       </div>
       {patches.map((patch) => (
         <div key={patch.addr} style={{ display: "flex", alignItems: "center", gap: 10, height: 26, paddingLeft: 4, paddingRight: 4, fontSize: 12, ...MONO_STYLE }}>
           <div onClick={() => openFn(patch.addr, false)} role="button" style={{ color: p.text, cursor: "pointer", hover: HOVER }}>{showAddress(patch.addr)}</div>
           <div style={{ flexGrow: 1, color: p.string }}>{patch.bytes}</div>
-          <div onClick={() => remove(patch.addr)} role="button" aria-label={`Remove patch at ${patch.addr}`} style={{ color: p.muted, cursor: "pointer", hover: HOVER }}>Remove</div>
+          <div onClick={() => remove(patch.addr)} role="button" aria-label={t("workbench.details.removePatch", { address: patch.addr })} style={{ color: p.muted, cursor: "pointer", hover: HOVER }}>{t("workbench.details.remove")}</div>
         </div>
       ))}
     </div>
@@ -127,7 +128,7 @@ export function Patches(): ReactElement {
 
 export function Terminal(): ReactElement {
   const { program } = useBench();
-  if (OS === "windows") return <EmptyState title="The terminal isn't available on Windows yet" hint="Open Windows Terminal or PowerShell next to Eleven for now." />;
+  if (OS === "windows") return <EmptyState title={t("workbench.details.noTerminal")} hint={t("workbench.details.noTerminalHint")} />;
   return <TerminalView cwd={dirname(program.origin)} />;
 }
 
@@ -144,16 +145,16 @@ export function RenameBar({ addr }: { readonly addr: string }): ReactElement {
     wb.patch({ renaming: null });
     if (!draft || draft === before) return;
     wb.rename(addr, draft);
-    wb.notify(`Renamed to ${draft}`, () => wb.rename(addr, before));
+    wb.notify(t("workbench.details.renamed", { name: draft }), () => wb.rename(addr, before));
   };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingTop: 8, paddingBottom: 8, paddingLeft: 12, paddingRight: 12, borderTopWidth: 1, borderColor: p.fill, backgroundColor: p.raised }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ color: p.muted, whiteSpace: "nowrap" }}>{`Rename ${addr} to`}</div>
-        <input {...TYPING} autoFocus value={wb.s.renameDraft} aria-label="New name" aria-invalid={problem !== null} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onChange={(e) => wb.patch({ renameDraft: e.value ?? "" })} onSubmit={save} style={{ flexGrow: 1, maxWidth: 300, height: 28, paddingLeft: 10, paddingRight: 10, borderRadius: 7, backgroundColor: p.deep, fontSize: 12.5, color: p.text, ...MONO_STYLE, ...fieldLook(p, focused, problem !== null) }} />
-        <TextButton label="Save" tone="primary" onClick={save} />
-        <TextButton label="Cancel" tone="ghost" onClick={() => wb.patch({ renaming: null })} />
-        <div style={{ color: p.muted, fontSize: 12, whiteSpace: "nowrap" }}>Saved in your project file, not the binary.</div>
+        <div style={{ color: p.muted, whiteSpace: "nowrap" }}>{t("workbench.details.renameTo", { address: addr })}</div>
+        <input {...TYPING} autoFocus value={wb.s.renameDraft} aria-label={t("workbench.details.newName")} aria-invalid={problem !== null} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onChange={(e) => wb.patch({ renameDraft: e.value ?? "" })} onSubmit={save} style={{ flexGrow: 1, maxWidth: 300, height: 28, paddingLeft: 10, paddingRight: 10, borderRadius: 7, backgroundColor: p.deep, fontSize: 12.5, color: p.text, ...MONO_STYLE, ...fieldLook(p, focused, problem !== null) }} />
+        <TextButton label={t("workbench.save")} tone="primary" onClick={save} />
+        <TextButton label={t("workbench.cancel")} tone="ghost" onClick={() => wb.patch({ renaming: null })} />
+        <div style={{ color: p.muted, fontSize: 12, whiteSpace: "nowrap" }}>{t("workbench.details.renameNote")}</div>
       </div>
       {problem && <div role="alert" style={{ color: p.error, fontSize: 12 }}>{problem}</div>}
     </div>
@@ -163,9 +164,9 @@ export function RenameBar({ addr }: { readonly addr: string }): ReactElement {
 /** Why a name can't be used, in one sentence with a fix, or null when it's fine. */
 export function nameProblem(name: string): string | null {
   const suggestion = name.replace(/\s+/g, "_").replace(/[^\w$.:]/g, "_").replace(/^(\d)/, "_$1");
-  if (/\s/.test(name)) return `Names can't have spaces. Try ${suggestion}.`;
-  if (/^\d/.test(name)) return `Names can't start with a number. Try ${suggestion}.`;
-  if (/[^\w$.:]/.test(name)) return `Use letters, numbers, _ . : or $. Try ${suggestion}.`;
+  if (/\s/.test(name)) return t("workbench.details.nameSpaces", { suggestion });
+  if (/^\d/.test(name)) return t("workbench.details.nameDigit", { suggestion });
+  if (/[^\w$.:]/.test(name)) return t("workbench.details.nameChars", { suggestion });
   return null;
 }
 
@@ -180,19 +181,19 @@ export function PatchBar({ addr }: { readonly addr: string }): ReactElement {
     if (!bytes) return;
     void (async (): Promise<void> => {
       try {
-        chat.thread.note(`Wrote a patched copy to ${await patchBytes(program, [{ addr, bytes }])}`);
+        chat.thread.note(t("workbench.patched", { path: await patchBytes(program, [{ addr, bytes }]) }));
       } catch (err) {
-        chat.thread.note(`Couldn't patch. ${err instanceof Error ? err.message : String(err)}`);
+        chat.thread.note(t("workbench.patchFailed", { message: err instanceof Error ? err.message : String(err) }));
       }
     })();
   };
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 8, paddingBottom: 8, paddingLeft: 12, paddingRight: 12, borderTopWidth: 1, borderColor: p.fill, backgroundColor: p.raised }}>
-      <div style={{ color: p.muted, whiteSpace: "nowrap" }}>{`New bytes at ${addr}`}</div>
-      <input {...TYPING} autoFocus value={wb.s.patchDraft} placeholder="90 90 90" aria-label="New bytes" onChange={(e) => wb.patch({ patchDraft: e.value ?? "" })} onSubmit={save} style={{ flexGrow: 1, maxWidth: 300, height: 28, paddingLeft: 10, paddingRight: 10, borderWidth: 1, borderColor: p.line3, borderRadius: 7, backgroundColor: p.deep, fontSize: 12.5, color: p.text, ...MONO_STYLE }} />
-      <TextButton label="Write copy" tone="primary" onClick={save} />
-      <TextButton label="Cancel" tone="outline" onClick={close} />
-      <div style={{ color: p.muted, fontSize: 12, whiteSpace: "nowrap" }}>Saved as a copy, not over the original.</div>
+      <div style={{ color: p.muted, whiteSpace: "nowrap" }}>{t("workbench.details.newBytesAt", { address: addr })}</div>
+      <input {...TYPING} autoFocus value={wb.s.patchDraft} placeholder="90 90 90" aria-label={t("workbench.details.newBytes")} onChange={(e) => wb.patch({ patchDraft: e.value ?? "" })} onSubmit={save} style={{ flexGrow: 1, maxWidth: 300, height: 28, paddingLeft: 10, paddingRight: 10, borderWidth: 1, borderColor: p.line3, borderRadius: 7, backgroundColor: p.deep, fontSize: 12.5, color: p.text, ...MONO_STYLE }} />
+      <TextButton label={t("workbench.details.writeCopyShort")} tone="primary" onClick={save} />
+      <TextButton label={t("workbench.cancel")} tone="outline" onClick={close} />
+      <div style={{ color: p.muted, fontSize: 12, whiteSpace: "nowrap" }}>{t("workbench.details.patchNote")}</div>
     </div>
   );
 }

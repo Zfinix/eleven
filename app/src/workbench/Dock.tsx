@@ -12,6 +12,7 @@ import { type Tool, TOOL_ICON, TOOL_LABEL } from "./dockOrder";
 import { fillsSpace, ToolBody } from "./Tools";
 import { ELLIPSIS, HOVER, IconButton, useBench } from "./parts";
 import { ResizeHandle } from "./Resize";
+import { t } from "../i18n";
 
 /** One chat on this project, as an editor tab: the agent's logo, the title, a dot while it works. */
 function ChatTabView({ tab, onPick, onClose }: { readonly tab: ChatTab; readonly onPick: () => void; readonly onClose: () => void }): ReactElement {
@@ -24,7 +25,7 @@ function ChatTabView({ tab, onPick, onClose }: { readonly tab: ChatTab; readonly
         <div style={{ minWidth: 0, ...ELLIPSIS }}>{tab.title}</div>
         {tab.busy && <Dot color={p.data} size={6} />}
       </div>
-      <div onClick={onClose} role="button" aria-label={`Close ${tab.title}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, flexShrink: 0, borderRadius: 5, cursor: "pointer", hover: HOVER }}>
+      <div onClick={onClose} role="button" aria-label={t("workbench.dock.closeChat", { title: tab.title })} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, flexShrink: 0, borderRadius: 5, cursor: "pointer", hover: HOVER }}>
         <Icon name="close" size={9} color={p.faint} />
       </div>
     </div>
@@ -52,8 +53,8 @@ export function PastChat({ summary, when, onOpen, onDelete }: { readonly summary
         {!hovered && <div style={{ flexShrink: 0, paddingRight: 4, fontSize: 11.5, color: p.faint }}>{when}</div>}
       </div>
       {hovered && (armed
-        ? <div onClick={press} role="button" aria-label={`Delete ${summary.title}`} style={{ flexShrink: 0, paddingLeft: 6, paddingRight: 6, fontSize: 12, color: p.error, cursor: "pointer", hover: HOVER }}>Delete?</div>
-        : <IconButton icon="trash" label="Delete chat" iconSize={13} color={p.faint} onClick={press} />)}
+        ? <div onClick={press} role="button" aria-label={t("workbench.dock.deleteChatNamed", { title: summary.title })} style={{ flexShrink: 0, paddingLeft: 6, paddingRight: 6, fontSize: 12, color: p.error, cursor: "pointer", hover: HOVER }}>{t("workbench.dock.confirmDelete")}</div>
+        : <IconButton icon="trash" label={t("workbench.dock.deleteChat")} iconSize={13} color={p.faint} onClick={press} />)}
     </div>
   );
 }
@@ -69,11 +70,11 @@ function PastChats({ onDone }: { readonly onDone: () => void }): ReactElement {
     <MenuSurface width={320} maxHeight={460}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, height: 32, paddingLeft: 8, paddingRight: 8, marginBottom: 4, borderRadius: 8, backgroundColor: p.fill }}>
         <Icon name="search" size={13} color={p.muted} />
-        <input {...TYPING} autoFocus value={query} placeholder={`Search chats in ${program.name}`} onChange={(e) => setQuery(e.value ?? "")} style={{ flexGrow: 1, fontSize: 12.5, color: p.text, backgroundColor: p.fill }} />
+        <input {...TYPING} autoFocus value={query} placeholder={t("workbench.dock.searchChats", { name: program.name })} onChange={(e) => setQuery(e.value ?? "")} style={{ flexGrow: 1, fontSize: 12.5, color: p.text, backgroundColor: p.fill }} />
       </div>
       <div style={{ display: "flex", flexDirection: "column", overflowY: "scroll", minHeight: 0 }}>
         {shown.map((summary) => <PastChat key={summary.id} summary={summary} when={ago(summary.updatedAt, now)} onOpen={() => { onDone(); chat.openThread(summary.id); }} onDelete={() => chat.deleteChats([summary.id])} />)}
-        {shown.length === 0 && <div style={{ paddingTop: 12, paddingBottom: 12, paddingLeft: 8, fontSize: 12.5, color: p.muted }}>{words ? "No chats match that." : "No other chats on this file yet."}</div>}
+        {shown.length === 0 && <div style={{ paddingTop: 12, paddingBottom: 12, paddingLeft: 8, fontSize: 12.5, color: p.muted }}>{words ? t("workbench.dock.noMatch") : t("workbench.dock.noChats")}</div>}
       </div>
     </MenuSurface>
   );
@@ -86,7 +87,7 @@ function ToolToggle({ tool, back }: { readonly tool: Tool; readonly back: boolea
   const on = wb.s.right === tool;
   return (
     <div {...menuOn(() => toolMenu(bench, tool))} style={{ display: "flex", borderRadius: 7, ...(on ? { backgroundColor: p.sel } : {}) }}>
-      <IconButton icon={TOOL_ICON[tool]} label={on && back ? "Back to the agent" : TOOL_LABEL[tool]} iconSize={16} color={on ? p.text : p.muted} onClick={() => wb.reveal(on && back ? "agent" : tool)} />
+      <IconButton icon={TOOL_ICON[tool]} label={on && back ? t("workbench.dock.backToAgent") : TOOL_LABEL[tool]} iconSize={16} color={on ? p.text : p.muted} onClick={() => wb.reveal(on && back ? "agent" : tool)} />
     </div>
   );
 }
@@ -101,14 +102,14 @@ function Header(): ReactElement {
   const hasAgent = tools.includes("agent");
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 2, height: 44, flexShrink: 0, paddingLeft: 8, paddingRight: 8 }}>
-      <div {...menuOn(() => toolMenu(bench, active))} role="tablist" aria-label="Chats on this project" style={{ display: "flex", alignItems: "center", gap: 2, flexGrow: 1, minWidth: 0, overflow: "hidden" }}>
+      <div {...menuOn(() => toolMenu(bench, active))} role="tablist" aria-label={t("workbench.dock.chats")} style={{ display: "flex", alignItems: "center", gap: 2, flexGrow: 1, minWidth: 0, overflow: "hidden" }}>
         {active === "agent"
           ? chat.tabs.map((tab) => <ChatTabView key={tab.id} tab={tab} onPick={() => chat.selectTab(tab.id)} onClose={() => chat.closeTab(tab.id)} />)
           : <div style={{ paddingLeft: 8, fontSize: 13, fontWeight: 500, color: p.text2 }}>{TOOL_LABEL[active]}</div>}
       </div>
       {hasAgent && (
         <div onMouseDown={past.onTriggerDown} style={{ display: "flex", position: "relative", borderRadius: 7, ...(past.open ? { backgroundColor: p.sel } : {}) }}>
-          <IconButton icon="history" label="Past chats" iconSize={16} onClick={past.onTriggerClick} />
+          <IconButton icon="history" label={t("workbench.dock.pastChats")} iconSize={16} onClick={past.onTriggerClick} />
           {past.open && (
             <Popover side="bottom" align="end" onDismiss={past.dismiss}>
               <PastChats onDone={past.close} />
@@ -116,9 +117,9 @@ function Header(): ReactElement {
           )}
         </div>
       )}
-      {hasAgent && <IconButton icon="new-chat" label="New chat" iconSize={16} onClick={() => { chat.newTab(); wb.reveal("agent"); }} />}
+      {hasAgent && <IconButton icon="new-chat" label={t("workbench.dock.newChat")} iconSize={16} onClick={() => { chat.newTab(); wb.reveal("agent"); }} />}
       {tools.filter((tool) => tool !== "agent").map((tool) => <ToolToggle key={tool} tool={tool} back={hasAgent} />)}
-      <IconButton icon="close" label="Close panel" iconSize={12} onClick={() => wb.patch({ rightOpen: false, pickerOpen: false })} />
+      <IconButton icon="close" label={t("workbench.dock.closePanel")} iconSize={12} onClick={() => wb.patch({ rightOpen: false, pickerOpen: false })} />
     </div>
   );
 }
@@ -129,7 +130,7 @@ export function Dock(): ReactElement {
   const { wb } = useBench();
   const tool = wb.s.right;
   return (
-    <div role="complementary" aria-label="Agent and inspector" style={{ position: "relative", display: "flex", flexDirection: "column", width: wb.s.sizes.dock, flexShrink: 0, borderLeftWidth: 1, borderColor: p.fill, backgroundColor: p.card }}>
+    <div role="complementary" aria-label={t("workbench.dock.label")} style={{ position: "relative", display: "flex", flexDirection: "column", width: wb.s.sizes.dock, flexShrink: 0, borderLeftWidth: 1, borderColor: p.fill, backgroundColor: p.card }}>
       <ResizeHandle edge="dock" />
       <Header />
       <div style={fillsSpace(tool) ? { display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0 } : { display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0, overflow: "scroll", paddingTop: 4, paddingLeft: 8, paddingRight: 8, paddingBottom: 10 }}>
