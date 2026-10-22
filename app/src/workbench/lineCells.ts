@@ -85,3 +85,12 @@ export function cellAt(cells: readonly Cell[], column: number): Cell | null {
   }
   return null;
 }
+
+/**
+ * How wide the rows are, from the longest line. A list measures rows lazily,
+ * so it cannot find its own widest row; the view knows the lines.
+ */
+export function contentWidth(lines: readonly string[], advance: number, gutter: number): number {
+  const longest = lines.reduce((most, line) => Math.max(most, line.length), 0);
+  return Math.ceil(longest * advance) + gutter + 40;
+}

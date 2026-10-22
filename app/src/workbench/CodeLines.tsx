@@ -1,5 +1,5 @@
 import { type EventPayload, type PublicInstance, type StyleDesc, useGpuix } from "@gpuix/react";
-import { type ReactElement, type RefObject, useEffect, useMemo, useRef } from "react";
+import { type ReactElement, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
 import { colorize, type Syntax, tokenize } from "../components/code";
 import { type Span, useSpans } from "../components/highlight";
@@ -14,7 +14,7 @@ import { type Settings, useSettings } from "../settings/store";
 import { useCommand } from "../lib/shortcuts";
 import { copyText } from "../settings/actions";
 import { goTo, isFunction, menuGroups, subjectMenu } from "./actions";
-import { type Cell, cellAt, chunksOf, columnAt, lineText, spansOf } from "./lineCells";
+import { type Cell, cellAt, chunksOf, columnAt, contentWidth, lineText, spansOf } from "./lineCells";
 import { currentMatch, FindBar, lineMatcher } from "./Find";
 import { arrowSvg, LANE_WIDTH, laneCount, type LanePiece, layoutJumps, piecesByLine } from "./arrows";
 import type { HexRow } from "./model";
@@ -153,7 +153,7 @@ function lookupIn(bench: Bench): Lookup {
   };
 }
 
-function Line({ fn, view, text, number, focused, margin, found = "no", spans = null, bytes = null, ask = null }: { readonly fn: string; readonly view: View; readonly text: string; readonly number: number; readonly focused: boolean; readonly margin: ReactElement | null; readonly found?: Found; readonly spans?: readonly Span[] | null; readonly bytes?: string | null; readonly ask?: AskRow | null }): ReactElement {
+function Line({ fn, view, text, number, focused, margin, found = "no", spans = null, bytes = null, ask = null, onAdvance = null }: { readonly fn: string; readonly view: View; readonly text: string; readonly number: number; readonly focused: boolean; readonly margin: ReactElement | null; readonly found?: Found; readonly spans?: readonly Span[] | null; readonly bytes?: string | null; readonly ask?: AskRow | null; readonly onAdvance?: ((advance: number) => void) | null }): ReactElement {
   const { p } = useTheme();
   const { renderer } = useGpuix();
   const bench = useBench();
@@ -217,6 +217,7 @@ function Line({ fn, view, text, number, focused, margin, found = "no", spans = n
     const box = id === undefined ? null : renderer?.getElementBounds?.(id);
     const drawn = lineText(run);
     if (!box) return run[0] ?? null;
+    if (drawn.length > 0 && box.width > 0) onAdvance?.(box.width / drawn.length);
     return cellAt(run, columnAt(box, event.x ?? 0, drawn.length)) ?? run[0] ?? null;
   };
   const menuFor = (cell: Cell | null, event: EventPayload): void => {
@@ -354,12 +355,18 @@ function Lines({ fn, view, lines, focusLine }: { readonly fn: string; readonly v
   // highlight per row instead makes the native search resolve every row
   // separately, which took the whole view from milliseconds to seconds.
   const lit = drawnWord(bench, settings, wb.s.selected, fn);
+  // A click measures the advance exactly; until one lands, a monospace glyph
+  // is near enough to size the rows.
+  const [advance, setAdvance] = useState(0);
+  useEffect(() => setAdvance(0), [look.family, look.size]);
+  const noteAdvance = (measured: number): void => setAdvance((now) => (Math.abs(now - measured) > 0.01 ? measured : now));
+  const wide = useMemo(() => contentWidth(lines, advance || look.size * 0.62, GUTTER_WIDTH), [lines, advance, look.size]);
   return (
     <>
       {wb.s.finding && <FindBar count={find.count} problem={find.problem} />}
-      <virtual-list ref={list} itemCount={lines.length} windowStart={shown.start} estimatedItemHeight={lineHeight} onVisibleRange={shown.onVisibleRange} {...(lit ? { highlight: { query: lit, wholeWord: true, caseSensitive: true, color: p.sel2 } } : {})} style={{ flexGrow: 1, minHeight: 0, paddingTop: 10, paddingBottom: 28, fontFamily: look.family, fontSize: look.size, lineHeight, ...scrollbar(p) }}>
+      <virtual-list ref={list} itemCount={lines.length} windowStart={shown.start} estimatedItemHeight={lineHeight} onVisibleRange={shown.onVisibleRange} contentWidth={wide} {...(lit ? { highlight: { query: lit, wholeWord: true, caseSensitive: true, color: p.sel2 } } : {})} style={{ flexGrow: 1, minHeight: 0, overflowX: "scroll", paddingTop: 10, paddingBottom: 28, fontFamily: look.family, fontSize: look.size, lineHeight, ...scrollbar(p) }}>
         {lines.slice(shown.start, shown.end).map((line, ix) => (
-          <Line key={shown.start + ix} fn={fn} view={view} text={line} number={shown.start + ix + 1} focused={shown.start + ix === focusLine} margin={margin(shown.start + ix)} found={found(shown.start + ix)} spans={painted?.[shown.start + ix] ?? null} bytes={bytesOf(shown.start + ix)} ask={askRow(shown.start + ix + 1)} />
+          <Line key={shown.start + ix} fn={fn} view={view} text={line} number={shown.start + ix + 1} focused={shown.start + ix === focusLine} margin={margin(shown.start + ix)} found={found(shown.start + ix)} spans={painted?.[shown.start + ix] ?? null} bytes={bytesOf(shown.start + ix)} ask={askRow(shown.start + ix + 1)} onAdvance={noteAdvance} />
         ))}
       </virtual-list>
     </>
