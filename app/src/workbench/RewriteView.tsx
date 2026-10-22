@@ -11,6 +11,7 @@ import { useNow } from "../lib/useNow";
 import { syntaxFor, useCodeLook } from "../settings/look";
 import { useSettings } from "../settings/store";
 import { useTheme } from "../theme";
+import { t } from "../i18n";
 import { copy } from "./actions";
 import type { Refs } from "./model";
 import { type Bench, TextButton, useBench } from "./parts";
@@ -228,23 +229,23 @@ export function RewriteView({ addr, language }: { readonly addr: string; readonl
     })();
   };
   if (live || (phase.kind === "done" && typing && shown < full.length)) {
-    return <Working code={full.slice(0, shown)} step={live ? phase.step : null} shape={shape} title={`${agent.name} is rewriting ${name} in ${language}`} syntax={syntaxOf(language)} />;
+    return <Working code={full.slice(0, shown)} step={live ? phase.step : null} shape={shape} title={t("workbench.view.rewrite.working", { agent: agent.name, name, language })} syntax={syntaxOf(language)} />;
   }
   switch (phase.kind) {
     case "failed":
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 16 }}>
-          <ErrorCard title={`Couldn't rewrite ${name} in ${language}`} detail={SIGN_IN.test(phase.message) ? `${agent.name} needs you to sign in. Sign in, then try again. Pseudocode still works.` : "Try again, or pick another agent in the chat. Pseudocode still works."} raw={phase.message} />
-          <div style={{ display: "flex" }}><TextButton label="Try again" tone="outline" onClick={() => setAttempt((n) => n + 1)} /></div>
+          <ErrorCard title={t("workbench.view.rewrite.failed", { name, language })} detail={SIGN_IN.test(phase.message) ? t("workbench.view.rewrite.signIn", { agent: agent.name }) : t("workbench.view.rewrite.failed.detail")} raw={phase.message} />
+          <div style={{ display: "flex" }}><TextButton label={t("workbench.view.tryAgain")} tone="outline" onClick={() => setAttempt((n) => n + 1)} /></div>
         </div>
       );
     case "done":
       return (
         <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 8, paddingLeft: 16, paddingRight: 12 }}>
-            <div style={{ flexGrow: 1, fontSize: 12, color: p.muted }}>{`${language}, rewritten by ${agent.name}. Check it against the pseudocode before relying on it.`}</div>
-            <TextButton label="Copy" tone="ghost" onClick={() => copy(bench, phase.code, `${name} in ${language}`)} />
-            <TextButton label="Rewrite again" tone="ghost" onClick={again} />
+            <div style={{ flexGrow: 1, fontSize: 12, color: p.muted }}>{t("workbench.view.rewrite.done", { language, agent: agent.name })}</div>
+            <TextButton label={t("workbench.view.copy")} tone="ghost" onClick={() => copy(bench, phase.code, t("workbench.view.rewrite.copied", { name, language }))} />
+            <TextButton label={t("workbench.view.rewrite.again")} tone="ghost" onClick={again} />
           </div>
           <SourceLines source={{ text: phase.code, starts: [] }} syntax={syntaxOf(language)} ask={rewritePlace(bench, addr, language, syntaxOf(language))} />
         </div>

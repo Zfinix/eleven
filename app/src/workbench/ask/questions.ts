@@ -1,6 +1,10 @@
 import type { Syntax } from "../../components/code";
+import { t } from "../../i18n";
 
-export const EXPLAIN = "What does this do?";
+/** The question Explain asks, in the reader's language like the other suggestions. */
+export function explainQuestion(): string {
+  return t("ask.q.explain");
+}
 
 const UNNAMED = /\b(?:DAT|FUN|PTR|LAB)_[0-9a-fA-F]+\b/;
 const ODD_NUMBER = /(?<![\w.$%])-?(?:0x[0-9a-fA-F]{5,}|\d{6,})\b/;
@@ -13,11 +17,11 @@ export function suggestedQuestions(lines: readonly string[], syntax: Syntax): re
   const odd = ODD_NUMBER.exec(text)?.[0];
   const lowLevel = syntax === "asm" || syntax === "ptx";
   return [
-    EXPLAIN,
-    ...(unnamed ? [`Name ${unnamed}`] : []),
-    ...(odd ? [`Why ${odd}?`] : []),
-    ...(!lowLevel && BRANCH.test(text) ? ["When does this branch run?"] : []),
-    ...(lowLevel ? ["What would this look like in C?"] : []),
-    "Where does this get used?",
+    explainQuestion(),
+    ...(unnamed ? [t("ask.q.name", { name: unnamed })] : []),
+    ...(odd ? [t("ask.q.why", { number: odd })] : []),
+    ...(!lowLevel && BRANCH.test(text) ? [t("ask.q.branch")] : []),
+    ...(lowLevel ? [t("ask.q.inC")] : []),
+    t("ask.q.used"),
   ].slice(0, 3);
 }

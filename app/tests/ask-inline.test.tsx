@@ -13,7 +13,7 @@ import { DARK, ThemeContext } from "../src/theme";
 import { quickSetup } from "../src/engine/warm";
 import { askRange } from "../src/workbench/ask/place";
 import { isPinned, pinAnswer, pinnedLines, unpinAnswer } from "../src/workbench/ask/pins";
-import { EXPLAIN, suggestedQuestions } from "../src/workbench/ask/questions";
+import { explainQuestion, suggestedQuestions } from "../src/workbench/ask/questions";
 import { initialState } from "../src/workbench/state";
 import { WorkbenchView } from "../src/workbench/Workbench";
 import { NO_GPU, SAMPLE_PROGRAM } from "./fixtures/sampleProgram";
@@ -51,9 +51,9 @@ test("a pinned answer is its own paragraph in the note, found again by its lines
 });
 
 test("suggested questions fit the lines: a name to give, a number to explain", () => {
-  expect(suggestedQuestions(["  DAT_10000c0d0 = 1;", "  if (x) {"], "c")).toEqual([EXPLAIN, "Name DAT_10000c0d0", "When does this branch run?"]);
-  expect(suggestedQuestions(["and.b64 %rd28, %rd27, -4294967296;"], "ptx")).toEqual([EXPLAIN, "Why -4294967296?", "What would this look like in C?"]);
-  expect(suggestedQuestions(["ret"], "asm")).toEqual([EXPLAIN, "What would this look like in C?", "Where does this get used?"]);
+  expect(suggestedQuestions(["  DAT_10000c0d0 = 1;", "  if (x) {"], "c")).toEqual([explainQuestion(), "Name DAT_10000c0d0", "When does this branch run?"]);
+  expect(suggestedQuestions(["and.b64 %rd28, %rd27, -4294967296;"], "ptx")).toEqual([explainQuestion(), "Why -4294967296?", "What would this look like in C?"]);
+  expect(suggestedQuestions(["ret"], "asm")).toEqual([explainQuestion(), "What would this look like in C?", "Where does this get used?"]);
 });
 
 test("the Ask bar follows a picked range, or a line picked by its number, but not a picked word", () => {
@@ -143,7 +143,7 @@ test("select lines, Explain, see the answer under them, accept its rename, pin i
   screen.clickLabel("Explain");
   await screen.until(() => screen.labelled("Ask about lines 18–25") !== null, 5_000);
   await screen.until(() => screen.text().includes("Renamed") || screen.labelled("Accept") !== null, 10_000);
-  expect(asked.at(-1)?.question).toBe(EXPLAIN);
+  expect(asked.at(-1)?.question).toBe(explainQuestion());
   expect(asked.at(-1)?.quote.lines[0]).toContain("_isatty(1)");
   expect(asked.at(-1)?.quote.lines).toHaveLength(8);
   expect(screen.texts().join("")).toContain("sets DAT_10000c0d0 to print one name per line.");

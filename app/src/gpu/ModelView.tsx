@@ -3,6 +3,7 @@ import { type ReactElement, useState } from "react";
 import { useSize } from "../lib/useSize";
 import { TYPING } from "../lib/shortcuts";
 import { type Palette, useTheme } from "../theme";
+import { t } from "../i18n";
 import { useCodeLook } from "../settings/look";
 import { Icon } from "../components/ui";
 import { alertColors, text } from "./look";
@@ -11,10 +12,10 @@ import { type ModelFact, type ModelNote, metaGroups, modelFacts, modelNotes, typ
 import type { LoadEffect, ModelInfo, ModelLayer, ModelPage, ModelTensor, PickleName } from "./types";
 
 const COLUMNS = [
-  { label: "Layer", weight: 262 },
-  { label: "Op", weight: 317.4 },
-  { label: "Output shape", weight: 280.5 },
-  { label: "Type", weight: 280.5 },
+  { label: "gpu.model.layer", weight: 262 },
+  { label: "gpu.model.op", weight: 317.4 },
+  { label: "gpu.model.outputShape", weight: 280.5 },
+  { label: "gpu.model.type", weight: 280.5 },
 ] as const;
 
 const CLIP = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } as const;
@@ -57,7 +58,7 @@ function Layers({ layers }: { readonly layers: readonly ModelLayer[] }): ReactEl
   return (
     <div style={{ display: "flex", flexDirection: "column", borderWidth: 1, borderColor: p.sel, borderRadius: 10, overflow: "hidden" }}>
       <div style={{ display: "flex", alignItems: "center", height: 34.6, fontWeight: 500, color: p.muted, ...text(12.5) }}>
-        {COLUMNS.map((c) => <Cell key={c.label} value={c.label} weight={c.weight} color={p.muted} />)}
+        {COLUMNS.map((c) => <Cell key={c.label} value={t(c.label)} weight={c.weight} color={p.muted} />)}
       </div>
       {layers.map((layer, ix) => <LayerRow key={`${layer.name}:${ix}`} layer={layer} />)}
     </div>
@@ -81,8 +82,8 @@ function Mix({ model }: { readonly model: ModelInfo }): ReactElement {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 12, paddingBottom: 12, paddingLeft: 14, paddingRight: 14, borderWidth: 1, borderColor: p.sel, borderRadius: 10 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-        <div style={{ fontWeight: 500 }}>Weights by type</div>
-        <div style={{ color: p.muted, ...text(12) }}>share of the file, not of tensor count</div>
+        <div style={{ fontWeight: 500 }}>{t("gpu.model.weightsByType")}</div>
+        <div style={{ color: p.muted, ...text(12) }}>{t("gpu.model.share")}</div>
       </div>
       <div style={{ display: "flex", height: 10, borderRadius: 5, overflow: "hidden", backgroundColor: p.fill }}>
         {model.mix.map((m) => <div key={m.type} style={{ flexGrow: Math.max(m.bytes / total, 0.006), flexBasis: 0, backgroundColor: typeColor(p, m.type), pointerEvents: "none" }} />)}
@@ -92,7 +93,7 @@ function Mix({ model }: { readonly model: ModelInfo }): ReactElement {
           <div key={m.type} style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: typeColor(p, m.type), pointerEvents: "none" }} />
             <div style={{ fontFamily: family, color: p.text3 }}>{m.type}</div>
-            <div style={{ color: p.muted }}>{`${Math.round((m.bytes / total) * 100)}% · ${bytes(m.bytes)} · ${m.tensors} tensors`}</div>
+            <div style={{ color: p.muted }}>{t("gpu.model.mix", { percent: Math.round((m.bytes / total) * 100), size: bytes(m.bytes), count: m.tensors })}</div>
           </div>
         ))}
       </div>
@@ -117,17 +118,17 @@ function noteFill(p: Palette, tone: NoteTone): { readonly bg: string; readonly l
 function openLabel(page: ModelPage): string {
   switch (page) {
     case "loads":
-      return "See what it loads";
+      return t("gpu.model.open.loads");
     case "template":
-      return "Open the chat template";
+      return t("gpu.model.open.template");
     case "metadata":
-      return "Show metadata";
+      return t("gpu.model.open.metadata");
     case "tensors":
-      return "Show tensors";
+      return t("gpu.model.open.tensors");
     case "nodes":
-      return "Show operators";
+      return t("gpu.model.open.nodes");
     case "overview":
-      return "Overview";
+      return t("gpu.model.open.overview");
     default: {
       const unhandled: never = page;
       return unhandled;
@@ -164,9 +165,9 @@ function Overview({ model, onPage, onAsk }: { readonly model: ModelInfo; readonl
     <div ref={ref} style={{ display: "flex", flexDirection: "column", gap: 16, paddingTop: 18, paddingBottom: 28, paddingLeft: 20, paddingRight: 20, userSelect: "text" }}>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 10 }}>
         <div style={{ fontWeight: 600, ...text(18) }}>{model.name}</div>
-        <div style={{ flexGrow: 1, paddingBottom: 2.3, color: p.muted }}>Read from the file's headers only. Nothing was loaded or run.</div>
+        <div style={{ flexGrow: 1, paddingBottom: 2.3, color: p.muted }}>{t("gpu.model.headersOnly")}</div>
         <div onClick={onAsk} role="button" style={{ display: "flex", alignItems: "center", height: 28, paddingLeft: 10, paddingRight: 10, borderWidth: 1, borderColor: p.line3, borderRadius: 8, backgroundColor: p.sel, color: p.text, cursor: "pointer", hover: { opacity: 0.72 }, userSelect: "none" }}>
-          <div>Ask AI about this model</div>
+          <div>{t("gpu.model.ask")}</div>
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: width === 0 || width >= FOUR_FROM ? 4 : 2, gap: 10 }}>
@@ -175,7 +176,7 @@ function Overview({ model, onPage, onAsk }: { readonly model: ModelInfo; readonl
       {model.mix.length > 1 && <Mix model={model} />}
       {notes.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ fontWeight: 500 }}>Worth knowing</div>
+          <div style={{ fontWeight: 500 }}>{t("gpu.model.worthKnowing")}</div>
           {notes.map((n) => <Note key={n.title} note={n} onPage={onPage} />)}
         </div>
       )}
@@ -187,11 +188,11 @@ function Overview({ model, onPage, onAsk }: { readonly model: ModelInfo; readonl
 type Grouping = "block" | "file";
 
 const TENSOR_COLUMNS = [
-  { label: "Tensor", grow: 3, right: false },
-  { label: "Shape", grow: 1.4, right: false },
-  { label: "Type", grow: 0.8, right: false },
-  { label: "Size", grow: 0.9, right: true },
-  { label: "Offset", grow: 1, right: true },
+  { label: "gpu.model.tensor", grow: 3, right: false },
+  { label: "gpu.model.shape", grow: 1.4, right: false },
+  { label: "gpu.model.type", grow: 0.8, right: false },
+  { label: "gpu.model.size", grow: 0.9, right: true },
+  { label: "gpu.model.offset", grow: 1, right: true },
 ] as const;
 
 function Seg({ label, on, onClick }: { readonly label: string; readonly on: boolean; readonly onClick: () => void }): ReactElement {
@@ -259,7 +260,7 @@ function Tensors({ model, picked, onPick }: { readonly model: ModelInfo; readonl
       : groups.flatMap((g, gi) => {
         const isOpen = g.tensors.length === 1 || open.has(g.key);
         const size = bytes(g.tensors.reduce((sum, t) => sum + t.bytes, 0));
-        const head = g.tensors.length === 1 ? [] : [<GroupRow key={`g${gi}`} label={g.label} meta={`${g.tensors.length} tensors · ${size}`} open={isOpen} onToggle={() => toggle(g.key)} />];
+        const head = g.tensors.length === 1 ? [] : [<GroupRow key={`g${gi}`} label={g.label} meta={t("gpu.model.group", { count: g.tensors.length, size })} open={isOpen} onToggle={() => toggle(g.key)} />];
         return [...head, ...(isOpen ? g.tensors.map(row) : [])];
       });
   const total = bytes(model.tensors.reduce((sum, t) => sum + t.bytes, 0));
@@ -267,22 +268,22 @@ function Tensors({ model, picked, onPick }: { readonly model: ModelInfo; readonl
     <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0, userSelect: "text" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, height: 40, flexShrink: 0, paddingLeft: 10, paddingRight: 12 }}>
         <div style={{ display: "flex", alignItems: "center", flexGrow: 0, flexShrink: 1, flexBasis: 280, minWidth: 120, height: 26, paddingLeft: 8, paddingRight: 8, borderWidth: 1, borderColor: p.line2, borderRadius: 7, backgroundColor: p.deep }}>
-          <input {...TYPING} value={query} placeholder="Name, type or shape" aria-label="Filter tensors by name, type or shape" onChange={(e) => setQuery(e.value ?? "")} style={{ flexGrow: 1, minWidth: 0, fontSize: 12, color: p.text3, fontFamily: family }} />
+          <input {...TYPING} value={query} placeholder={t("gpu.model.filter.placeholder")} aria-label={t("gpu.model.filter")} onChange={(e) => setQuery(e.value ?? "")} style={{ flexGrow: 1, minWidth: 0, fontSize: 12, color: p.text3, fontFamily: family }} />
         </div>
-        <div role="radiogroup" aria-label="Group tensors" style={{ display: "flex", gap: 2, padding: 2, borderRadius: 8, backgroundColor: p.fill }}>
-          <Seg label="By block" on={grouping === "block"} onClick={() => setGrouping("block")} />
-          <Seg label="File order" on={grouping === "file"} onClick={() => setGrouping("file")} />
+        <div role="radiogroup" aria-label={t("gpu.model.grouping")} style={{ display: "flex", gap: 2, padding: 2, borderRadius: 8, backgroundColor: p.fill }}>
+          <Seg label={t("gpu.model.byBlock")} on={grouping === "block"} onClick={() => setGrouping("block")} />
+          <Seg label={t("gpu.model.fileOrder")} on={grouping === "file"} onClick={() => setGrouping("file")} />
         </div>
         <div style={{ flexGrow: 1 }} />
-        <div style={{ color: p.muted, ...text(12) }}>{filter ? `${found.length} of ${model.tensors.length} tensors` : `${model.tensors.length.toLocaleString("en-US")} tensors · ${total}`}</div>
+        <div style={{ color: p.muted, ...text(12) }}>{filter ? t("gpu.model.found", { found: found.length, count: model.tensors.length }) : t("gpu.model.total", { count: model.tensors.length.toLocaleString("en-US"), size: total })}</div>
       </div>
       <div role="row" style={{ display: "flex", alignItems: "center", flexShrink: 0, height: 30, borderBottomWidth: 1, borderColor: p.line2, color: p.muted, fontWeight: 500, ...text(12.5) }}>
         {TENSOR_COLUMNS.map((c, ix) => (
-          <div key={c.label} style={{ flexGrow: c.grow, flexBasis: 0, minWidth: 0, paddingLeft: ix === 0 ? 16 : 12, paddingRight: ix === TENSOR_COLUMNS.length - 1 ? 16 : 12, textAlign: c.right ? "right" : "left" }}>{c.label}</div>
+          <div key={c.label} style={{ flexGrow: c.grow, flexBasis: 0, minWidth: 0, paddingLeft: ix === 0 ? 16 : 12, paddingRight: ix === TENSOR_COLUMNS.length - 1 ? 16 : 12, textAlign: c.right ? "right" : "left" }}>{t(c.label)}</div>
         ))}
       </div>
-      <div role="grid" aria-label="Tensors" style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0, overflowY: "scroll" }}>
-        {body.length > 0 ? body : <div style={{ padding: 18, color: p.muted }}>{`No tensors match “${filter}”.`}</div>}
+      <div role="grid" aria-label={t("gpu.model.tensors")} style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0, overflowY: "scroll" }}>
+        {body.length > 0 ? body : <div style={{ padding: 18, color: p.muted }}>{t("gpu.model.noMatch", { query: filter })}</div>}
       </div>
     </div>
   );
@@ -323,8 +324,8 @@ function Template({ model }: { readonly model: ModelInfo }): ReactElement {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingTop: 18, paddingBottom: 28, paddingLeft: 20, paddingRight: 20, userSelect: "text" }}>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 10 }}>
-        <div style={{ fontWeight: 600, ...text(14) }}>Chat template</div>
-        <div style={{ color: p.muted }}>{hidden ? "The runtime fills this in for every conversation. The highlighted line goes in front of it." : "The runtime fills this in for every conversation."}</div>
+        <div style={{ fontWeight: 600, ...text(14) }}>{t("gpu.model.chatTemplate")}</div>
+        <div style={{ color: p.muted }}>{hidden ? t("gpu.model.template.hidden") : t("gpu.model.template")}</div>
       </div>
       <div role="region" aria-label="tokenizer.chat_template" style={{ display: "flex", flexDirection: "column", paddingTop: 10, paddingBottom: 10, borderWidth: 1, borderColor: p.line2, borderRadius: 10, backgroundColor: p.deep, fontFamily: family, ...text(12), overflowX: "scroll" }}>
         {lines.map((line, ix) => (
@@ -342,13 +343,13 @@ function effectOf(p: Palette, item: PickleName): { readonly label: string; reado
   const effect: LoadEffect = item.effect;
   switch (effect) {
     case "data":
-      return { label: "Builds data", color: p.string };
+      return { label: t("gpu.model.effect.data"), color: p.string };
     case "layer":
-      return { label: "Builds a PyTorch layer", color: p.text3 };
+      return { label: t("gpu.model.effect.layer"), color: p.text3 };
     case "class":
-      return { label: `Builds a ${item.from} class`, color: p.number };
+      return { label: t("gpu.model.effect.class", { from: item.from }), color: p.number };
     case "runs code":
-      return { label: "Runs code", color: p.error };
+      return { label: t("gpu.model.effect.runsCode"), color: p.error };
     default: {
       const unhandled: never = effect;
       return unhandled;
@@ -368,11 +369,11 @@ function Loads({ model }: { readonly model: ModelInfo }): ReactElement {
           <div style={{ color: p.text2 }}>{model.risk.detail}</div>
         </div>
       )}
-      <div style={{ paddingTop: 16, paddingBottom: 10, paddingLeft: 20, paddingRight: 20, color: p.muted }}>Every Python name this pickle asks for when it loads. Eleven read them without running anything.</div>
+      <div style={{ paddingTop: 16, paddingBottom: 10, paddingLeft: 20, paddingRight: 20, color: p.muted }}>{t("gpu.model.loads")}</div>
       <div style={{ display: "flex", alignItems: "center", height: 30, borderBottomWidth: 1, borderColor: p.line2, color: p.muted, fontWeight: 500, ...text(12.5) }}>
-        <div style={{ flexGrow: 3, flexBasis: 0, paddingLeft: 20, paddingRight: 12 }}>Name</div>
-        <div style={{ flexGrow: 1.2, flexBasis: 0, paddingLeft: 12, paddingRight: 12 }}>From</div>
-        <div style={{ flexGrow: 1.4, flexBasis: 0, paddingLeft: 12, paddingRight: 20 }}>What it does on load</div>
+        <div style={{ flexGrow: 3, flexBasis: 0, paddingLeft: 20, paddingRight: 12 }}>{t("gpu.model.name")}</div>
+        <div style={{ flexGrow: 1.2, flexBasis: 0, paddingLeft: 12, paddingRight: 12 }}>{t("gpu.model.from")}</div>
+        <div style={{ flexGrow: 1.4, flexBasis: 0, paddingLeft: 12, paddingRight: 20 }}>{t("gpu.model.onLoad")}</div>
       </div>
       {model.loads.map((item) => {
         const effect = effectOf(p, item);
@@ -408,9 +409,9 @@ function Operators({ model }: { readonly model: ModelInfo }): ReactElement {
       </div>
       <div style={{ display: "flex", alignItems: "center", height: 30, borderBottomWidth: 1, borderColor: p.line2, color: p.muted, fontWeight: 500, ...text(12.5) }}>
         <div style={{ flexGrow: 0, flexShrink: 0, flexBasis: 56, paddingLeft: 20 }}>#</div>
-        <div style={{ flexGrow: 1, flexBasis: 0, paddingLeft: 12, paddingRight: 12 }}>Operator</div>
-        <div style={{ flexGrow: 2, flexBasis: 0, paddingLeft: 12, paddingRight: 12 }}>Reads</div>
-        <div style={{ flexGrow: 2, flexBasis: 0, paddingLeft: 12, paddingRight: 20 }}>Writes</div>
+        <div style={{ flexGrow: 1, flexBasis: 0, paddingLeft: 12, paddingRight: 12 }}>{t("gpu.model.operator")}</div>
+        <div style={{ flexGrow: 2, flexBasis: 0, paddingLeft: 12, paddingRight: 12 }}>{t("gpu.model.reads")}</div>
+        <div style={{ flexGrow: 2, flexBasis: 0, paddingLeft: 12, paddingRight: 20 }}>{t("gpu.model.writes")}</div>
       </div>
       {model.nodes.map((n, ix) => (
         <div key={`${ix}:${n.name}`} role="row" style={{ display: "flex", alignItems: "center", height: 30, borderTopWidth: 1, borderColor: p.fill, fontFamily: family, ...text(12) }}>

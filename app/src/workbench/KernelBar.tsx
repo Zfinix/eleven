@@ -12,6 +12,7 @@ import { errorMessage } from "../lib/guards";
 import { useNow } from "../lib/useNow";
 import { useCodeLook } from "../settings/look";
 import { SANS, useTheme } from "../theme";
+import { type PlainId, t } from "../i18n";
 import { copy } from "./actions";
 import type { AskPlace } from "./ask/place";
 import { exportKernel } from "./export";
@@ -32,7 +33,7 @@ type Notes =
   | { readonly kind: "ready"; readonly notes: readonly KernelNote[] }
   | { readonly kind: "failed"; readonly message: string };
 
-const NOTE: Readonly<Record<KernelLanguage, string>> = { "CUDA C++": "readable source", "HIP C++": "for AMD GPUs", Metal: "for Apple GPUs" };
+const NOTE: Readonly<Record<KernelLanguage, PlainId>> = { "CUDA C++": "gpu.kernel.note.cuda", "HIP C++": "gpu.kernel.note.hip", Metal: "gpu.kernel.note.metal" };
 const ICON: Readonly<Record<KernelLanguage, string>> = { "CUDA C++": "lang-cpp", "HIP C++": "lang-cpp", Metal: "lang-metal" };
 const FRAME_MS = 33;
 
@@ -128,14 +129,14 @@ function ViewAs({ shown, agent, onPick }: { readonly shown: Shown; readonly agen
   const { p } = useTheme();
   const entry = (label: Shown, mark: { readonly icon: string } | { readonly logo: string }, note: string): MenuEntry => ({ kind: "action", label, ...(label === shown ? { icon: "check" } : mark), keys: note, run: () => onPick(label) });
   const entries: readonly MenuEntry[] = [
-    entry("PTX", { icon: "assembly" }, "in the file"),
+    entry("PTX", { icon: "assembly" }, t("gpu.kernel.inFile")),
     { kind: "separator" },
-    ...KERNEL_LANGUAGES.map((language) => entry(language, { logo: ICON[language] }, NOTE[language])),
+    ...KERNEL_LANGUAGES.map((language) => entry(language, { logo: ICON[language] }, t(NOTE[language]))),
   ];
   return (
-    <Tooltip label={`Show this kernel as its PTX, or rewritten in another GPU language by ${agent}`}>
-      <div onClick={(event) => openMenu(event.x ?? 0, event.y ?? 0, entries)} role="button" aria-label={`View as ${shown}`} style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, height: 26, paddingLeft: 9, paddingRight: 7, borderRadius: 7, backgroundColor: p.fill, fontSize: 12, color: p.text3, cursor: "pointer", hover: HOVER }}>
-        <div style={{ color: p.muted, whiteSpace: "nowrap", pointerEvents: "none" }}>View as</div>
+    <Tooltip label={t("gpu.kernel.viewAs.tip", { agent })}>
+      <div onClick={(event) => openMenu(event.x ?? 0, event.y ?? 0, entries)} role="button" aria-label={t("gpu.kernel.viewAs.label", { language: shown })} style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, height: 26, paddingLeft: 9, paddingRight: 7, borderRadius: 7, backgroundColor: p.fill, fontSize: 12, color: p.text3, cursor: "pointer", hover: HOVER }}>
+        <div style={{ color: p.muted, whiteSpace: "nowrap", pointerEvents: "none" }}>{t("gpu.kernel.viewAs")}</div>
         <div style={{ whiteSpace: "nowrap", pointerEvents: "none" }}>{shown}</div>
         <Icon name="updown" size={12} color={p.muted} />
       </div>
@@ -199,8 +200,8 @@ export function useKernelExtras(lib: ShaderLibrary, fn: ShaderFunction, ir: Load
   const toolbar = (
     <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
       <ViewAs shown={shown} agent={agent.name} onPick={pick} />
-      {language === null && <Toggle label="Explain" icon="text" on={explain} tip="Explain each group of lines in plain words" onClick={() => setExplain(!explain)} />}
-      {language !== null && phase.kind === "done" && <Toggle label="Beside PTX" icon="split" on={compare} tip="The rewrite beside the PTX it came from" onClick={() => setCompare(!compare)} />}
+      {language === null && <Toggle label={t("gpu.kernel.explain")} icon="text" on={explain} tip={t("gpu.kernel.explain.tip")} onClick={() => setExplain(!explain)} />}
+      {language !== null && phase.kind === "done" && <Toggle label={t("gpu.kernel.beside")} icon="split" on={compare} tip={t("gpu.kernel.beside.tip")} onClick={() => setCompare(!compare)} />}
     </div>
   );
   if (language === null) {
@@ -210,12 +211,12 @@ export function useKernelExtras(lib: ShaderLibrary, fn: ShaderFunction, ir: Load
         case "ready":
           return null;
         case "working":
-          return <Busy title={`${agent.name} is explaining ${name}`} step={notes.step} />;
+          return <Busy title={t("gpu.kernel.explaining", { agent: agent.name, name })} step={notes.step} />;
         case "failed":
           return (
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, paddingLeft: 18, paddingRight: 12, paddingBottom: 4 }}>
-              <div style={{ flexGrow: 1, fontSize: 12, color: p.error }}>{`Couldn't explain ${name}. ${notes.message}`}</div>
-              <TextButton label="Try again" tone="ghost" onClick={() => setAttempt((n) => n + 1)} />
+              <div style={{ flexGrow: 1, fontSize: 12, color: p.error }}>{t("gpu.kernel.explainFailed", { name, error: notes.message })}</div>
+              <TextButton label={t("workbench.view.tryAgain")} tone="ghost" onClick={() => setAttempt((n) => n + 1)} />
             </div>
           );
         default: {
@@ -226,9 +227,9 @@ export function useKernelExtras(lib: ShaderLibrary, fn: ShaderFunction, ir: Load
     })();
     return { subtitle: null, toolbar, status, body: null, notes: notes.kind === "ready" ? notes.notes : [] };
   }
-  const subtitle = `${language} · rewritten from the PTX`;
+  const subtitle = t("gpu.kernel.subtitle", { language });
   if (live || (phase.kind === "done" && typing && typed < full.length)) {
-    const body = <div style={{ display: "flex", flexDirection: "column", flexGrow: 999, flexBasis: 420, minWidth: 0 }}><Working code={full.slice(0, typed)} step={live ? phase.step : null} shape={PLACEHOLDER_LINES} title={`${agent.name} is rewriting ${name} as ${language}`} syntax="c" /></div>;
+    const body = <div style={{ display: "flex", flexDirection: "column", flexGrow: 999, flexBasis: 420, minWidth: 0 }}><Working code={full.slice(0, typed)} step={live ? phase.step : null} shape={PLACEHOLDER_LINES} title={t("gpu.kernel.rewriting", { agent: agent.name, name, language })} syntax="c" /></div>;
     return { subtitle, toolbar, status: null, body, notes: [] };
   }
   const again = (): void => {
@@ -240,8 +241,8 @@ export function useKernelExtras(lib: ShaderLibrary, fn: ShaderFunction, ir: Load
   if (phase.kind === "failed") {
     const body = (
       <div style={{ display: "flex", flexDirection: "column", gap: 10, flexGrow: 1, padding: 16 }}>
-        <ErrorCard title={`Couldn't rewrite ${name} as ${language}`} detail="Try again, or pick another agent in the chat. The PTX still works." raw={phase.message} />
-        <div style={{ display: "flex" }}><TextButton label="Try again" tone="outline" onClick={() => setAttempt((n) => n + 1)} /></div>
+        <ErrorCard title={t("gpu.kernel.failed", { name, language })} detail={t("gpu.kernel.failed.detail")} raw={phase.message} />
+        <div style={{ display: "flex" }}><TextButton label={t("workbench.view.tryAgain")} tone="outline" onClick={() => setAttempt((n) => n + 1)} /></div>
       </div>
     );
     return { subtitle, toolbar, status: null, body: <div style={{ display: "flex", flexGrow: 999, flexBasis: 420, minWidth: 0 }}>{body}</div>, notes: [] };
@@ -252,26 +253,26 @@ export function useKernelExtras(lib: ShaderLibrary, fn: ShaderFunction, ir: Load
     void (async (): Promise<void> => {
       try {
         const path = await exportKernel(bench.program, name, KERNEL_EXTENSION[language], code);
-        bench.wb.notify(`Saved ${name} as ${path}`, null);
+        bench.wb.notify(t("gpu.kernel.saved", { name, path }), null);
       } catch (err) {
-        bench.wb.notify(`Couldn't save ${name}. ${errorMessage(err)}`, null);
+        bench.wb.notify(t("gpu.kernel.saveFailed", { name, error: errorMessage(err) }), null);
       }
     })();
   };
   const status = (
     <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, paddingLeft: 18, paddingRight: 12, paddingBottom: 4 }}>
-      <div style={{ flexGrow: 1, flexShrink: 1, minWidth: 0, fontSize: 12, color: p.muted }}>{`${language}, rewritten by ${agent.name} from the PTX. Check it against the PTX before relying on it.`}</div>
-      <TextButton label="Copy" tone="ghost" onClick={() => copy(bench, code, `${name} in ${language}`)} />
-      <TextButton label="Save as a file" tone="ghost" onClick={save} />
-      <TextButton label="Rewrite again" tone="ghost" onClick={again} />
+      <div style={{ flexGrow: 1, flexShrink: 1, minWidth: 0, fontSize: 12, color: p.muted }}>{t("gpu.kernel.done", { language, agent: agent.name })}</div>
+      <TextButton label={t("workbench.view.copy")} tone="ghost" onClick={() => copy(bench, code, t("workbench.view.rewrite.copied", { name, language }))} />
+      <TextButton label={t("gpu.kernel.save")} tone="ghost" onClick={save} />
+      <TextButton label={t("workbench.view.rewrite.again")} tone="ghost" onClick={again} />
     </div>
   );
   const rewritten = <CodeLinesOf code={code} grammar="c" ask={rewritePlaceOf(lib, fn, language)} />;
   const body = compare && ptx !== null
     ? (
       <div style={{ display: "flex", gap: 12, flexGrow: 999, flexBasis: 420, minWidth: 0 }}>
-        <Column label="PTX, from the file"><CodeLinesOf code={ptx} grammar="ptx" ask={shaderPlace(lib, fn)} /></Column>
-        <Column label={`${language}, rewritten by ${agent.name}`}>{rewritten}</Column>
+        <Column label={t("gpu.kernel.ptx")}><CodeLinesOf code={ptx} grammar="ptx" ask={shaderPlace(lib, fn)} /></Column>
+        <Column label={t("gpu.kernel.rewrittenBy", { language, agent: agent.name })}>{rewritten}</Column>
       </div>
     )
     : <div style={{ display: "flex", flexGrow: 999, flexBasis: 420, minWidth: 0 }}><Column label="">{rewritten}</Column></div>;

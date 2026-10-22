@@ -10,6 +10,7 @@ import { useListWindow } from "../lib/useListWindow";
 import { useLoaded } from "../lib/useLoaded";
 import { showAddress, syntaxFor, useCodeLook } from "../settings/look";
 import { useSettings } from "../settings/store";
+import { t } from "../i18n";
 import { useCommand } from "../lib/shortcuts";
 import { copyText } from "../settings/actions";
 import { goTo, isFunction, subjectMenu } from "./actions";
@@ -115,7 +116,7 @@ function Breakpoint({ addr, paused }: { readonly addr: string | null; readonly p
   const on = addr !== null && wb.s.breakpoints.has(addr);
   if (addr === null) return <div style={{ width: 22, flexShrink: 0 }} />;
   return (
-    <div onClick={() => wb.toggleBreakpoint(addr)} role="button" aria-label={`Breakpoint at ${addr}`} aria-selected={on} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 22, flexShrink: 0, cursor: "pointer", hover: { opacity: 0.72 } }}>
+    <div onClick={() => wb.toggleBreakpoint(addr)} role="button" aria-label={t("workbench.view.code.breakpointAt", { addr })} aria-selected={on} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 22, flexShrink: 0, cursor: "pointer", hover: { opacity: 0.72 } }}>
       {paused ? <Icon name="play" size={11} color={on ? p.error : p.data} /> : <div style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: on ? p.error : "transparent", pointerEvents: "none" }} />}
     </div>
   );
@@ -188,7 +189,7 @@ function Line({ fn, view, text, number, focused, margin, found = "no", spans = n
   const lit = highlightedWord(wb.s.selected, fn);
   const glow = (text: string): StyleDesc => (lit !== null && text === lit ? { backgroundColor: p.sel2, borderRadius: 3 } : {});
   const row = (
-    <div role="row" aria-label={`Line ${number}`} aria-selected={picked} style={{ display: "flex", userSelect: "text", fontFamily: look.family, fontSize: look.size, lineHeight: look.lineHeight, ...lineTint(found, picked, ranged, p), ...(paused ? { backgroundColor: p.sel2 } : {}) }}>
+    <div role="row" aria-label={t("workbench.view.line", { number })} aria-selected={picked} style={{ display: "flex", userSelect: "text", fontFamily: look.family, fontSize: look.size, lineHeight: look.lineHeight, ...lineTint(found, picked, ranged, p), ...(paused ? { backgroundColor: p.sel2 } : {}) }}>
       {view === "asm" && <Breakpoint addr={here} paused={paused} />}
       {gutter ? <div {...subjectMenu(bench, subject(null), (event) => pick(null, event))} style={{ position: "relative", display: "flex", justifyContent: "flex-end", width: 50, flexShrink: 0, paddingRight: 16, color: picked ? p.text : p.gutter, userSelect: "none" }}>{ask?.pinned && <PinDot />}{String(number)}</div> : <div {...subjectMenu(bench, subject(null), (event) => pick(null, event))} style={{ width: 16, flexShrink: 0 }} />}
       {margin}
@@ -208,8 +209,8 @@ function Line({ fn, view, text, number, focused, margin, found = "no", spans = n
           if (!target) return <div key={ix} {...subjectMenu(bench, subject(word(part.text)), (event) => pick(word(part.text), event))} style={{ color: p.call, whiteSpace: "nowrap", ...glow(part.text) }}>{part.text}</div>;
           const token = { text: part.text, addr: target };
           return (
-            <Tooltip key={ix} label={`Go to ${nameOf(target)}`} side="top">
-              <div {...subjectMenu(bench, subject(token), () => openFn(target, false))} role="link" aria-label={`Open ${nameOf(target)}`} style={{ color: p.link, whiteSpace: "nowrap", textDecoration: "underline", cursor: "pointer", ...glow(part.text) }}>
+            <Tooltip key={ix} label={t("workbench.view.code.goTo", { name: nameOf(target) })} side="top">
+              <div {...subjectMenu(bench, subject(token), () => openFn(target, false))} role="link" aria-label={t("workbench.view.open", { name: nameOf(target) })} style={{ color: p.link, whiteSpace: "nowrap", textDecoration: "underline", cursor: "pointer", ...glow(part.text) }}>
                 {nameOf(target)}
               </div>
             </Tooltip>
@@ -301,12 +302,12 @@ function Lines({ fn, view, lines, focusLine }: { readonly fn: string; readonly v
 }
 
 /** A function boundary in the listing: its label, or a step to the function before or after it. */
-function Boundary({ fn, lead }: { readonly fn: string; readonly lead: string }): ReactElement {
+function Boundary({ fn, lead, label }: { readonly fn: string; readonly lead: string; readonly label: string }): ReactElement {
   const { p } = useTheme();
   const { nameOf, openFn } = useBench();
   const look = useCodeLook();
   return (
-    <div onClick={() => openFn(fn, false)} role="button" aria-label={`${lead} ${nameOf(fn)}`} style={{ display: "flex", gap: 10, flexShrink: 0, paddingTop: 4, paddingBottom: 4, paddingLeft: 22, fontFamily: look.family, fontSize: look.size, lineHeight: look.lineHeight, color: p.faint, cursor: "pointer", hover: { opacity: 0.72 } }}>
+    <div onClick={() => openFn(fn, false)} role="button" aria-label={label} style={{ display: "flex", gap: 10, flexShrink: 0, paddingTop: 4, paddingBottom: 4, paddingLeft: 22, fontFamily: look.family, fontSize: look.size, lineHeight: look.lineHeight, color: p.faint, cursor: "pointer", hover: { opacity: 0.72 } }}>
       <div>{lead}</div>
       <div style={{ color: p.call }}>{`${nameOf(fn)}:`}</div>
       <div>{fn}</div>
@@ -324,12 +325,13 @@ function useNeighbours(addr: string): { readonly before: string | null; readonly
 
 function ListingLines({ fn, lines, focusLine }: { readonly fn: string; readonly lines: readonly string[]; readonly focusLine: number }): ReactElement {
   const { before, after } = useNeighbours(fn);
+  const { nameOf } = useBench();
   return (
     <>
-      {before && <Boundary fn={before} lead="↑" />}
-      <Boundary fn={fn} lead="" />
+      {before && <Boundary fn={before} lead="↑" label={t("workbench.view.code.previous", { name: nameOf(before) })} />}
+      <Boundary fn={fn} lead="" label={nameOf(fn)} />
       <Lines fn={fn} view="asm" lines={lines} focusLine={focusLine} />
-      {after && <Boundary fn={after} lead="↓" />}
+      {after && <Boundary fn={after} lead="↓" label={t("workbench.view.code.next", { name: nameOf(after) })} />}
     </>
   );
 }
@@ -341,11 +343,11 @@ export function CodeLines({ addr, view }: { readonly addr: string; readonly view
   const code = useLoaded(() => program.code(addr, view), `${program.name}:${addr}:${view}:${wb.s.revision}`);
   switch (code.kind) {
     case "loading":
-      return <div style={{ padding: 16, color: p.muted }}>{`${program.engine} is reading ${nameOf(addr)}. The first open of a file takes a few seconds.`}</div>;
+      return <div style={{ padding: 16, color: p.muted }}>{t("workbench.view.code.reading", { engine: program.engine, name: nameOf(addr) })}</div>;
     case "failed":
       return (
         <div style={{ padding: 16 }}>
-          <ErrorCard title={`Couldn't load ${nameOf(addr)}`} detail={view === "pseudo" ? `${program.engine} couldn't decompile it. The ${program.arch === DALVIK ? "bytecode" : "assembly"} view still shows every instruction.` : `${program.engine} couldn't read its instructions. Open the file again, or check Setup.`} raw={code.message} />
+          <ErrorCard title={t("workbench.view.code.loadFailed", { name: nameOf(addr) })} detail={view === "pseudo" ? t(program.arch === DALVIK ? "workbench.view.code.noPseudo.bytecode" : "workbench.view.code.noPseudo.assembly", { engine: program.engine }) : t("workbench.view.code.noInstructions", { engine: program.engine })} raw={code.message} />
         </div>
       );
     case "ready":

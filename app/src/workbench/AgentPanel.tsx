@@ -6,6 +6,7 @@ import { indexMentions, type Mention, type MentionIndex } from "../chat/mentions
 import type { Bookmark } from "../engine/project";
 import { enabledSkills, skillPrompt } from "../skills/load";
 import { useTheme } from "../theme";
+import { type PlainId, t } from "../i18n";
 import { appIcon, Icon } from "../components/ui";
 import { ask } from "./actions";
 import { LiveThread } from "./LiveThread";
@@ -38,13 +39,14 @@ function mentionsOf(program: Program, nameOf: (addr: string) => string, bookmark
 
 /** Questions that fit what the file actually holds: a chat template, quantized weights, a graph. */
 function modelQuestions(model: ModelInfo | undefined): readonly string[] {
-  return [
-    "What is in this model, and is it safe to load?",
-    ...(model?.template ? ["Does its chat template add anything to my prompts?"] : []),
-    ...(model && model.mix.some((m) => /^(I?Q\d)/.test(m.type)) ? ["Which parts are quantized hardest, and what does that cost?"] : []),
-    ...(model && model.nodes.length > 0 ? ["What does it take in, and what does it give back?"] : []),
-    ...(model && model.loads.length > 0 ? ["What would loading this file import?"] : []),
+  const ids: readonly PlainId[] = [
+    "workbench.view.agent.model.contents",
+    ...(model?.template ? ["workbench.view.agent.model.template" as const] : []),
+    ...(model && model.mix.some((m) => /^(I?Q\d)/.test(m.type)) ? ["workbench.view.agent.model.quantized" as const] : []),
+    ...(model && model.nodes.length > 0 ? ["workbench.view.agent.model.io" as const] : []),
+    ...(model && model.loads.length > 0 ? ["workbench.view.agent.model.imports" as const] : []),
   ];
+  return ids.map((id) => t(id));
 }
 
 /** A model has no functions to point at, so it starts from questions about the file instead of playbooks. */
@@ -57,8 +59,8 @@ function EmptyModelChat(): ReactElement {
     <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 20, flexGrow: 1, paddingLeft: 8, paddingRight: 8 }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
         <img src={appIcon(p.icon)} style={{ width: 64, height: 64 }} />
-        <div style={{ fontSize: 18, color: p.text2 }}>What do you want to know about it?</div>
-        <div style={{ fontSize: 12, color: p.muted }}>{model ? `${program.name} · ${model.tensors.length.toLocaleString("en-US")} tensors` : program.name}</div>
+        <div style={{ fontSize: 18, color: p.text2 }}>{t("workbench.view.agent.knowAboutIt")}</div>
+        <div style={{ fontSize: 12, color: p.muted }}>{model ? t("workbench.view.agent.tensors", { name: program.name, count: model.tensors.length.toLocaleString("en-US") }) : program.name}</div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
         {modelQuestions(model).map((question) => (
@@ -72,10 +74,10 @@ function EmptyModelChat(): ReactElement {
   );
 }
 
-const GPU_QUESTIONS: readonly string[] = [
-  "What are these kernels for?",
-  "Which kernels use the most registers, and does it limit how many run at once?",
-  "Which GPUs was this built for, and which would fall back or fail?",
+const GPU_QUESTIONS: readonly PlainId[] = [
+  "workbench.view.agent.gpu.purpose",
+  "workbench.view.agent.gpu.registers",
+  "workbench.view.agent.gpu.targets",
 ];
 
 /** Kernel files start from questions about the GPU code rather than playbooks for functions. */
@@ -88,11 +90,11 @@ function EmptyGpuChat(): ReactElement {
     <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 20, flexGrow: 1, paddingLeft: 8, paddingRight: 8 }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
         <img src={appIcon(p.icon)} style={{ width: 64, height: 64 }} />
-        <div style={{ fontSize: 18, color: p.text2 }}>What do you want to know about it?</div>
-        <div style={{ fontSize: 12, color: p.muted }}>{count > 0 ? `${program.name} · ${count.toLocaleString("en-US")} ${count === 1 ? "kernel" : "kernels"}` : program.name}</div>
+        <div style={{ fontSize: 18, color: p.text2 }}>{t("workbench.view.agent.knowAboutIt")}</div>
+        <div style={{ fontSize: 12, color: p.muted }}>{count === 0 ? program.name : count === 1 ? t("workbench.view.agent.oneKernel", { name: program.name }) : t("workbench.view.agent.kernels", { name: program.name, count: count.toLocaleString("en-US") })}</div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        {GPU_QUESTIONS.map((question) => (
+        {GPU_QUESTIONS.map((id) => t(id)).map((question) => (
           <div key={question} onClick={() => ask(bench, question)} role="button" style={{ display: "flex", alignItems: "center", gap: 10, height: 36, paddingLeft: 10, paddingRight: 10, borderRadius: 8, cursor: "pointer", hover: HOVER }}>
             <Icon name="gpu" size={15} color={p.data} />
             <div style={{ flexGrow: 1, minWidth: 0, color: p.text3, ...ELLIPSIS }}>{question}</div>
@@ -113,12 +115,12 @@ function EmptyChat(): ReactElement {
     <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 20, flexGrow: 1, paddingLeft: 8, paddingRight: 8 }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
         <img src={appIcon(p.icon)} style={{ width: 64, height: 64 }} />
-        <div style={{ fontSize: 18, color: p.text2 }}>What do you want to dig into?</div>
-        <div style={{ fontSize: 12, color: p.muted }}>{`${program.name} · ${program.functions.length.toLocaleString()} functions`}</div>
+        <div style={{ fontSize: 18, color: p.text2 }}>{t("workbench.view.agent.digInto")}</div>
+        <div style={{ fontSize: 12, color: p.muted }}>{t("workbench.view.agent.functions", { name: program.name, count: program.functions.length.toLocaleString() })}</div>
       </div>
       {playbooks.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <div style={{ paddingLeft: 10, paddingBottom: 4, fontSize: 11.5, color: p.faint }}>Playbooks</div>
+          <div style={{ paddingLeft: 10, paddingBottom: 4, fontSize: 11.5, color: p.faint }}>{t("workbench.view.agent.playbooks")}</div>
           {playbooks.map((skill) => (
             <div key={skill.name} onClick={() => ask(bench, skillPrompt(skill, here))} role="button" style={{ display: "flex", alignItems: "center", gap: 10, height: 36, paddingLeft: 10, paddingRight: 10, borderRadius: 8, cursor: "pointer", hover: HOVER }}>
               <Icon name="bolt" size={15} color={p.data} />
@@ -146,7 +148,7 @@ export function AgentTab(): ReactElement {
         ? (model ? <EmptyModelChat /> : gpu ? <EmptyGpuChat /> : <EmptyChat />)
         : <LiveThread chatId={active?.id ?? null} />}
       <div style={{ display: "flex", flexShrink: 0, paddingLeft: 10, paddingRight: 10, paddingBottom: 10 }}>
-        <Composer place="dock" target={chat.target} agents={chat.agents} thread={chat.thread} onAttach={chat.openFile} onDetach={chat.detach} onPickAgent={chat.pickAgent} mention={mention} mentions={mentions} hint={model ? "Ask about this model, / for skills" : gpu ? "Ask about these kernels, / for skills" : null} />
+        <Composer place="dock" target={chat.target} agents={chat.agents} thread={chat.thread} onAttach={chat.openFile} onDetach={chat.detach} onPickAgent={chat.pickAgent} mention={mention} mentions={mentions} hint={model ? t("workbench.view.agent.hint.model") : gpu ? t("workbench.view.agent.hint.gpu") : null} />
       </div>
     </div>
   );

@@ -7,9 +7,11 @@ import type { Syntax } from "../components/code";
 import { Button, ErrorCard } from "../components/kit";
 import { Icon } from "../components/ui";
 import { forgetRecreation, languageOf, recreate, type RecreateFn, type RecreateKey, type RecreateRequest, savedPath, savedRecreation } from "../engine/recreate";
+import { listOf, type PlainId, t, thisDevice } from "../i18n";
 import { swiftTypes, type SwiftType } from "../engine/swiftTypes";
 import { ASSETS } from "../lib/assets";
 import { errorMessage } from "../lib/guards";
+import { FILE_MANAGER } from "../lib/platform";
 import { useLoaded } from "../lib/useLoaded";
 import { showInFinder, tildePath } from "../settings/system";
 import { useTheme } from "../theme";
@@ -35,6 +37,14 @@ const WHY: Readonly<Record<TraceReason, string>> = {
   named: "named in the binary",
 };
 
+/** WHY in the reader's language; WHY itself stays English since it keys saved recreations and goes to the agent. */
+const WHY_LABEL: Readonly<Record<TraceReason, PlainId>> = {
+  metadata: "workbench.view.recovered.why.metadata",
+  accessor: "workbench.view.recovered.why.accessor",
+  path: "workbench.view.recovered.why.path",
+  named: "workbench.view.recovered.why.named",
+};
+
 type Recreation =
   | { readonly kind: "idle" }
   | { readonly kind: "reading"; readonly step: string | null }
@@ -44,6 +54,18 @@ type Recreation =
 
 function counted(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
+
+/** What the file was built from, as a list the reader's language joins: "3 functions and 1 type". */
+function builtFrom(fns: number, types: number): string {
+  const parts = [fns === 1 ? t("workbench.view.recovered.oneFunction") : t("workbench.view.recovered.functions", { count: fns })];
+  if (types) parts.push(types === 1 ? t("workbench.view.recovered.oneType") : t("workbench.view.recovered.types", { count: types }));
+  return listOf(parts);
+}
+
+function languageName(file: string): string {
+  const language = languageOf(file);
+  return language.fence ? language.label : t("workbench.view.recovered.originalLanguage");
 }
 
 function syntaxOf(file: string): Syntax {
@@ -75,9 +97,9 @@ export function RecoveredView({ file }: { readonly file: string }): ReactElement
   if (original.kind === "ready" && original.value !== null) return <OriginalFile file={file} text={original.value} />;
   switch (trace.kind) {
     case "loading":
-      return <div style={{ padding: 16, color: p.muted }}>{`Tracing ${file.split("/").pop() ?? file} in the binary…`}</div>;
+      return <div style={{ padding: 16, color: p.muted }}>{t("workbench.view.recovered.tracing", { name: file.split("/").pop() ?? file })}</div>;
     case "failed":
-      return <div style={{ padding: 16 }}><ErrorCard title={`Couldn't trace ${file}`} detail="The rest of the app still reads. Try the functions in the sidebar instead." raw={trace.message} /></div>;
+      return <div style={{ padding: 16 }}><ErrorCard title={t("workbench.view.recovered.traceFailed", { file })} detail={t("workbench.view.recovered.traceFailed.detail")} raw={trace.message} /></div>;
     case "ready":
       return <TracedFile trace={trace.value} />;
     default: {
@@ -94,8 +116,8 @@ function OriginalFile({ file, text }: { readonly file: string; readonly text: st
   return (
     <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 8, paddingLeft: 16, paddingRight: 12 }}>
-        <div style={{ flexGrow: 1, minWidth: 0, fontSize: 12, color: p.muted, ...ELLIPSIS }}>{`The original file, found on this Mac at ${tildePath(file)}`}</div>
-        <TextButton label="Show in Finder" tone="ghost" onClick={() => showInFinder(file)} />
+        <div style={{ flexGrow: 1, minWidth: 0, fontSize: 12, color: p.muted, ...ELLIPSIS }}>{t("workbench.view.recovered.original", { device: thisDevice(), path: tildePath(file) })}</div>
+        <TextButton label={t("settings.showIn", { app: FILE_MANAGER })} tone="ghost" onClick={() => showInFinder(file)} />
       </div>
       <SourceLines source={source} syntax={syntaxOf(file)} ask={ask} />
     </div>
@@ -188,7 +210,6 @@ function TracedFile({ trace }: { readonly trace: FileTrace }): ReactElement {
   const { state, shape, key, attempt, start, again } = useRecreation(bench, trace);
   const [evidence, setEvidence] = useState(false);
   const name = trace.file.split("/").pop() ?? trace.file;
-  const language = languageOf(trace.file);
   const restart = `${trace.file}:${agent.id}:${attempt}`;
   const live = state.kind === "reading" || state.kind === "writing";
   const [typing, setTyping] = useState(false);
@@ -202,25 +223,24 @@ function TracedFile({ trace }: { readonly trace: FileTrace }): ReactElement {
   const full = state.kind === "writing" ? state.code : state.kind === "done" ? state.source.text : "";
   const shown = useTypewriter(full, typing, restart);
   if (live || (state.kind === "done" && typing && shown < full.length)) {
-    return <Working code={full.slice(0, shown)} step={live ? state.step : null} shape={shape} title={`${agent.name} is recreating ${name}`} syntax={syntaxOf(trace.file)} />;
+    return <Working code={full.slice(0, shown)} step={live ? state.step : null} shape={shape} title={t("workbench.view.recovered.recreating", { agent: agent.name, name })} syntax={syntaxOf(trace.file)} />;
   }
   if (state.kind === "failed") {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 16 }}>
-        <ErrorCard title={`Couldn't recreate ${name}`} detail={SIGN_IN.test(state.message) ? `${agent.name} needs you to sign in. Sign in, then try again.` : "Try again, or pick another agent in the chat. The functions in it still open."} raw={state.message} />
-        <div style={{ display: "flex" }}><TextButton label="Try again" tone="outline" onClick={start} /></div>
+        <ErrorCard title={t("workbench.view.recovered.failed", { name })} detail={SIGN_IN.test(state.message) ? t("workbench.view.recovered.signIn", { agent: agent.name }) : t("workbench.view.recovered.failed.detail")} raw={state.message} />
+        <div style={{ display: "flex" }}><TextButton label={t("workbench.view.tryAgain")} tone="outline" onClick={start} /></div>
       </div>
     );
   }
   if (state.kind === "done" && !evidence) {
-    const from = [counted(trace.fns.length, "function"), ...(trace.types.length ? [counted(trace.types.length, "type")] : [])].join(" and ");
     return (
       <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0 }}>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, paddingTop: 8, paddingLeft: 16, paddingRight: 12 }}>
-          <div style={{ flexGrow: 1, flexBasis: 260, fontSize: 12, color: p.muted }}>{`${language.label}, recreated by ${agent.name} from ${from}. Names and structure are its best reading of the binary; check them against the pseudocode.`}</div>
-          <TextButton label="What it's built from" tone="ghost" onClick={() => setEvidence(true)} />
-          <TextButton label="Copy" tone="ghost" onClick={() => copy(bench, state.source.text, name)} />
-          <TextButton label="Recreate again" tone="ghost" onClick={again} />
+          <div style={{ flexGrow: 1, flexBasis: 260, fontSize: 12, color: p.muted }}>{t("workbench.view.recovered.done", { language: languageName(trace.file), agent: agent.name, from: builtFrom(trace.fns.length, trace.types.length) })}</div>
+          <TextButton label={t("workbench.view.recovered.builtFrom")} tone="ghost" onClick={() => setEvidence(true)} />
+          <TextButton label={t("workbench.view.copy")} tone="ghost" onClick={() => copy(bench, state.source.text, name)} />
+          <TextButton label={t("workbench.view.recovered.again")} tone="ghost" onClick={again} />
         </div>
         <SourceLines source={state.source} syntax={syntaxOf(trace.file)} labels ask={sourcePlace(trace.file, syntaxOf(trace.file))} />
       </div>
@@ -252,12 +272,9 @@ function Evidence({ trace, saved, onRecreate, onShowFile, onAsk }: {
   const agent = chat.agents.selected;
   const name = trace.file.split("/").pop() ?? trace.file;
   const logo = join(ASSETS, "icons", `${logoFor((name.split(".").pop() ?? "").toLowerCase())}.svg`);
-  const language = languageOf(trace.file);
-  const where = trace.guessed ? `Guessed from the type ${stemOf(trace.file)}` : trace.file;
-  const why = trace.guessed
-    ? "No path for this file is left in the binary. Its name comes from a Swift type, so the real file may be named differently or hold more types."
-    : "The binary holds this file’s compiled code, not its text. These are the parts Eleven traced back to it.";
-  const hint = trace.fns.length ? `Writes the whole file in ${language.label} from the parts below` : `${agent.name} looks for the code itself`;
+  const where = trace.guessed ? t("workbench.view.recovered.guessedFrom", { name: stemOf(trace.file) }) : trace.file;
+  const why = trace.guessed ? t("workbench.view.recovered.guessed") : t("workbench.view.recovered.compiled");
+  const hint = trace.fns.length ? t("workbench.view.recovered.writes", { language: languageName(trace.file) }) : t("workbench.view.recovered.looks", { agent: agent.name });
   return (
     <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0, overflowY: "scroll" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 22, maxWidth: 760, paddingTop: 28, paddingBottom: 40, paddingLeft: 32, paddingRight: 32 }}>
@@ -271,42 +288,42 @@ function Evidence({ trace, saved, onRecreate, onShowFile, onAsk }: {
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
           {saved
-            ? <Button label="Show recreated file" tone="primary" icon="spark" onClick={onShowFile} />
-            : <Button label={`Recreate with ${agent.name}`} tone="primary" icon="spark" onClick={onRecreate} />}
-          <Button label="Ask in chat" tone="outline" onClick={onAsk} />
+            ? <Button label={t("workbench.view.recovered.show")} tone="primary" icon="spark" onClick={onShowFile} />
+            : <Button label={t("workbench.view.recovered.recreateWith", { agent: agent.name })} tone="primary" icon="spark" onClick={onRecreate} />}
+          <Button label={t("workbench.view.recovered.askInChat")} tone="outline" onClick={onAsk} />
           {!saved && <div style={{ fontSize: 12, color: p.faint }}>{hint}</div>}
         </div>
         {trace.types.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <SectionTitle text="Types" />
+            <SectionTitle text={t("workbench.view.recovered.typesTitle")} />
             {trace.types.map((type) => (
               <div key={type.name} style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 30, paddingLeft: 8, paddingRight: 8, borderRadius: 8, backgroundColor: p.raised }}>
                 <div style={{ fontSize: 12, color: p.keyword, ...MONO_STYLE }}>{type.kind}</div>
                 <div style={{ flexGrow: 1, minWidth: 0, fontSize: 12, color: p.kind, userSelect: "text", ...MONO_STYLE, ...ELLIPSIS }}>{type.name}</div>
-                <div style={{ fontSize: 11.5, color: p.faint }}>{type.methods.length ? `${counted(type.methods.length, "method")} in its metadata` : "Swift metadata"}</div>
+                <div style={{ fontSize: 11.5, color: p.faint }}>{type.methods.length === 0 ? t("workbench.view.recovered.swiftMetadata") : type.methods.length === 1 ? t("workbench.view.recovered.oneMethod") : t("workbench.view.recovered.methods", { count: type.methods.length })}</div>
               </div>
             ))}
           </div>
         )}
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <SectionTitle text="Functions from this file" count={trace.fns.length ? String(trace.fns.length) : ""} />
+          <SectionTitle text={t("workbench.view.recovered.functionsTitle")} count={trace.fns.length ? String(trace.fns.length) : ""} />
           {trace.fns.slice(0, MAX_ROWS).map((fn) => (
-            <div key={fn.addr} onClick={() => openFn(fn.addr, true)} role="button" aria-label={`Open ${nameOf(fn.addr)}`} style={{ display: "flex", alignItems: "center", gap: 10, height: 30, flexShrink: 0, paddingLeft: 8, paddingRight: 8, borderRadius: 8, cursor: "pointer", hover: HOVER }}>
+            <div key={fn.addr} onClick={() => openFn(fn.addr, true)} role="button" aria-label={t("workbench.view.open", { name: nameOf(fn.addr) })} style={{ display: "flex", alignItems: "center", gap: 10, height: 30, flexShrink: 0, paddingLeft: 8, paddingRight: 8, borderRadius: 8, cursor: "pointer", hover: HOVER }}>
               <Icon name="function" size={14} color={p.muted} />
               <div style={{ flexGrow: 1, minWidth: 0, fontSize: 12, color: p.text3, pointerEvents: "none", ...MONO_STYLE, ...ELLIPSIS }}>{nameOf(fn.addr)}</div>
-              <div style={{ flexShrink: 0, fontSize: 11.5, color: p.faint, pointerEvents: "none", whiteSpace: "nowrap" }}>{WHY[fn.why]}</div>
+              <div style={{ flexShrink: 0, fontSize: 11.5, color: p.faint, pointerEvents: "none", whiteSpace: "nowrap" }}>{t(WHY_LABEL[fn.why])}</div>
               <div style={{ flexShrink: 0, fontSize: 11, color: p.faint, pointerEvents: "none", ...MONO_STYLE }}>{fn.addr.slice(-5)}</div>
             </div>
           ))}
           {trace.fns.length === 0 && (
             <div style={{ paddingTop: 10, paddingBottom: 10, paddingLeft: 8, paddingRight: 8, borderRadius: 8, backgroundColor: p.raised, color: p.muted }}>
-              {`Nothing in the binary points to this file directly yet. ${agent.name} can still look for it: it reads the type’s metadata, the strings that mention it, and the code that uses them.`}
+              {t("workbench.view.recovered.nothing", { agent: agent.name })}
             </div>
           )}
         </div>
         {trace.strings.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <SectionTitle text="Strings that mention it" />
+            <SectionTitle text={t("workbench.view.recovered.strings")} />
             {trace.strings.map((text) => <div key={text} style={{ height: 28, display: "flex", alignItems: "center", paddingLeft: 8, paddingRight: 8, fontSize: 12, color: p.string, userSelect: "text", ...MONO_STYLE, ...ELLIPSIS }}>{JSON.stringify(text)}</div>)}
           </div>
         )}
