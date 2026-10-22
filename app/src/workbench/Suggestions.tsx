@@ -8,18 +8,19 @@ import { Icon } from "../components/ui";
 import { goTo } from "./actions";
 import { ELLIPSIS, HOVER, IconButton, MONO_STYLE, TextButton, useBench } from "./parts";
 import { useProject } from "./useProject";
+import { type PlainId, t } from "../i18n";
 
-const KIND: Readonly<Record<EditField, { readonly label: string; readonly done: string; readonly icon: string }>> = {
-  names: { label: "Rename", done: "Renamed", icon: "rename" },
-  notes: { label: "Note", done: "Noted", icon: "note" },
-  comments: { label: "Comment", done: "Commented", icon: "note" },
-  colors: { label: "Colour", done: "Coloured", icon: "circle" },
-  bookmarks: { label: "Bookmark", done: "Bookmarked", icon: "bookmark" },
-  patches: { label: "Patch", done: "Patched", icon: "hex" },
-  groups: { label: "Group", done: "Grouped", icon: "graph" },
-  types: { label: "Change type", done: "Changed type", icon: "tag" },
-  formats: { label: "Number format", done: "Changed format", icon: "hex" },
-  breakpoints: { label: "Breakpoint", done: "Added breakpoint", icon: "play" },
+const KIND: Readonly<Record<EditField, { readonly label: PlainId; readonly done: PlainId; readonly icon: string }>> = {
+  names: { label: "workbench.suggestion.rename", done: "workbench.suggestion.renamed", icon: "rename" },
+  notes: { label: "workbench.suggestion.note", done: "workbench.suggestion.noted", icon: "note" },
+  comments: { label: "workbench.suggestion.comment", done: "workbench.suggestion.commented", icon: "note" },
+  colors: { label: "workbench.suggestion.colour", done: "workbench.suggestion.coloured", icon: "circle" },
+  bookmarks: { label: "workbench.suggestion.bookmark", done: "workbench.suggestion.bookmarked", icon: "bookmark" },
+  patches: { label: "workbench.suggestion.patch", done: "workbench.suggestion.patched", icon: "hex" },
+  groups: { label: "workbench.suggestion.group", done: "workbench.suggestion.grouped", icon: "graph" },
+  types: { label: "workbench.suggestion.type", done: "workbench.suggestion.typed", icon: "tag" },
+  formats: { label: "workbench.suggestion.format", done: "workbench.suggestion.formatted", icon: "hex" },
+  breakpoints: { label: "workbench.suggestion.breakpoint", done: "workbench.suggestion.breakpointAdded", icon: "play" },
 };
 
 /** Suggestions decided before this window opened stay out of the chat. */
@@ -56,37 +57,37 @@ function Card({ edit, onDismiss }: { readonly edit: Edit; readonly onDismiss: ()
       setProblem(errorMessage(err));
     }
   };
-  const before = edit.field === "names" ? (edit.before ?? nameOf(edit.key)) : (edit.before ?? "nothing");
+  const before = edit.field === "names" ? (edit.before ?? nameOf(edit.key)) : (edit.before ?? t("workbench.suggestion.nothing"));
   return (
     <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 10, paddingBottom: 10, paddingLeft: 12, paddingRight: 12, borderWidth: 1, borderColor: p.line2, borderRadius: 12, backgroundColor: p.raised }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: p.muted }}>
         <Icon name={kind.icon} size={13} color={p.muted} />
-        <div>{kind.label}</div>
+        <div>{t(kind.label)}</div>
         <div style={{ flexGrow: 1 }} />
         <div onClick={() => goTo(bench, edit.key)} role="button" style={{ fontSize: 11.5, color: p.call, cursor: "pointer", hover: HOVER, ...MONO_STYLE }}>{edit.key}</div>
-        {settled && <IconButton icon="close" label="Dismiss" tip={false} size={20} iconSize={9} onClick={onDismiss} />}
+        {settled && <IconButton icon="close" label={t("workbench.suggestion.dismiss")} tip={false} size={20} iconSize={9} onClick={onDismiss} />}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, fontSize: 12, userSelect: "text", ...MONO_STYLE }}>
         <div style={{ color: p.muted, textDecoration: "line-through", ...ELLIPSIS }}>{before}</div>
         <div style={{ color: p.faint }}>→</div>
-        <div style={{ color: p.text, ...ELLIPSIS }}>{edit.after ?? "removed"}</div>
+        <div style={{ color: p.text, ...ELLIPSIS }}>{edit.after ?? t("workbench.suggestion.removed")}</div>
       </div>
       {edit.reason && <div style={{ fontSize: 12.5, color: p.text3, userSelect: "text" }}>{edit.reason}</div>}
       {edit.status === "proposed" && (
         <div style={{ display: "flex", gap: 8 }}>
-          <TextButton label="Accept" tone="primary" onClick={() => run(() => accept(program.id, [edit.id]))} />
-          <TextButton label="Decline" tone="outline" onClick={() => run(() => decline(program.id, [edit.id]))} />
+          <TextButton label={t("workbench.suggestion.accept")} tone="primary" onClick={() => run(() => accept(program.id, [edit.id]))} />
+          <TextButton label={t("workbench.suggestion.decline")} tone="outline" onClick={() => run(() => decline(program.id, [edit.id]))} />
         </div>
       )}
       {edit.status === "applied" && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: p.string }}>
-          <div>{kind.done}</div>
-          <div onClick={() => run(() => { undo(program.id, edit.id); wb.notify(`Undid the ${kind.label.toLowerCase()}`, null); })} role="button" style={{ color: p.link, cursor: "pointer", hover: HOVER }}>Undo</div>
+          <div>{t(kind.done)}</div>
+          <div onClick={() => run(() => { undo(program.id, edit.id); wb.notify(t("workbench.suggestion.undid", { what: t(kind.label).toLowerCase() }), null); })} role="button" style={{ color: p.link, cursor: "pointer", hover: HOVER }}>{t("workbench.undo")}</div>
         </div>
       )}
-      {edit.status === "rejected" && <div style={{ fontSize: 12, color: p.muted }}>Declined</div>}
-      {edit.status === "undone" && <div style={{ fontSize: 12, color: p.muted }}>Undone</div>}
-      {problem && <div role="alert" style={{ fontSize: 12, color: p.error }}>{`Couldn't do that. ${problem}`}</div>}
+      {edit.status === "rejected" && <div style={{ fontSize: 12, color: p.muted }}>{t("workbench.suggestion.declined")}</div>}
+      {edit.status === "undone" && <div style={{ fontSize: 12, color: p.muted }}>{t("workbench.suggestion.undone")}</div>}
+      {problem && <div role="alert" style={{ fontSize: 12, color: p.error }}>{t("workbench.couldNotDo", { message: problem })}</div>}
     </div>
   );
 }

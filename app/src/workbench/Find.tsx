@@ -6,12 +6,13 @@ import { noteTyping } from "../lib/shortcuts";
 import { useTheme } from "../theme";
 import { IconButton, MONO_STYLE, SegItem, useBench } from "./parts";
 import type { FindMode } from "./state";
+import { type PlainId, t } from "../i18n";
 
-const MODES: readonly { readonly mode: FindMode; readonly label: string }[] = [
-  { mode: "text", label: "Text" },
-  { mode: "regex", label: "Regex" },
-  { mode: "hex", label: "Hex" },
-  { mode: "number", label: "Number" },
+export const FIND_MODES: readonly { readonly mode: FindMode; readonly label: PlainId }[] = [
+  { mode: "text", label: "workbench.find.text" },
+  { mode: "regex", label: "workbench.find.regex" },
+  { mode: "hex", label: "workbench.find.hex" },
+  { mode: "number", label: "workbench.find.number" },
 ];
 
 export type Matcher = { readonly kind: "ok"; readonly test: (text: string) => boolean } | { readonly kind: "empty" } | { readonly kind: "bad"; readonly why: string };
@@ -34,17 +35,17 @@ export function lineMatcher(query: string, mode: FindMode): Matcher {
         const pattern = new RegExp(q, "i");
         return { kind: "ok", test: (text) => pattern.test(text) };
       } catch {
-        return { kind: "bad", why: "That isn't a pattern Eleven can read." };
+        return { kind: "bad", why: t("workbench.find.badPattern") };
       }
     case "number": {
       const value = /^0x[0-9a-f]+$/i.test(q) ? BigInt(q) : /^-?\d+$/.test(q) ? BigInt(q) : null;
-      if (value === null) return { kind: "bad", why: "Type a number, like 80 or 0x50." };
+      if (value === null) return { kind: "bad", why: t("workbench.find.badNumber") };
       const pattern = new RegExp(`(?:0x0*${value.toString(16)}\\b|#${escape(value.toString(10))}\\b|\\b${escape(value.toString(10))}\\b)`, "i");
       return { kind: "ok", test: (text) => pattern.test(text) };
     }
     case "hex": {
       const bytes = hexBytes(q);
-      if (!bytes) return { kind: "bad", why: "Type whole bytes, like 1f 20 03 d5." };
+      if (!bytes) return { kind: "bad", why: t("workbench.find.badBytes") };
       const spaced = bytes.map((byte) => byte.toString(16).padStart(2, "0")).join(" ");
       return { kind: "ok", test: (text) => text.toLowerCase().includes(spaced) };
     }
@@ -87,13 +88,13 @@ export function findInBytes(bytes: readonly number[], query: string, mode: FindM
   switch (mode) {
     case "hex": {
       const needle = hexBytes(q);
-      return needle ? runs(needle) : { hits: [], problem: "Type whole bytes, like 1f 20 03 d5." };
+      return needle ? runs(needle) : { hits: [], problem: t("workbench.find.badBytes") };
     }
     case "text":
       return runs([...q].map((ch) => ch.charCodeAt(0) & 0xff));
     case "number": {
       const value = /^(0x[0-9a-f]+|\d+)$/i.test(q) ? BigInt(q) : null;
-      return value === null ? { hits: [], problem: "Type a number, like 80 or 0x50." } : runs(littleEndian(value));
+      return value === null ? { hits: [], problem: t("workbench.find.badNumber") } : runs(littleEndian(value));
     }
     case "regex": {
       try {
@@ -101,7 +102,7 @@ export function findInBytes(bytes: readonly number[], query: string, mode: FindM
         const text = String.fromCharCode(...bytes.map((byte) => (byte >= 0x20 && byte < 0x7f ? byte : 0x2e)));
         return { hits: [...text.matchAll(pattern)].filter((m) => m[0].length > 0).map((m) => [m.index ?? 0, m[0].length] as const), problem: null };
       } catch {
-        return { hits: [], problem: "That isn't a pattern Eleven can read." };
+        return { hits: [], problem: t("workbench.find.badPattern") };
       }
     }
     default: {
@@ -129,17 +130,17 @@ export function FindBar({ count, problem }: { readonly count: number; readonly p
     if (event.key === "escape") wb.patch({ finding: false });
     if (event.key === "enter" && event.modifiers?.shift) step(-1);
   };
-  const status = problem ?? (s.findQuery.trim() === "" ? "" : count === 0 ? "No matches" : `${at + 1} of ${count}`);
+  const status = problem ?? (s.findQuery.trim() === "" ? "" : count === 0 ? t("workbench.find.noMatches") : t("workbench.find.position", { at: at + 1, count }));
   return (
     <div role="search" style={{ display: "flex", alignItems: "center", gap: 8, height: 38, flexShrink: 0, paddingLeft: 12, paddingRight: 8, borderBottomWidth: 1, borderColor: p.fill }}>
-      <input autoFocus value={s.findQuery} placeholder="Find in this view" aria-label="Find" onKeyDown={onKeyDown} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onChange={(e) => wb.patch({ findQuery: e.value ?? "", findAt: 0 })} onSubmit={() => step(1)} style={{ flexGrow: 1, minWidth: 80, maxWidth: 360, height: 26, paddingLeft: 9, paddingRight: 9, borderRadius: 7, backgroundColor: p.deep, fontSize: 12.5, color: p.text, ...MONO_STYLE, ...fieldLook(p, focused, problem !== null) }} />
-      <div role="radiogroup" aria-label="Find as" style={{ display: "flex", gap: 2, padding: 2, borderRadius: 8, backgroundColor: p.raised2 }}>
-        {MODES.map((m) => <SegItem key={m.mode} label={m.label} on={m.mode === s.findMode} onBg={p.sel2} padding={8} onClick={() => wb.patch({ findMode: m.mode, findAt: 0 })} />)}
+      <input autoFocus value={s.findQuery} placeholder={t("workbench.find.placeholder")} aria-label={t("workbench.find.label")} onKeyDown={onKeyDown} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onChange={(e) => wb.patch({ findQuery: e.value ?? "", findAt: 0 })} onSubmit={() => step(1)} style={{ flexGrow: 1, minWidth: 80, maxWidth: 360, height: 26, paddingLeft: 9, paddingRight: 9, borderRadius: 7, backgroundColor: p.deep, fontSize: 12.5, color: p.text, ...MONO_STYLE, ...fieldLook(p, focused, problem !== null) }} />
+      <div role="radiogroup" aria-label={t("workbench.find.as")} style={{ display: "flex", gap: 2, padding: 2, borderRadius: 8, backgroundColor: p.raised2 }}>
+        {FIND_MODES.map((m) => <SegItem key={m.mode} label={t(m.label)} on={m.mode === s.findMode} onBg={p.sel2} padding={8} onClick={() => wb.patch({ findMode: m.mode, findAt: 0 })} />)}
       </div>
       <div style={{ flexGrow: 1, fontSize: 12, color: problem ? p.error : p.muted, whiteSpace: "nowrap" }}>{status}</div>
-      <IconButton icon="back" label="Previous match" size={24} iconSize={13} onClick={() => step(-1)} />
-      <IconButton icon="forward" label="Next match" size={24} iconSize={13} onClick={() => step(1)} />
-      <IconButton icon="close" label="Close find" size={24} iconSize={12} onClick={() => wb.patch({ finding: false })} />
+      <IconButton icon="back" label={t("workbench.find.previous")} size={24} iconSize={13} onClick={() => step(-1)} />
+      <IconButton icon="forward" label={t("workbench.find.next")} size={24} iconSize={13} onClick={() => step(1)} />
+      <IconButton icon="close" label={t("workbench.find.close")} size={24} iconSize={12} onClick={() => wb.patch({ finding: false })} />
     </div>
   );
 }

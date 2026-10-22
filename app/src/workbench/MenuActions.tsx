@@ -3,6 +3,7 @@ import { loadProject } from "../engine/project";
 import { exportAllPseudocode, exportFunction, exportObjcInventory } from "./export";
 import { patchBytes } from "./patch";
 import { useBench } from "./parts";
+import { t } from "../i18n";
 
 /** Offers the workbench's File, Export and View items to the menu bar while it is open. */
 export function MenuActions(): null {
@@ -12,9 +13,9 @@ export function MenuActions(): null {
   const exported = (work: Promise<string>): void => {
     void (async (): Promise<void> => {
       try {
-        chat.thread.note(`Saved to ${await work}`);
+        chat.thread.note(t("workbench.export.saved", { path: await work }));
       } catch (err) {
-        chat.thread.note(`Couldn't export. ${err instanceof Error ? err.message : String(err)}`);
+        chat.thread.note(t("workbench.export.failed", { message: err instanceof Error ? err.message : String(err) }));
       }
     })();
   };

@@ -10,6 +10,7 @@ import { errorMessage } from "../lib/guards";
 import { useCommand } from "../lib/shortcuts";
 import type { Bench } from "./parts";
 import { pickToOpen } from "../lib/pick";
+import { t } from "../i18n";
 
 const AUTOSAVE_MS = 2000;
 
@@ -25,16 +26,16 @@ export function useOpenInWorkbench(bench: Bench): (path: string) => void {
       const target = chat.choose(path, show);
       if (target) show(target);
     } catch (err) {
-      wb.notify(`Couldn't open that file. ${errorMessage(err)}`, null);
+      wb.notify(t("workbench.document.openFailed", { message: errorMessage(err) }), null);
     }
   };
   useCommand("open", () => {
     void (async (): Promise<void> => {
       try {
-        const first = await pickToOpen(renderer, "Open");
+        const first = await pickToOpen(renderer, t("workbench.document.open"));
         if (first) open(first);
       } catch (err) {
-        wb.notify(`Couldn't show the file picker. ${errorMessage(err)}`, null);
+        wb.notify(t("workbench.document.pickerFailed", { message: errorMessage(err) }), null);
       }
     })();
   });
@@ -54,9 +55,9 @@ export function useDocument(bench: Bench): void {
     if (!path) return;
     try {
       await saveDocument(target, program.id, path);
-      if (asking) wb.notify(`Saved ${basename(path)}`, null);
+      if (asking) wb.notify(t("workbench.document.saved", { name: basename(path) }), null);
     } catch (err) {
-      wb.notify(`Couldn't save the project. ${errorMessage(err)}`, null);
+      wb.notify(t("workbench.document.saveFailed", { message: errorMessage(err) }), null);
     }
   };
   const later = (): void => {

@@ -11,6 +11,9 @@ import type { HexRow, Refs } from "./model";
 import { fileOffset } from "./patch";
 import { ELLIPSIS, MONO_STYLE, TextButton, useBench } from "./parts";
 import { currentAddr, placeIn, segmentOf } from "./where";
+import { type PlainId, t } from "../i18n";
+
+const NO_COLOR: PlainId = "workbench.inspector.none";
 
 function Heading({ text }: { readonly text: string }): ReactElement {
   const { p } = useTheme();
@@ -44,33 +47,33 @@ function TensorInspector({ name, tensor }: { readonly name: string; readonly ten
   const bench = useBench();
   const { gpuData } = bench;
   const model = gpuData.kind === "ready" ? gpuData.value.models.find((m) => m.name === name) : undefined;
-  const picked = model?.tensors.find((t) => t.name === tensor);
+  const picked = model?.tensors.find((entry) => entry.name === tensor);
   const box = { display: "flex", flexDirection: "column", gap: 18, flexGrow: 1, minHeight: 0, overflowY: "scroll", paddingTop: 4, paddingLeft: 14, paddingRight: 14, paddingBottom: 18 } as const;
   if (!model || !picked) {
     return (
       <div style={box}>
         <Heading text={model?.name ?? name} />
-        <div style={{ color: p.muted, fontSize: 12.5 }}>{model && model.tensors.length > 0 ? "Pick a tensor to see its shape, type and where it is in the file." : "Nothing in this model to inspect yet."}</div>
+        <div style={{ color: p.muted, fontSize: 12.5 }}>{model && model.tensors.length > 0 ? t("workbench.inspector.pickTensor") : t("workbench.inspector.emptyModel")}</div>
       </div>
     );
   }
   const elements = picked.shape ? picked.shape.split(" × ").reduce((n, d) => n * Number(d), 1) : 1;
   const block = blockOf(picked.name);
-  const blocks = new Set(model.tensors.flatMap((t) => blockOf(t.name) ?? [])).size;
+  const blocks = new Set(model.tensors.flatMap((entry) => blockOf(entry.name) ?? [])).size;
   return (
     <div style={box}>
-      <div role="region" aria-label="Tensor" style={{ display: "flex", flexDirection: "column" }}>
+      <div role="region" aria-label={t("workbench.inspector.tensor")} style={{ display: "flex", flexDirection: "column" }}>
         <div style={{ fontSize: 13, color: p.text, userSelect: "text", ...MONO_STYLE }}>{picked.name}</div>
         {tensorRole(picked.name) && <div style={{ marginBottom: 8, color: p.muted, fontSize: 12.5 }}>{tensorRole(picked.name)}</div>}
-        <Pair label="Shape" value={picked.shape || "scalar"} mono />
-        <Pair label="Elements" value={elements.toLocaleString("en-US")} mono />
-        <Pair label="Type" value={picked.type} mono />
-        <Pair label="Size" value={bytes(picked.bytes)} mono />
-        {picked.offset !== null && <Pair label="Offset" value={`0x${picked.offset.toString(16)}${model.format.startsWith("GGUF") ? " in data" : " in file"}`} mono />}
-        <Pair label="Block" value={block === null ? "outside the blocks" : `${block} of ${blocks}`} />
+        <Pair label={t("workbench.inspector.shape")} value={picked.shape || t("workbench.inspector.scalar")} mono />
+        <Pair label={t("workbench.inspector.elements")} value={elements.toLocaleString("en-US")} mono />
+        <Pair label={t("workbench.inspector.type")} value={picked.type} mono />
+        <Pair label={t("workbench.inspector.size")} value={bytes(picked.bytes)} mono />
+        {picked.offset !== null && <Pair label={t("workbench.inspector.offset")} value={t(model.format.startsWith("GGUF") ? "workbench.inspector.inData" : "workbench.inspector.inFile", { offset: `0x${picked.offset.toString(16)}` })} mono />}
+        <Pair label={t("workbench.inspector.block")} value={block === null ? t("workbench.inspector.outsideBlocks") : t("workbench.inspector.blockOf", { block, count: blocks })} />
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-        <TextButton label="Ask about this tensor" tone="ask" onClick={() => ask(bench, `In the model ${model.name}, what does the tensor ${picked.name} (${picked.shape}, ${picked.type}) do?`)} />
+        <TextButton label={t("workbench.inspector.askTensor")} tone="ask" onClick={() => ask(bench, t("workbench.inspector.askTensorPrompt", { model: model.name, tensor: picked.name, shape: picked.shape, type: picked.type }))} />
       </div>
     </div>
   );
@@ -99,33 +102,33 @@ function CodeInspector(): ReactElement {
   const calls = refs.kind === "ready" ? refs.value.callees.map(nameOf).join(", ") : "";
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18, flexGrow: 1, minHeight: 0, overflowY: "scroll", paddingTop: 4, paddingLeft: 14, paddingRight: 14, paddingBottom: 18 }}>
-      <div role="region" aria-label="Selection" style={{ display: "flex", flexDirection: "column" }}>
-        <Heading text="Selection" />
-        <Pair label="Address" value={at} mono />
-        <Pair label="In file at" value={offset.kind === "ready" && offset.value !== null ? `0x${offset.value.toString(16)}` : "Not in the file"} mono />
-        <Pair label="Segment" value={segmentOf(program.segments, at) ?? "Unknown"} />
-        <Pair label="Bytes" value={hex.kind === "ready" ? bytesAt(hex.value, at) || "None" : "Reading…"} mono />
+      <div role="region" aria-label={t("workbench.inspector.selection")} style={{ display: "flex", flexDirection: "column" }}>
+        <Heading text={t("workbench.inspector.selection")} />
+        <Pair label={t("workbench.action.address")} value={at} mono />
+        <Pair label={t("workbench.inspector.inFileAt")} value={offset.kind === "ready" && offset.value !== null ? `0x${offset.value.toString(16)}` : t("workbench.inspector.notInFile")} mono />
+        <Pair label={t("workbench.inspector.segment")} value={segmentOf(program.segments, at) ?? t("workbench.inspector.unknown")} />
+        <Pair label={t("workbench.inspector.bytes")} value={hex.kind === "ready" ? bytesAt(hex.value, at) || t("workbench.inspector.none") : t("workbench.inspector.reading")} mono />
       </div>
-      <div role="region" aria-label="Function" style={{ display: "flex", flexDirection: "column" }}>
-        <Heading text="Function" />
-        <Pair label="Name" value={placeIn(nameOf(focusAddr), focusAddr, at)} mono />
-        <Pair label="Called by" value={callers === null ? "Finding…" : callers === 1 ? "1 place" : `${callers} places`} />
-        <Pair label="Calls" value={refs.kind === "ready" ? calls || "Nothing" : "Finding…"} />
+      <div role="region" aria-label={t("workbench.inspector.function")} style={{ display: "flex", flexDirection: "column" }}>
+        <Heading text={t("workbench.inspector.function")} />
+        <Pair label={t("workbench.menu.name")} value={placeIn(nameOf(focusAddr), focusAddr, at)} mono />
+        <Pair label={t("workbench.calledBy")} value={callers === null ? t("workbench.inspector.finding") : callers === 1 ? t("workbench.inspector.onePlace") : t("workbench.inspector.places", { count: callers })} />
+        <Pair label={t("workbench.calls")} value={refs.kind === "ready" ? calls || t("workbench.inspector.nothing") : t("workbench.inspector.finding")} />
       </div>
-      <div role="region" aria-label="Your notes" style={{ display: "flex", flexDirection: "column" }}>
-        <Heading text="Tag and note" />
-        <div role="radiogroup" aria-label="Colour tag" style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-          {[{ name: "None", color: "" }, ...BLOCK_COLORS].map((c) => (
-            <div key={c.name} onClick={() => wb.setColor(focusAddr, c.color)} role="radio" aria-label={c.name} aria-selected={color === c.color} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, borderRadius: 10, backgroundColor: c.color || p.fill, cursor: "pointer" }}>
+      <div role="region" aria-label={t("workbench.inspector.yourNotes")} style={{ display: "flex", flexDirection: "column" }}>
+        <Heading text={t("workbench.inspector.tagAndNote")} />
+        <div role="radiogroup" aria-label={t("workbench.inspector.colourTag")} style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+          {[{ label: NO_COLOR, color: "" }, ...BLOCK_COLORS].map((c) => (
+            <div key={c.label} onClick={() => wb.setColor(focusAddr, c.color)} role="radio" aria-label={t(c.label)} aria-selected={color === c.color} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, borderRadius: 10, backgroundColor: c.color || p.fill, cursor: "pointer" }}>
               {color === c.color && <Icon name="check" size={12} color={c.color ? "#ffffff" : p.text} />}
             </div>
           ))}
         </div>
-        <textarea {...TYPING} value={wb.s.notes.get(focusAddr) ?? ""} minRows={3} maxRows={8} placeholder="What this function does, in your words" aria-label="Note" onChange={(e) => wb.setNote(focusAddr, e.value ?? "")} style={{ paddingTop: 8, paddingBottom: 8, paddingLeft: 9, paddingRight: 9, borderWidth: 1, borderColor: p.line3, borderRadius: 8, backgroundColor: p.deep, fontSize: 12.5, color: p.text3 }} />
+        <textarea {...TYPING} value={wb.s.notes.get(focusAddr) ?? ""} minRows={3} maxRows={8} placeholder={t("workbench.inspector.notePlaceholder")} aria-label={t("workbench.inspector.note")} onChange={(e) => wb.setNote(focusAddr, e.value ?? "")} style={{ paddingTop: 8, paddingBottom: 8, paddingLeft: 9, paddingRight: 9, borderWidth: 1, borderColor: p.line3, borderRadius: 8, backgroundColor: p.deep, fontSize: 12.5, color: p.text3 }} />
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-        <TextButton label="Patch this line…" tone="outline" onClick={() => wb.patch({ patching: at, patchDraft: "" })} />
-        <TextButton label="Ask about this line" tone="outline" onClick={() => ask(bench, `What does the code at ${at} in ${nameOf(focusAddr)} do?`)} />
+        <TextButton label={t("workbench.inspector.patchLine")} tone="outline" onClick={() => wb.patch({ patching: at, patchDraft: "" })} />
+        <TextButton label={t("workbench.inspector.askLine")} tone="outline" onClick={() => ask(bench, t("workbench.inspector.askLinePrompt", { address: at, name: nameOf(focusAddr) }))} />
       </div>
     </div>
   );
