@@ -8,7 +8,7 @@ import { useCodeLook } from "../settings/look";
 import { Icon } from "../components/ui";
 import { alertColors, text } from "./look";
 import { bytes } from "./models/read";
-import { type ModelFact, type ModelNote, metaGroups, modelFacts, modelNotes, type NoteTone, opCounts, tensorGroups } from "./models/facts";
+import { type ModelFact, type ModelNote, metaGroups, modelFacts, modelNotes, type NoteTone, opCounts, riskQuote, riskText, tensorGroups } from "./models/facts";
 import type { LoadEffect, ModelInfo, ModelLayer, ModelPage, ModelTensor, PickleName } from "./types";
 
 const COLUMNS = [
@@ -319,7 +319,8 @@ function templateColor(p: Palette, line: string): string {
 function Template({ model }: { readonly model: ModelInfo }): ReactElement {
   const { p } = useTheme();
   const { family } = useCodeLook();
-  const hidden = model.risk && model.template?.includes(model.risk.detail) ? model.risk.detail : null;
+  const quote = riskQuote(model.risk);
+  const hidden = quote && model.template?.includes(quote) ? quote : null;
   const lines = (model.template ?? "").replace(/(%\}|\}\})(?=\{)/g, "$1\n").split("\n");
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingTop: 18, paddingBottom: 28, paddingLeft: 20, paddingRight: 20, userSelect: "text" }}>
@@ -361,12 +362,13 @@ function Loads({ model }: { readonly model: ModelInfo }): ReactElement {
   const { p } = useTheme();
   const { family } = useCodeLook();
   const risk = alertColors(p);
+  const warning = model.risk ? riskText(model.risk) : null;
   return (
     <div style={{ display: "flex", flexDirection: "column", userSelect: "text" }}>
-      {model.risk && (
+      {warning && (
         <div role="alert" style={{ marginTop: 16, marginLeft: 20, marginRight: 20, paddingTop: 12, paddingBottom: 12, paddingLeft: 14, paddingRight: 14, borderWidth: 1, borderColor: risk.line, borderRadius: 10, backgroundColor: risk.bg }}>
-          <div style={{ fontWeight: 500 }}>{model.risk.title}</div>
-          <div style={{ color: p.text2 }}>{model.risk.detail}</div>
+          <div style={{ fontWeight: 500 }}>{warning.title}</div>
+          <div style={{ color: p.text2 }}>{warning.detail}</div>
         </div>
       )}
       <div style={{ paddingTop: 16, paddingBottom: 10, paddingLeft: 20, paddingRight: 20, color: p.muted }}>{t("gpu.model.loads")}</div>

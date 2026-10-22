@@ -45,7 +45,7 @@ function useLook(tab: Tab): Look {
     case "text":
       return { title: tab.title, icon: "text", iconColor: null };
     case "tool":
-      return { title: TOOL_LABEL[tab.tool], icon: TOOL_ICON[tab.tool], iconColor: null };
+      return { title: t(TOOL_LABEL[tab.tool]), icon: TOOL_ICON[tab.tool], iconColor: null };
     default: {
       const unhandled: never = tab;
       return unhandled;

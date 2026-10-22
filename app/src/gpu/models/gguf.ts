@@ -61,9 +61,9 @@ function shown(value: Value): string {
 /** Text a chat template puts in front of the model: a default system message, or plain text outside its tags that every prompt carries. */
 export function hiddenPrompt(template: string): ModelRisk | null {
   const fallback = /<\|im_start\|>system\\?n?\s*([^<'"{}]{8,}?)\s*(?:<\|im_end\|>|['"])/.exec(template)?.[1]?.trim();
-  if (fallback) return { title: "Adds a system prompt when you send none", detail: fallback };
+  if (fallback) return { kind: "systemPrompt", text: fallback };
   const loose = template.replace(/\{%[\s\S]*?%\}|\{\{[\s\S]*?\}\}|\{#[\s\S]*?#\}/g, " ").replace(/\s+/g, " ").trim();
-  if (loose.split(" ").length >= 3) return { title: "Adds text to every prompt", detail: loose };
+  if (loose.split(" ").length >= 3) return { kind: "everyPrompt", text: loose };
   return null;
 }
 
@@ -97,7 +97,7 @@ export async function readGguf(path: string): Promise<ModelInfo> {
   }
   const mix = mixOf(tensors);
   const template = text(meta, "tokenizer.chat_template");
-  const risk: ModelRisk | null = template ? (hiddenPrompt(template) ?? { title: "Ships a chat template", detail: "It shapes every prompt the model sees. Open Chat template to read it." }) : null;
+  const risk: ModelRisk | null = template ? (hiddenPrompt(template) ?? { kind: "template" }) : null;
   const arch = text(meta, "general.architecture") ?? "unknown";
   const context = text(meta, `${arch}.context_length`);
   const metadata: MetaEntry[] = [...meta].filter(([key]) => key !== "tokenizer.chat_template").map(([key, value]) => ({ key, value: shown(value) }));

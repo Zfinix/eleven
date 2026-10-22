@@ -153,6 +153,12 @@ function rowSubject(list: ListKind, row: TableRow, raw: TableRow | undefined): S
   }
 }
 
+/** A segment row keeps "start to end" as data; the reader sees it in their language. */
+function rangeText(range: string): string {
+  const [start, end, ...rest] = range.split(" to ");
+  return start !== undefined && end !== undefined && rest.length === 0 ? t("workbench.chrome.rangeOf", { start, end }) : range;
+}
+
 function Table({ list }: { readonly list: ListKind }): ReactElement {
   const { p } = useTheme();
   const bench = useBench();
@@ -173,9 +179,9 @@ function Table({ list }: { readonly list: ListKind }): ReactElement {
       {rows.length === 0 && <Centered><EmptyState title={t(NONE[list])} hint={t("workbench.chrome.noneHint", { engine: program.engine })} /></Centered>}
       {rows.length > 0 && <virtual-list itemCount={rows.length} windowStart={shown.start} estimatedItemHeight={ROW_HEIGHT} onVisibleRange={shown.onVisibleRange} style={{ flexGrow: 1, minHeight: 0, paddingBottom: 24 }}>
         {rows.slice(shown.start, shown.end).map((row, ix) => (
-          <div key={shown.start + ix} {...subjectMenu(bench, rowSubject(list, row, program[list][shown.start + ix]))} role="row" aria-label={row.b} style={{ display: "flex", userSelect: "text", borderTopWidth: 1, borderColor: p.raised2 }}>
+          <div key={shown.start + ix} {...subjectMenu(bench, rowSubject(list, row, program[list][shown.start + ix]))} role="row" aria-label={list === "segments" ? rangeText(row.b) : row.b} style={{ display: "flex", userSelect: "text", borderTopWidth: 1, borderColor: p.raised2 }}>
             <div style={{ width: FIRST_COLUMN, flexShrink: 0, color: p.muted, ...cell }}>{addresses(row.a)}</div>
-            <div style={{ flexGrow: 1, minWidth: 0, color: list === "strings" ? p.string : p.text3, ...cell }}>{list === "segments" ? addresses(row.b) : row.b}</div>
+            <div style={{ flexGrow: 1, minWidth: 0, color: list === "strings" ? p.string : p.text3, ...cell }}>{list === "segments" ? rangeText(addresses(row.b)) : row.b}</div>
           </div>
         ))}
       </virtual-list>}

@@ -87,7 +87,7 @@ function ToolToggle({ tool, back }: { readonly tool: Tool; readonly back: boolea
   const on = wb.s.right === tool;
   return (
     <div {...menuOn(() => toolMenu(bench, tool))} style={{ display: "flex", borderRadius: 7, ...(on ? { backgroundColor: p.sel } : {}) }}>
-      <IconButton icon={TOOL_ICON[tool]} label={on && back ? t("workbench.dock.backToAgent") : TOOL_LABEL[tool]} iconSize={16} color={on ? p.text : p.muted} onClick={() => wb.reveal(on && back ? "agent" : tool)} />
+      <IconButton icon={TOOL_ICON[tool]} label={on && back ? t("workbench.dock.backToAgent") : t(TOOL_LABEL[tool])} iconSize={16} color={on ? p.text : p.muted} onClick={() => wb.reveal(on && back ? "agent" : tool)} />
     </div>
   );
 }
@@ -105,7 +105,7 @@ function Header(): ReactElement {
       <div {...menuOn(() => toolMenu(bench, active))} role="tablist" aria-label={t("workbench.dock.chats")} style={{ display: "flex", alignItems: "center", gap: 2, flexGrow: 1, minWidth: 0, overflow: "hidden" }}>
         {active === "agent"
           ? chat.tabs.map((tab) => <ChatTabView key={tab.id} tab={tab} onPick={() => chat.selectTab(tab.id)} onClose={() => chat.closeTab(tab.id)} />)
-          : <div style={{ paddingLeft: 8, fontSize: 13, fontWeight: 500, color: p.text2 }}>{TOOL_LABEL[active]}</div>}
+          : <div style={{ paddingLeft: 8, fontSize: 13, fontWeight: 500, color: p.text2 }}>{t(TOOL_LABEL[active])}</div>}
       </div>
       {hasAgent && (
         <div onMouseDown={past.onTriggerDown} style={{ display: "flex", position: "relative", borderRadius: 7, ...(past.open ? { backgroundColor: p.sel } : {}) }}>

@@ -196,7 +196,7 @@ export function useChat(target: Target | null, onTarget: (target: Target | null)
     try {
       next = found.target ? prepareTarget(found.target) : null;
     } catch {
-      at(slot).note(`${found.target} isn't there anymore, so this chat has no file attached.`);
+      at(slot).note(t("chat.note.fileGone", { path: found.target ?? "" }));
     }
     show(slot, next, [...tabs.order, slot]);
   };

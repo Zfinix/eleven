@@ -15,7 +15,7 @@ import { useLoaded } from "../../lib/useLoaded";
 import { useNow } from "../../lib/useNow";
 import { shellIn } from "../../terminal/shell";
 import { type Palette, useTheme } from "../../theme";
-import { type Arrangement, type ArrangedFile, type ArrangeStep, arrange, type FailReason, failureReason, failureText, forgetArrangement, type Placement, savedArrangement } from "../arrange";
+import { type Arrangement, type ArrangedFile, type ArrangeStep, arrange, type FailReason, failureReason, failureText, forgetArrangement, type Placement, reasonText, savedArrangement } from "../arrange";
 import { type Bench, ELLIPSIS, HOVER, MONO_STYLE, useBench } from "../parts";
 import { type SourceFiles as Files, sourceFiles, traceStatic } from "../sources";
 import { useFolders } from "./memory";
@@ -359,7 +359,7 @@ function ArrangedTree({ arrangement, agent }: { readonly arrangement: Arrangemen
   const mark = (file: ArrangedFile): ReactElement => {
     const label = placementLabel(file.placement, agent);
     return (
-      <Tooltip label={t("workbench.side.placedWhy", { how: label, reason: file.reason })}>
+      <Tooltip label={t("workbench.side.placedWhy", { how: label, reason: reasonText(file.reason) })}>
         <div aria-label={label} style={{ width: 6, height: 6, flexShrink: 0, borderRadius: 3, backgroundColor: placementColor(file.placement, p) }} />
       </Tooltip>
     );
@@ -369,7 +369,7 @@ function ArrangedTree({ arrangement, agent }: { readonly arrangement: Arrangemen
       {tree.map((node) => {
         if (node.folder) return <TreeFolder key={node.path} name={node.name} open={!closed.has(node.path)} depth={node.depth} onClick={() => folders.toggle(`arr:${node.path}`)} />;
         const file = byPath.get(node.full);
-        return file ? fileRow(file.key, node.name, node.depth, node.ext, { count: String(file.fns.length), italic: file.placement === "guess", mark: mark(file), why: t("workbench.side.placedWhy", { how: placementLabel(file.placement, agent), reason: file.reason }) }) : null;
+        return file ? fileRow(file.key, node.name, node.depth, node.ext, { count: String(file.fns.length), italic: file.placement === "guess", mark: mark(file), why: t("workbench.side.placedWhy", { how: placementLabel(file.placement, agent), reason: reasonText(file.reason) }) }) : null;
       })}
       {arrangement.unplaced.length > 0 && <TreeFolder name={t("workbench.side.notPlaced")} open={unplacedOpen} depth={0} count={arrangement.unplaced.length.toLocaleString()} faint onClick={() => folders.toggle("arr:#unplaced")} />}
       {unplacedOpen && arrangement.unplaced.slice(0, UNPLACED_SHOWN).map((addr) => (

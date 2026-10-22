@@ -138,7 +138,7 @@ export async function readPickle(path: string): Promise<ModelInfo> {
   const loads: PickleName[] = pickleImports(await pickleBytes(path)).map((name) => ({ name, from: packageOf(name), effect: loadEffect(name) }));
   const dangerous = loads.filter((item) => item.effect === "runs code").map((item) => item.name);
   const risk: ModelRisk | null = dangerous.length > 0
-    ? { title: `${basename(path)} runs Python code when it loads`, detail: `It's a pickle file that calls ${dangerous.join(", ")}. Eleven read it without loading it. Don't open it in PyTorch.` }
+    ? { kind: "runsCode", file: basename(path), calls: dangerous }
     : null;
   const size = (await stat(path)).size;
   return {

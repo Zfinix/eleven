@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { deleteThread, listThreads } from "../chat/history";
 import { RECORDINGS_DIR } from "../gpu/trace";
+import { t } from "../i18n";
 import { supportPath } from "../lib/support";
 import { currentSettings } from "./store";
 import { cacheRoot, copyToClipboard, exe, trash } from "../lib/platform";
@@ -28,15 +29,16 @@ export function folderBytes(path: string): number {
 }
 
 export function sizeText(bytes: number): string {
-  if (bytes === 0) return "Empty";
-  const units = ["bytes", "KB", "MB", "GB"] as const;
-  let value = bytes;
+  if (bytes === 0) return t("settings.size.empty");
+  if (bytes < 1000) return t("settings.size.bytes", { count: bytes });
+  const units = ["KB", "MB", "GB"] as const;
+  let value = bytes / 1000;
   let unit = 0;
   while (value >= 1000 && unit < units.length - 1) {
     value /= 1000;
     unit += 1;
   }
-  return `${unit >= 3 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
+  return `${unit >= 2 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
 }
 
 export function projectCount(): number {

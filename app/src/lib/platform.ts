@@ -335,13 +335,13 @@ export const THIS_DEVICE = OS === "mac" ? "this Mac" : "this computer";
 
 export const OS_NAME = OS === "mac" ? "macOS" : OS === "windows" ? "Windows" : "Linux";
 
-/** A small program every machine has, for the first-run example, with questions that suit it. */
-export const SAMPLE_APP: { readonly path: string; readonly name: string; readonly ideas: readonly string[] } =
+/** A small program every machine has, for the first-run example. */
+export const SAMPLE_APP: { readonly path: string; readonly name: string } =
   OS === "mac"
-    ? { path: "/System/Applications/Calculator.app", name: "Calculator", ideas: ["What happens when I press the equals key? Walk me through the code.", "How does it keep the history of past results?", "Where does it switch between Basic and Scientific?"] }
+    ? { path: "/System/Applications/Calculator.app", name: "Calculator" }
     : OS === "windows"
-      ? { path: "C:\\Windows\\System32\\notepad.exe", name: "Notepad", ideas: ["What happens when I save a file? Walk me through the code.", "How does it find text with Find and Replace?", "Where does it decide which encoding to use?"] }
-      : { path: "/usr/bin/bc", name: "bc", ideas: ["What happens when I type 2+2 and press Enter? Walk me through the code.", "How does it parse an expression?", "Where does it handle numbers with many digits?"] };
+      ? { path: "C:\\Windows\\System32\\notepad.exe", name: "Notepad" }
+      : { path: "/usr/bin/bc", name: "bc" };
 
 /** Programs to suggest opening on a first run, when they exist here. */
 export const STARTER_FILES: readonly string[] =

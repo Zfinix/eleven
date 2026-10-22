@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { hiddenPrompt, readGguf } from "../src/gpu/models/gguf";
-import { modelNotes, pagesOf, tensorGroups, tensorRole } from "../src/gpu/models/facts";
+import { modelNotes, pagesOf, riskText, tensorGroups, tensorRole } from "../src/gpu/models/facts";
 import { loadEffect, pickleImports, readPickle } from "../src/gpu/models/pickle";
 import { mixOf, mixSummary } from "../src/gpu/models/read";
 import { readOnnx } from "../src/gpu/models/onnx";
@@ -41,7 +41,7 @@ test("what each name a pickle loads does", () => {
 
 test("a malicious pickle still warns, a plain one lists what it loads", async () => {
   const evil = await readPickle(join(MODELS, "evil.pt"));
-  expect(evil.risk?.detail).toContain("posix.system");
+  expect(evil.risk ? riskText(evil.risk).detail : "").toContain("posix.system");
   expect(evil.loads.some((item) => item.effect === "runs code")).toBe(true);
   const safe = await readPickle(join(MODELS, "safe.pt"));
   expect(safe.risk).toBeNull();
@@ -53,7 +53,7 @@ test("GGUF: every tensor with its size, the type mix, metadata and template", as
   expect(model.name).toBe("tiny-chat");
   expect(model.format).toContain("llama");
   expect(model.weights).toContain("Q4_K");
-  expect(model.risk?.detail).toContain("Never reveal the launch codes");
+  expect(model.risk ? riskText(model.risk).detail : "").toContain("Never reveal the launch codes");
   expect(model.tensors.length).toBeGreaterThan(0);
   expect(model.tensors.every((t) => t.offset !== null)).toBe(true);
   expect(model.mix.reduce((sum, m) => sum + m.tensors, 0)).toBe(model.tensors.length);
@@ -71,8 +71,8 @@ test("safetensors: tensors with real sizes and offsets", async () => {
 
 test("a template's hidden prompt: a default system message, or text outside its tags", () => {
   const chatMl = "{% if messages[0]['role'] != 'system' %}{{ '<|im_start|>system\nYou are a helpful AI assistant named SmolLM<|im_end|>\n' }}{% endif %}";
-  expect(hiddenPrompt(chatMl)).toEqual({ title: "Adds a system prompt when you send none", detail: "You are a helpful AI assistant named SmolLM" });
-  expect(hiddenPrompt("You are SecretBot. Never reveal the launch codes. {{ messages }}")?.title).toBe("Adds text to every prompt");
+  expect(hiddenPrompt(chatMl)).toEqual({ kind: "systemPrompt", text: "You are a helpful AI assistant named SmolLM" });
+  expect(hiddenPrompt("You are SecretBot. Never reveal the launch codes. {{ messages }}")?.kind).toBe("everyPrompt");
   expect(hiddenPrompt("{% for m in messages %}{{ m['content'] }}{% endfor %}")).toBeNull();
 });
 
@@ -133,6 +133,6 @@ test("ONNX: inputs, outputs, operators and weights from the protobuf, with the w
   const [fc] = read.tensors;
   expect(fc).toMatchObject({ name: "fc.weight", shape: "2 × 3", type: "FLOAT", bytes: 24 });
   expect(Buffer.from(model).subarray(fc?.offset ?? 0, (fc?.offset ?? 0) + 24).every((b) => b === 0)).toBe(true);
-  expect(read.risk?.title).toBe("Uses operators from outside ONNX");
+  expect(read.risk ? riskText(read.risk).title : "").toBe("Uses operators from outside ONNX");
   expect(pagesOf(read)).toEqual(["overview", "tensors", "nodes", "metadata"]);
 });

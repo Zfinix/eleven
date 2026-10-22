@@ -240,7 +240,7 @@ function Session({ debug, page, setPage, onAsk }: { readonly debug: Debug; reado
         <Toolbar debug={debug} onAsk={stopped ? () => onAsk(stopped) : null} />
       </div>
       <div role="tablist" style={{ display: "flex", flexWrap: "wrap", gap: 2, paddingLeft: 10, paddingRight: 10, paddingBottom: 6 }}>
-        {PAGES.map((item) => <SegItem key={item.page} label={item.label} on={page === item.page} onBg={p.sel2} padding={9} onClick={() => setPage(item.page)} />)}
+        {PAGES.map((item) => <SegItem key={item.page} label={t(item.label)} on={page === item.page} onBg={p.sel2} padding={9} onClick={() => setPage(item.page)} />)}
       </div>
       <div style={{ flexGrow: 1, minHeight: 0, overflow: "scroll", paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 12 }}>
         {page === "stack" && (stopped ? <div style={{ display: "flex", flexDirection: "column", gap: 12 }}><Frames frames={stopped.frames} /><Scopes scopes={stopped.scopes.filter((scope) => !isRegisters(scope))} load={debug.loadVars} /></div> : waiting)}

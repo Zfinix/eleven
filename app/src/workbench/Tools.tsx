@@ -93,8 +93,8 @@ export function DockTabs({ zone, trailing }: { readonly zone: Zone; readonly tra
         return (
           <Fragment key={tab}>
             {drag?.before === tab && marker}
-            <div ref={keep} onAuxClick={menu.onAuxClick} onMouseDown={(event) => event.x !== undefined && (event.button ?? 0) === 0 && setDrag({ tab, startX: event.x, before: undefined })} onMouseUp={drop} onClick={() => wb.reveal(tab)} role="tab" aria-selected={on} aria-label={TOOL_LABEL[tab]} style={{ display: "flex", alignItems: "center", gap: 6, height: 26, paddingLeft: 10, paddingRight: 10, borderRadius: 7, fontSize: 12.5, color: on ? p.text : p.muted, cursor: "pointer", opacity: drag?.tab === tab && drag.before !== undefined ? 0.5 : 1, ...(on ? { backgroundColor: p.sel } : {}) }}>
-              <div style={{ whiteSpace: "nowrap", pointerEvents: "none" }}>{TOOL_LABEL[tab]}</div>
+            <div ref={keep} onAuxClick={menu.onAuxClick} onMouseDown={(event) => event.x !== undefined && (event.button ?? 0) === 0 && setDrag({ tab, startX: event.x, before: undefined })} onMouseUp={drop} onClick={() => wb.reveal(tab)} role="tab" aria-selected={on} aria-label={t(TOOL_LABEL[tab])} style={{ display: "flex", alignItems: "center", gap: 6, height: 26, paddingLeft: 10, paddingRight: 10, borderRadius: 7, fontSize: 12.5, color: on ? p.text : p.muted, cursor: "pointer", opacity: drag?.tab === tab && drag.before !== undefined ? 0.5 : 1, ...(on ? { backgroundColor: p.sel } : {}) }}>
+              <div style={{ whiteSpace: "nowrap", pointerEvents: "none" }}>{t(TOOL_LABEL[tab])}</div>
               {tab === "patches" && patches > 0 && <div style={{ fontSize: 11, color: p.faint, pointerEvents: "none" }}>{`${patches}`}</div>}
             </div>
           </Fragment>

@@ -4,7 +4,7 @@ import { type Syntax as Grammar, tokenize } from "../components/code";
 import { type Syntax, syntaxFor, useCodeLook } from "../settings/look";
 import { useSettings } from "../settings/store";
 import { type Palette, SANS, useTheme } from "../theme";
-import { t } from "../i18n";
+import { type PlainId, t } from "../i18n";
 import { type AskRow, PinDot, useAskRows } from "../workbench/ask/AskThread";
 import type { AskPlace } from "../workbench/ask/place";
 import type { KernelNote } from "./kernelRewrite";
@@ -104,6 +104,47 @@ function LoadedByCard({ loadedBy, onOpen }: { readonly loadedBy: Loaded<LoadedBy
 
 const CLIP = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } as const;
 
+/** The CUDA and HIP readers name a kernel's stats in English, which other code matches on, so they read in the current language only here. */
+const STAT_NAME: ReadonlyMap<string, PlainId> = new Map([
+  ["Registers", "gpu.stat.registers"],
+  ["Shared memory", "gpu.stat.sharedMemory"],
+  ["Code size", "gpu.stat.codeSize"],
+  ["Parameter block", "gpu.stat.paramBlock"],
+  ["Built for", "gpu.stat.builtFor"],
+  ["Vector registers", "gpu.stat.vectorRegisters"],
+  ["Scalar registers", "gpu.stat.scalarRegisters"],
+  ["Local memory (LDS)", "gpu.stat.lds"],
+  ["Scratch", "gpu.stat.scratch"],
+  ["Wavefront", "gpu.stat.wavefront"],
+  ["Largest workgroup", "gpu.stat.largestWorkgroup"],
+]);
+
+function statValue(value: string): string {
+  const [, count, unit] = /^([\d,]+) (.+)$/.exec(value) ?? [];
+  if (count === undefined) return value;
+  switch (unit) {
+    case "per thread":
+      return t("gpu.stat.perThread", { count });
+    case "per wave":
+      return t("gpu.stat.perWave", { count });
+    case "bytes":
+      return t("gpu.stat.bytes", { count });
+    case "bytes per thread":
+      return t("gpu.stat.bytesPerThread", { count });
+    case "lanes":
+      return t("gpu.stat.lanes", { count });
+    case "threads":
+      return t("gpu.stat.threads", { count });
+    default:
+      return value;
+  }
+}
+
+function statText(stat: Binding): Binding {
+  const name = STAT_NAME.get(stat.slot);
+  return { slot: name ? t(name) : stat.slot, type: statValue(stat.type) };
+}
+
 function Bindings({ title, bindings, mono }: { readonly title: string; readonly bindings: readonly Binding[]; readonly mono: boolean }): ReactElement {
   const { p } = useTheme();
   const { family } = useCodeLook();
@@ -196,7 +237,7 @@ export function ShaderView({ fn, stage, api, ir, loadedBy, onOpen, onAsk, ask, e
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 12, flexGrow: 1, flexBasis: 280, maxWidth: 340, padding: 14, borderLeftWidth: 1, borderColor: p.sel }}>
         {api === "metal" && <LoadedByCard loadedBy={loadedBy} onOpen={onOpen} />}
-        {fn.stats.length > 0 && <Bindings title={t("gpu.needs")} bindings={fn.stats} mono={false} />}
+        {fn.stats.length > 0 && <Bindings title={t("gpu.needs")} bindings={fn.stats.map(statText)} mono={false} />}
         {fn.bindings.length > 0 && <Bindings title={api === "metal" ? t("gpu.inputs") : t("gpu.parameters")} bindings={fn.bindings} mono={api !== "metal"} />}
         <div onClick={onAsk} style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 30, borderWidth: 1, borderColor: p.line3, borderRadius: 8, backgroundColor: p.sel, color: p.text, cursor: "pointer", hover: { opacity: 0.72 } }}>
           <div>{t("gpu.askSlow")}</div>

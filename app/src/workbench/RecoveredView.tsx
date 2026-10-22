@@ -52,10 +52,6 @@ type Recreation =
   | { readonly kind: "done"; readonly source: SourceText }
   | { readonly kind: "failed"; readonly message: string };
 
-function counted(n: number, word: string): string {
-  return `${n} ${word}${n === 1 ? "" : "s"}`;
-}
-
 /** What the file was built from, as a list the reader's language joins: "3 functions and 1 type". */
 function builtFrom(fns: number, types: number): string {
   const parts = [fns === 1 ? t("workbench.view.recovered.oneFunction") : t("workbench.view.recovered.functions", { count: fns })];
@@ -177,8 +173,7 @@ function useRecreation(bench: Bench, trace: FileTrace): {
         const req: RecreateRequest = { ...key, native, binary: { path: bench.program.path, name: bench.program.name, arch: bench.program.arch }, strings: trace.strings, pseudocode };
         const source = await recreate(req, ({ step, code }) => setState(code === null ? { kind: "reading", step } : { kind: "writing", step, code }));
         setState({ kind: "done", source });
-        const from = [counted(key.fns.length, "function"), ...(key.types.length ? [counted(key.types.length, "type")] : [])].join(" and ");
-        bench.chat.thread.note(`${key.agent.name} recreated ${trace.file.split("/").pop() ?? trace.file} from ${from}. Saved at ${tildePath(savedPath(key))}.`);
+        bench.chat.thread.note(t("workbench.view.recovered.recreated", { agent: key.agent.name, file: trace.file.split("/").pop() ?? trace.file, from: builtFrom(key.fns.length, key.types.length), path: tildePath(savedPath(key)) }));
       } catch (err) {
         setState({ kind: "failed", message: errorMessage(err) });
       }

@@ -35,7 +35,7 @@ export type Info = {
   readonly java: { readonly path: string | null; readonly version: string | null };
   readonly rea: { readonly version: string | null; readonly state: ReaState };
   readonly lldb: string | null;
-  readonly sizes: { readonly projects: string | null; readonly apps: number; readonly chats: string | null; readonly cache: string | null; readonly recordings: string | null };
+  readonly sizes: { readonly projects: number | null; readonly apps: number; readonly chats: number | null; readonly cache: number | null; readonly recordings: number | null };
   readonly app: AppUpdate;
   readonly remembered: number;
 };
@@ -142,9 +142,9 @@ export function reaStatus(state: ReaState): { readonly text: string; readonly to
   }
 }
 
-/** A folder size, or a word saying it is still being measured. */
-export function measured(size: string | null): string {
-  return size ?? t("settings.measuring");
+/** A folder size in the current language, or a word saying it is still being measured. */
+export function measured(bytes: number | null): string {
+  return bytes === null ? t("settings.measuring") : sizeText(bytes);
 }
 
 /** Asks GitHub for Eleven's newest release on the chosen channel. */
@@ -178,11 +178,11 @@ async function gather(): Promise<Info> {
     rea: { version: reaV, state: reaState() },
     lldb: findLldbDap(),
     sizes: {
-      projects: sizeText(folderBytes(PROJECTS_DIR)),
+      projects: folderBytes(PROJECTS_DIR),
       apps: projectCount(),
-      chats: sizeText(folderBytes(THREADS_DIR)),
-      cache: sizeText(folderBytes(cacheDir())),
-      recordings: sizeText(folderBytes(RECORDINGS_DIR)),
+      chats: folderBytes(THREADS_DIR),
+      cache: folderBytes(cacheDir()),
+      recordings: folderBytes(RECORDINGS_DIR),
     },
     app: appUpdate(),
     remembered: rememberedAnswerProjects(),

@@ -31,7 +31,14 @@ export type ModelPage = (typeof MODEL_PAGES)[number];
 
 export type ModelLayer = { readonly name: string; readonly op: string; readonly shape: string; readonly type: string };
 
-export type ModelRisk = { readonly title: string; readonly detail: string };
+/** What to know before loading a model, kept as data so the warning reads in the language picked when shown. */
+export type ModelRisk =
+  | { readonly kind: "systemPrompt"; readonly text: string }
+  | { readonly kind: "everyPrompt"; readonly text: string }
+  | { readonly kind: "template" }
+  | { readonly kind: "foreignOps"; readonly domains: readonly string[] }
+  | { readonly kind: "outsideWeights"; readonly count: number }
+  | { readonly kind: "runsCode"; readonly file: string; readonly calls: readonly string[] };
 
 /** One stored tensor; `offset` is from the start of the file's data section, null when the format doesn't say. */
 export type ModelTensor = { readonly name: string; readonly shape: string; readonly type: string; readonly bytes: number; readonly offset: number | null };

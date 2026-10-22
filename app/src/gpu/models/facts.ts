@@ -1,4 +1,5 @@
-import type { MetaEntry, ModelInfo, ModelPage, ModelTensor } from "../types";
+import { listOf, type PlainId, t } from "../../i18n";
+import type { MetaEntry, ModelInfo, ModelPage, ModelRisk, ModelTensor } from "../types";
 import { bytes, count } from "./read";
 
 export type ModelFact = { readonly label: string; readonly value: string; readonly sub: string };
@@ -27,17 +28,17 @@ export function pagesOf(model: ModelInfo): readonly ModelPage[] {
 export function pageLabel(page: ModelPage): string {
   switch (page) {
     case "overview":
-      return "Overview";
+      return t("gpu.model.page.overview");
     case "tensors":
-      return "Tensors";
+      return t("gpu.model.page.tensors");
     case "nodes":
-      return "Operators";
+      return t("gpu.model.page.nodes");
     case "metadata":
-      return "Metadata";
+      return t("gpu.model.page.metadata");
     case "template":
-      return "Chat template";
+      return t("gpu.model.page.template");
     case "loads":
-      return "What it loads";
+      return t("gpu.model.page.loads");
     default: {
       const unhandled: never = page;
       return unhandled;
@@ -120,20 +121,20 @@ function ggufFacts(model: ModelInfo): readonly ModelFact[] {
   const kv = at("attention.head_count_kv");
   const vocab = listLength(get("tokenizer.ggml.tokens")) ?? grouped(at("vocab_size"));
   return [
-    { label: "Architecture", value: joined([arch, blocks && `${blocks} blocks`], " · "), sub: joined([at("embedding_length") && `${at("embedding_length")} wide`, heads && `${heads} heads`, kv && kv !== heads && `${kv} KV heads`], ", ") },
-    { label: "Context", value: at("context_length") ? `${grouped(at("context_length"))} tokens` : "Unknown", sub: at("rope.freq_base") ? `RoPE base ${grouped(at("rope.freq_base"))}` : "" },
-    { label: "Size", value: joined([get("general.size_label"), bytes(model.size)], " · "), sub: `${model.format.split(" · ")[0] ?? "GGUF"}, ${model.tensors.length.toLocaleString("en-US")} tensors` },
-    { label: "Tokenizer", value: joined([get("tokenizer.ggml.model"), vocab && `${vocab} tokens`], " · ") || "None", sub: get("tokenizer.ggml.pre") ? `pre-tokenizer ${get("tokenizer.ggml.pre")}` : "" },
+    { label: t("gpu.model.fact.architecture"), value: joined([arch, blocks && t("gpu.model.fact.blocks", { count: blocks })], " · "), sub: joined([at("embedding_length") && t("gpu.model.fact.wide", { count: at("embedding_length") ?? "" }), heads && t("gpu.model.fact.heads", { count: heads }), kv && kv !== heads && t("gpu.model.fact.kvHeads", { count: kv })], ", ") },
+    { label: t("gpu.model.fact.context"), value: at("context_length") ? t("gpu.model.fact.tokens", { count: grouped(at("context_length")) ?? "" }) : t("gpu.model.fact.unknown"), sub: at("rope.freq_base") ? t("gpu.model.fact.rope", { base: grouped(at("rope.freq_base")) ?? "" }) : "" },
+    { label: t("gpu.model.fact.size"), value: joined([get("general.size_label"), bytes(model.size)], " · "), sub: t("gpu.model.fact.formatTensors", { format: model.format.split(" · ")[0] ?? "GGUF", count: model.tensors.length.toLocaleString("en-US") }) },
+    { label: t("gpu.model.fact.tokenizer"), value: joined([get("tokenizer.ggml.model"), vocab && t("gpu.model.fact.tokens", { count: vocab })], " · ") || t("gpu.model.fact.none"), sub: get("tokenizer.ggml.pre") ? t("gpu.model.fact.preTokenizer", { name: get("tokenizer.ggml.pre") ?? "" }) : "" },
   ];
 }
 
 function safetensorsFacts(model: ModelInfo): readonly ModelFact[] {
   const blocks = new Set(model.tensors.flatMap((t) => BLOCK.exec(t.name)?.[1] ?? [])).size;
   return [
-    { label: "Format", value: "safetensors", sub: model.metadata.length > 0 ? `${model.metadata.length} metadata entries` : "no metadata" },
-    { label: "Parameters", value: count(parameters(model.tensors)), sub: model.mix.map((m) => m.type).join(", ") },
-    { label: "Size", value: bytes(model.size), sub: `${model.tensors.length.toLocaleString("en-US")} tensors` },
-    { label: "Layout", value: blocks > 0 ? `${blocks} layers` : "No numbered layers", sub: "" },
+    { label: t("gpu.model.fact.format"), value: "safetensors", sub: model.metadata.length > 0 ? t("gpu.model.fact.metadataEntries", { count: model.metadata.length }) : t("gpu.model.fact.noMetadata") },
+    { label: t("gpu.model.fact.parameters"), value: count(parameters(model.tensors)), sub: model.mix.map((m) => m.type).join(", ") },
+    { label: t("gpu.model.fact.size"), value: bytes(model.size), sub: t("gpu.model.fact.tensors", { count: model.tensors.length.toLocaleString("en-US") }) },
+    { label: t("gpu.model.fact.layout"), value: blocks > 0 ? t("gpu.model.fact.layers", { count: blocks }) : t("gpu.model.fact.noLayers"), sub: "" },
   ];
 }
 
@@ -141,10 +142,10 @@ function pickleFacts(model: ModelInfo): readonly ModelFact[] {
   const classes = [...new Set(model.loads.filter((l) => l.effect === "class").map((l) => l.from))];
   const running = model.loads.filter((l) => l.effect === "runs code").length;
   return [
-    { label: "Format", value: model.format, sub: "a Python pickle" },
-    { label: "Size", value: bytes(model.size), sub: "" },
-    { label: "Built with", value: classes.length > 0 ? classes.join(", ") : "PyTorch only", sub: "" },
-    { label: "Loads", value: `${model.loads.length} Python names`, sub: running > 0 ? `${running} run code` : "none run code" },
+    { label: t("gpu.model.fact.format"), value: model.format, sub: t("gpu.model.fact.pickle") },
+    { label: t("gpu.model.fact.size"), value: bytes(model.size), sub: "" },
+    { label: t("gpu.model.fact.builtWith"), value: classes.length > 0 ? classes.join(", ") : t("gpu.model.fact.pytorchOnly"), sub: "" },
+    { label: t("gpu.model.fact.loads"), value: t("gpu.model.fact.pythonNames", { count: model.loads.length }), sub: running > 0 ? t("gpu.model.fact.runCode", { count: running }) : t("gpu.model.fact.noneRunCode") },
   ];
 }
 
@@ -156,18 +157,18 @@ export function opCounts(model: ModelInfo): readonly (readonly [string, number])
 }
 
 export function shapeText(shape: readonly number[]): string {
-  return shape.length === 0 ? "scalar" : shape.map((d) => (d < 0 ? "?" : String(d))).join(" × ");
+  return shape.length === 0 ? t("gpu.model.scalar") : shape.map((d) => (d < 0 ? "?" : String(d))).join(" × ");
 }
 
 function onnxFacts(model: ModelInfo): readonly ModelFact[] {
   const [, opset, from] = model.format.split(" · ");
   const ops = opCounts(model);
-  const io = (list: ModelInfo["inputs"]): string => list.map((t) => `${t.name} ${shapeText(t.shape)}`).join(", ") || "None";
+  const io = (list: ModelInfo["inputs"]): string => list.map((tensor) => `${tensor.name} ${shapeText(tensor.shape)}`).join(", ") || t("gpu.model.fact.none");
   return [
-    { label: "Format", value: joined(["ONNX", opset ?? null], " · "), sub: from ?? "" },
-    { label: "Input", value: io(model.inputs), sub: model.inputs.length > 1 ? `${model.inputs.length} inputs` : "" },
-    { label: "Output", value: io(model.outputs), sub: model.outputs.length > 1 ? `${model.outputs.length} outputs` : "" },
-    { label: "Graph", value: `${model.nodes.length.toLocaleString("en-US")} operators`, sub: ops.slice(0, 3).map(([op, n]) => `${op} ×${n}`).join(", ") },
+    { label: t("gpu.model.fact.format"), value: joined(["ONNX", opset ?? null], " · "), sub: from ?? "" },
+    { label: t("gpu.model.fact.input"), value: io(model.inputs), sub: model.inputs.length > 1 ? t("gpu.model.fact.inputs", { count: model.inputs.length }) : "" },
+    { label: t("gpu.model.fact.output"), value: io(model.outputs), sub: model.outputs.length > 1 ? t("gpu.model.fact.outputs", { count: model.outputs.length }) : "" },
+    { label: t("gpu.model.fact.graph"), value: t("gpu.model.fact.operators", { count: model.nodes.length.toLocaleString("en-US") }), sub: ops.slice(0, 3).map(([op, n]) => `${op} ×${n}`).join(", ") },
   ];
 }
 
@@ -176,13 +177,40 @@ export function modelFacts(model: ModelInfo): readonly ModelFact[] {
   if (model.format.startsWith("GGUF")) return ggufFacts(model);
   if (model.format === "safetensors") return safetensorsFacts(model);
   if (model.loads.length > 0 || model.format.includes("pickle")) return pickleFacts(model);
-  const tensorText = (list: ModelInfo["inputs"]): string => list.map((t) => `${t.name} ${shapeText(t.shape)}`).join(", ") || "Unknown";
+  const tensorText = (list: ModelInfo["inputs"]): string => list.map((tensor) => `${tensor.name} ${shapeText(tensor.shape)}`).join(", ") || t("gpu.model.fact.unknown");
   return [
-    { label: "Format", value: model.format, sub: "" },
-    { label: "Weights", value: model.weights, sub: "" },
-    { label: "Input", value: tensorText(model.inputs), sub: "" },
-    { label: "Output", value: tensorText(model.outputs), sub: "" },
+    { label: t("gpu.model.fact.format"), value: model.format, sub: "" },
+    { label: t("gpu.model.fact.weights"), value: model.weights, sub: "" },
+    { label: t("gpu.model.fact.input"), value: tensorText(model.inputs), sub: "" },
+    { label: t("gpu.model.fact.output"), value: tensorText(model.outputs), sub: "" },
   ];
+}
+
+/** A model's risk as a heading and what it means, in the current language; quoted model text stays as written. */
+export function riskText(risk: ModelRisk): { readonly title: string; readonly detail: string } {
+  switch (risk.kind) {
+    case "systemPrompt":
+      return { title: t("gpu.model.risk.systemPrompt"), detail: risk.text };
+    case "everyPrompt":
+      return { title: t("gpu.model.risk.everyPrompt"), detail: risk.text };
+    case "template":
+      return { title: t("gpu.model.risk.template"), detail: t("gpu.model.risk.template.detail") };
+    case "foreignOps":
+      return { title: t("gpu.model.risk.foreignOps"), detail: t("gpu.model.risk.foreignOps.detail", { domains: risk.domains.join(", ") }) };
+    case "outsideWeights":
+      return { title: t("gpu.model.risk.outsideWeights"), detail: t("gpu.model.risk.outsideWeights.detail", { count: risk.count }) };
+    case "runsCode":
+      return { title: t("gpu.model.risk.runsCode", { file: risk.file }), detail: t("gpu.model.risk.runsCode.detail", { calls: risk.calls.join(", ") }) };
+    default: {
+      const unhandled: never = risk;
+      return unhandled;
+    }
+  }
+}
+
+/** The text a chat template puts in front of every prompt, when that is the risk. */
+export function riskQuote(risk: ModelRisk | null): string | null {
+  return risk?.kind === "systemPrompt" || risk?.kind === "everyPrompt" ? risk.text : null;
 }
 
 /** The things worth telling someone before they load the file. */
@@ -191,23 +219,28 @@ export function modelNotes(model: ModelInfo): readonly ModelNote[] {
   const pickle = model.loads.length > 0;
   if (model.risk) {
     const fromTemplate = model.template !== null;
-    notes.push({ title: model.risk.title, body: fromTemplate ? "The chat template puts this in front of the model's conversations." : model.risk.detail, quote: fromTemplate ? model.risk.detail : null, page: fromTemplate ? "template" : pickle ? "loads" : null, tone: "warn" });
+    const { title, detail } = riskText(model.risk);
+    notes.push({ title, body: fromTemplate ? t("gpu.model.note.fromTemplate") : detail, quote: fromTemplate ? detail : null, page: fromTemplate ? "template" : pickle ? "loads" : null, tone: "warn" });
   }
   if (pickle) {
     const classes = [...new Set(model.loads.filter((l) => l.effect === "class").map((l) => l.from))];
-    if (classes.length > 0) notes.push({ title: `Needs ${classes.join(" and ")} installed to load`, body: `It rebuilds classes from ${classes.join(" and ")}, so loading it imports that code.`, quote: null, page: "loads", tone: "warn" });
-    if (!model.risk) notes.push({ title: "Nothing in it runs system commands", body: "Every name it loads builds tensors, layers or classes. No os, subprocess or eval.", quote: null, page: null, tone: "ok" });
+    if (classes.length > 0) notes.push({ title: t("gpu.model.note.needs", { names: listOf(classes) }), body: t("gpu.model.note.needs.body", { names: listOf(classes) }), quote: null, page: "loads", tone: "warn" });
+    if (!model.risk) notes.push({ title: t("gpu.model.note.noCommands"), body: t("gpu.model.note.noCommands.body"), quote: null, page: null, tone: "ok" });
   } else if (model.tensors.length > 0) {
     const kind = model.format.startsWith("GGUF") ? "GGUF" : model.format.startsWith("ONNX") ? "ONNX" : "safetensors";
-    const body = kind === "ONNX" ? "ONNX describes a graph of standard operators and their weights. Loading it runs no Python." : `${kind} holds numbers and text only. There is nothing in it a runtime executes.`;
-    if (!(kind === "ONNX" && model.risk)) notes.push({ title: "Loading it runs no code", body, quote: null, page: null, tone: "ok" });
+    const body = kind === "ONNX" ? t("gpu.model.note.onnx.body") : t("gpu.model.note.data.body", { format: kind });
+    if (!(kind === "ONNX" && model.risk)) notes.push({ title: t("gpu.model.note.noCode"), body, quote: null, page: null, tone: "ok" });
   }
   const path = model.metadata.find((entry) => /\.(file|path|dataset)$/.test(entry.key) && entry.value.startsWith("/"));
-  if (path) notes.push({ title: "Records where it was built", body: `${path.key} is ${path.value}`, quote: null, page: "metadata", tone: "plain" });
+  if (path) notes.push({ title: t("gpu.model.note.builtAt"), body: t("gpu.model.note.builtAt.body", { key: path.key, value: path.value }), quote: null, page: "metadata", tone: "plain" });
   return notes;
 }
 
-function looseGroup(name: string): string {
+type Loose = "Embeddings" | "Output" | "Other";
+
+const LOOSE_LABEL: Readonly<Record<Loose, PlainId>> = { Embeddings: "gpu.model.group.embeddings", Output: "gpu.model.group.output", Other: "gpu.model.group.other" };
+
+function looseGroup(name: string): Loose {
   if (/embd|embed|wte|wpe|tok_/.test(name)) return "Embeddings";
   if (/output|lm_head|head|norm/.test(name)) return "Output";
   return "Other";
@@ -222,7 +255,7 @@ export function tensorGroups(tensors: readonly ModelTensor[]): readonly TensorGr
     const last = groups.at(-1);
     const found = last?.key === key ? last : block ? undefined : groups.find((g) => g.key === key);
     if (found) found.tensors.push(tensor);
-    else groups.push({ key, label: key, tensors: [tensor] });
+    else groups.push({ key, label: block ?? t(LOOSE_LABEL[looseGroup(tensor.name)]), tensors: [tensor] });
   }
   const number = (g: TensorGroup): number => Number(/\.(\d+)$/.exec(g.key)?.[1] ?? Number.NaN);
   const blocks = groups.filter((g) => !Number.isNaN(number(g))).sort((a, b) => number(a) - number(b));
@@ -231,11 +264,12 @@ export function tensorGroups(tensors: readonly ModelTensor[]): readonly TensorGr
 }
 
 export function metaGroups(metadata: readonly MetaEntry[]): readonly MetaGroup[] {
-  const titles = new Map<string, string>([["general", "General"], ["tokenizer", "Tokenizer"], ["quantize", "Quantization"], ["split", "Split"]]);
+  const titles = new Map<string, PlainId>([["general", "gpu.model.meta.general"], ["tokenizer", "gpu.model.meta.tokenizer"], ["quantize", "gpu.model.meta.quantize"], ["split", "gpu.model.meta.split"]]);
   const groups = new Map<string, MetaEntry[]>();
   for (const entry of metadata) {
     const root = entry.key.includes(".") ? (entry.key.split(".")[0] ?? "") : "";
-    const title = titles.get(root) ?? (root ? `Architecture: ${root}` : "About this file");
+    const known = titles.get(root);
+    const title = known ? t(known) : root ? t("gpu.model.meta.arch", { root }) : t("gpu.model.meta.file");
     groups.set(title, [...(groups.get(title) ?? []), entry]);
   }
   return [...groups].map(([title, entries]) => ({ title, entries }));
@@ -243,21 +277,22 @@ export function metaGroups(metadata: readonly MetaEntry[]): readonly MetaGroup[]
 
 /** What a tensor does, from the names llama.cpp and Hugging Face give them. */
 export function tensorRole(name: string): string {
-  const rules: readonly (readonly [RegExp, string])[] = [
-    [/token_embd|embed_tokens|wte/, "Token embeddings"],
-    [/attn_q\b|attn_q\.|q_proj/, "Attention queries"],
-    [/attn_k\b|attn_k\.|k_proj/, "Attention keys"],
-    [/attn_v\b|attn_v\.|v_proj/, "Attention values"],
-    [/attn_output|o_proj/, "Attention output projection"],
-    [/attn_norm|input_layernorm/, "Normalizes the input to attention"],
-    [/ffn_norm|post_attention_layernorm/, "Normalizes the input to feed-forward"],
-    [/ffn_gate|gate_proj/, "Feed-forward gate"],
-    [/ffn_up|up_proj/, "Feed-forward, up projection"],
-    [/ffn_down|down_proj/, "Feed-forward, down projection"],
-    [/output_norm|model\.norm|ln_f/, "Final normalization"],
-    [/^output\.|lm_head/, "Output projection to the vocabulary"],
+  const rules: readonly (readonly [RegExp, PlainId])[] = [
+    [/token_embd|embed_tokens|wte/, "gpu.model.role.tokenEmbeddings"],
+    [/attn_q\b|attn_q\.|q_proj/, "gpu.model.role.queries"],
+    [/attn_k\b|attn_k\.|k_proj/, "gpu.model.role.keys"],
+    [/attn_v\b|attn_v\.|v_proj/, "gpu.model.role.values"],
+    [/attn_output|o_proj/, "gpu.model.role.attentionOutput"],
+    [/attn_norm|input_layernorm/, "gpu.model.role.attentionNorm"],
+    [/ffn_norm|post_attention_layernorm/, "gpu.model.role.feedForwardNorm"],
+    [/ffn_gate|gate_proj/, "gpu.model.role.gate"],
+    [/ffn_up|up_proj/, "gpu.model.role.up"],
+    [/ffn_down|down_proj/, "gpu.model.role.down"],
+    [/output_norm|model\.norm|ln_f/, "gpu.model.role.finalNorm"],
+    [/^output\.|lm_head/, "gpu.model.role.output"],
   ];
-  return rules.find(([pattern]) => pattern.test(name))?.[1] ?? "";
+  const role = rules.find(([pattern]) => pattern.test(name))?.[1];
+  return role ? t(role) : "";
 }
 
 export function blockOf(name: string): string | null {

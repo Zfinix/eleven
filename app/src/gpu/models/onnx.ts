@@ -177,8 +177,8 @@ export async function readOnnx(path: string): Promise<ModelInfo> {
     ...stringPairs(buf, model, 14),
   ];
   const risk: ModelRisk | null = custom.length > 0
-    ? { title: "Uses operators from outside ONNX", detail: `${custom.join(", ")}. Only a runtime that ships them can run this model.` }
-    : outside.length > 0 ? { title: "Keeps its weights in another file", detail: `${outside.length} of its tensors are stored outside this file, so it won't load without them.` } : null;
+    ? { kind: "foreignOps", domains: custom }
+    : outside.length > 0 ? { kind: "outsideWeights", count: outside.length } : null;
   return {
     name: basename(path),
     format: `ONNX${opset ? ` · opset ${opset}` : ""}${by ? ` · from ${by}` : ""}`,
