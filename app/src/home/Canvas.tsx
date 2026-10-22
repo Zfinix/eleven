@@ -4,7 +4,7 @@ import { CodeView } from "../components/code";
 import { type MenuEntry, menuOn } from "../components/ContextMenu";
 import type { Target } from "../engine/target";
 import { t } from "../i18n";
-import { MONO, useTheme } from "../theme";
+import { MONO, scrollbar, useTheme } from "../theme";
 import { Icon, Row, Spacer } from "../components/ui";
 import type { CanvasTab } from "../chat/thread";
 import { copyText } from "../chat/useThread";
@@ -93,7 +93,7 @@ export function Canvas({ tabs, active, target, onSelect, onLink, onWorkbench, on
         <Spacer />
         <div style={{ flexShrink: 0, whiteSpace: "nowrap" }}>{tab.kind === "result" ? t("canvas.toolResult") : t("canvas.fromGhidra")}</div>
       </Row>
-      <div style={{ display: "flex", alignItems: "flex-start", flexGrow: 1, minWidth: 0, minHeight: 0, overflow: "scroll" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", flexGrow: 1, minWidth: 0, minHeight: 0, overflow: "scroll", ...scrollbar(p) }}>
         <CodeBody tab={tab} onLink={onLink} />
       </div>
     </div>

@@ -6,7 +6,7 @@ import { useListWindow } from "../lib/useListWindow";
 import { useLoaded } from "../lib/useLoaded";
 import { showAddress, useCodeLook } from "../settings/look";
 import { type Settings, useSettings } from "../settings/store";
-import { SANS, useTheme } from "../theme";
+import { SANS, scrollbar, useTheme } from "../theme";
 import type { ListKind, TableRow } from "./model";
 import { EmptyState, ErrorCard } from "../components/kit";
 import { subjectMenu } from "./actions";
@@ -177,7 +177,7 @@ function Table({ list }: { readonly list: ListKind }): ReactElement {
         <div style={{ paddingTop: 6, paddingBottom: 6, paddingLeft: 8, paddingRight: 8 }}>{t(second)}</div>
       </div>
       {rows.length === 0 && <Centered><EmptyState title={t(NONE[list])} hint={t("workbench.chrome.noneHint", { engine: program.engine })} /></Centered>}
-      {rows.length > 0 && <virtual-list itemCount={rows.length} windowStart={shown.start} estimatedItemHeight={ROW_HEIGHT} onVisibleRange={shown.onVisibleRange} style={{ flexGrow: 1, minHeight: 0, paddingBottom: 24 }}>
+      {rows.length > 0 && <virtual-list itemCount={rows.length} windowStart={shown.start} estimatedItemHeight={ROW_HEIGHT} onVisibleRange={shown.onVisibleRange} style={{ ...scrollbar(p), flexGrow: 1, minHeight: 0, paddingBottom: 24 }}>
         {rows.slice(shown.start, shown.end).map((row, ix) => (
           <div key={shown.start + ix} {...subjectMenu(bench, rowSubject(list, row, program[list][shown.start + ix]))} role="row" aria-label={list === "segments" ? rangeText(row.b) : row.b} style={{ display: "flex", userSelect: "text", borderTopWidth: 1, borderColor: p.raised2 }}>
             <div style={{ width: FIRST_COLUMN, flexShrink: 0, color: p.muted, ...cell }}>{addresses(row.a)}</div>

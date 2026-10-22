@@ -4,7 +4,7 @@ import { Fragment, type ReactElement, useRef, useState } from "react";
 import { menuOn } from "../components/ContextMenu";
 import { loadProject } from "../engine/project";
 import { t } from "../i18n";
-import { useTheme } from "../theme";
+import { scrollbar, useTheme } from "../theme";
 import { toolMenu } from "./actions";
 import { AgentTab } from "./AgentPanel";
 import { DebugView } from "./DebugView";
@@ -117,7 +117,7 @@ export function BottomDock(): ReactElement {
     <div role="region" aria-label={t("workbench.chrome.details")} style={{ position: "relative", display: "flex", flexDirection: "column", height: wb.s.sizes.details, flexShrink: 0, borderTopWidth: 1, borderColor: p.fill }}>
       <ResizeHandle edge="details" />
       <DockTabs zone="bottom" trailing={<IconButton icon="arrow-down" label={t("workbench.chrome.hideDetails")} size={24} iconSize={12} onClick={() => wb.patch({ bottomOpen: false })} />} />
-      <div style={fillsSpace(tool) ? { display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0 } : { display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0, overflow: "scroll", paddingTop: 4, paddingLeft: 8, paddingRight: 8, paddingBottom: 10 }}>
+      <div style={fillsSpace(tool) ? { display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0 } : { display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0, overflow: "scroll", ...scrollbar(p), paddingTop: 4, paddingLeft: 8, paddingRight: 8, paddingBottom: 10 }}>
         <ToolBody tool={tool} />
       </div>
     </div>

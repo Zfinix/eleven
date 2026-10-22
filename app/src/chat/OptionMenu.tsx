@@ -2,7 +2,7 @@ import { type ReactElement, useState } from "react";
 
 import type { OptionChoice, SessionOption } from "../agents/events";
 import { t } from "../i18n";
-import { useTheme } from "../theme";
+import { scrollbar, useTheme } from "../theme";
 import { Chip, Icon, MenuSurface, Popover, Row, usePopover } from "../components/ui";
 import { TYPING } from "../lib/shortcuts";
 
@@ -94,7 +94,7 @@ function SearchableChoices({ option, onPick }: { readonly option: SessionOption;
           <input {...TYPING} autoFocus value={query} placeholder={t("chat.option.search", { count: option.choices.length })} onChange={(e) => setQuery(e.value ?? "")} style={{ flexGrow: 1, fontSize: 12.5, color: p.text, backgroundColor: p.fill }} />
         </Row>
       )}
-      <div style={{ display: "flex", flexDirection: "column", overflowY: "scroll", flexGrow: 1, minHeight: 0 }}>
+      <div style={{ display: "flex", flexDirection: "column", overflowY: "scroll", ...scrollbar(p), flexGrow: 1, minHeight: 0 }}>
         {shown.map((choice) => (
           <ChoiceRow key={choice.value} icon={option.category === "mode" ? modeIcon(choice) : null} choice={choice} selected={choice.value === option.current} onPick={() => onPick(choice.value)} />
         ))}

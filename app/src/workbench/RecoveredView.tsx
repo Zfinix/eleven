@@ -14,7 +14,7 @@ import { errorMessage } from "../lib/guards";
 import { FILE_MANAGER } from "../lib/platform";
 import { useLoaded } from "../lib/useLoaded";
 import { showInFinder, tildePath } from "../settings/system";
-import { useTheme } from "../theme";
+import { scrollbar, useTheme } from "../theme";
 import { ask, copy } from "./actions";
 import type { SourceText } from "./model";
 import { type Bench, ELLIPSIS, HOVER, MONO_STYLE, TextButton, useBench } from "./parts";
@@ -271,7 +271,7 @@ function Evidence({ trace, saved, onRecreate, onShowFile, onAsk }: {
   const why = trace.guessed ? t("workbench.view.recovered.guessed") : t("workbench.view.recovered.compiled");
   const hint = trace.fns.length ? t("workbench.view.recovered.writes", { language: languageName(trace.file) }) : t("workbench.view.recovered.looks", { agent: agent.name });
   return (
-    <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0, overflowY: "scroll" }}>
+    <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0, overflowY: "scroll", ...scrollbar(p) }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 22, maxWidth: 760, paddingTop: 28, paddingBottom: 40, paddingLeft: 32, paddingRight: 32 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

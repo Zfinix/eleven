@@ -1,4 +1,4 @@
-import type { GpuixTheme } from "@gpuix/react";
+import type { GpuixTheme, StyleDesc } from "@gpuix/react";
 import { createContext, useContext } from "react";
 
 import type { CodeLook, Syntax } from "./settings/look";
@@ -109,6 +109,11 @@ export const LIGHT: Palette = {
 };
 
 /** Solid greys pick up the wallpaper's tint through the glass and fade; text there is see-through white (or black), stronger as the window gets clearer. */
+/** The scrollbar thumb every scrolling view draws, so long code and lists show where you are. */
+export function scrollbar(p: Palette): Pick<StyleDesc, "scrollbarColor" | "scrollbarWidth"> {
+  return { scrollbarColor: p.gutter, scrollbarWidth: 6 };
+}
+
 export function onGlass(p: Palette, transparency = 30): Palette {
   const dark = p === DARK;
   const clearer = Math.min(1, Math.max(0, (transparency - 30) / 70));

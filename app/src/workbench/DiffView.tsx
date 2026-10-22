@@ -1,6 +1,6 @@
 import { type ReactElement, useMemo, useState } from "react";
 
-import { type Palette, useTheme } from "../theme";
+import { type Palette, scrollbar, useTheme } from "../theme";
 import { useLoaded } from "../lib/useLoaded";
 import { ask } from "./actions";
 import { tokenize } from "../components/code";
@@ -144,7 +144,7 @@ export function DiffView(): ReactElement {
         <TextButton label={t("workbench.view.diff.pickAnother")} tone="outline" onClick={openCompare} />
       </div>
       <div style={{ display: "flex", flexGrow: 1, minHeight: 0 }}>
-        <div style={{ width: 280, flexShrink: 0, overflow: "scroll", paddingLeft: 6, paddingRight: 6, paddingBottom: 8 }}>
+        <div style={{ width: 280, flexShrink: 0, overflow: "scroll", ...scrollbar(p), paddingLeft: 6, paddingRight: 6, paddingBottom: 8 }}>
           {matches.slice(0, MAX_ROWS).map((match) => (
             <div key={`${match.name}:${match.status}`} onClick={() => setSelected(match)} role="option" style={{ ...row, ...(selected?.name === match.name && selected.status === match.status ? { backgroundColor: p.sel } : {}) }}>
               <div style={{ flexGrow: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: p.text }}>{match.name}</div>
@@ -153,7 +153,7 @@ export function DiffView(): ReactElement {
           ))}
           {matches.length > MAX_ROWS && <div style={{ paddingLeft: 8, paddingTop: 6, fontSize: 11.5, color: p.faint }}>{t("workbench.view.diff.capped", { shown: MAX_ROWS, count: matches.length })}</div>}
         </div>
-        <div style={{ flexGrow: 1, minWidth: 0, overflow: "scroll", paddingLeft: 12, paddingRight: 12, paddingBottom: 12, borderLeftWidth: 1, borderColor: p.fill }}>
+        <div style={{ flexGrow: 1, minWidth: 0, overflow: "scroll", ...scrollbar(p), paddingLeft: 12, paddingRight: 12, paddingBottom: 12, borderLeftWidth: 1, borderColor: p.fill }}>
           {!selected && <div style={{ marginTop: 8, color: p.muted }}>{t("workbench.view.diff.pickFunction")}</div>}
           {selected?.status === "added" && <div style={{ marginTop: 8, color: p.muted }}>{t("workbench.view.diff.isNew", { name: selected.name, binary: compare.name })}</div>}
           {selected?.status === "removed" && <div style={{ marginTop: 8, color: p.muted }}>{t("workbench.view.diff.isGone", { name: selected.name, binary: compare.name })}</div>}

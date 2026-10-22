@@ -2,7 +2,7 @@ import type { LinearGradientBackground } from "@gpuix/react";
 import type { ReactElement } from "react";
 
 import { type PlainId, t, thisDevice } from "../i18n";
-import { type Appearance, frostRadius, glassTint, MONO, onGlass, useTheme } from "../theme";
+import { type Appearance, frostRadius, glassTint, MONO, onGlass, scrollbar, useTheme } from "../theme";
 import { codeFamily, formatAddress, lineHeightFor, type Syntax, syntaxFor } from "./look";
 import { PERMISSION_PRESETS, PERMISSION_TOOLS, type PermissionTable, type Settings } from "./store";
 
@@ -22,7 +22,7 @@ export function CodePreview({ settings }: { readonly settings: Settings }): Reac
   const syntax = syntaxFor(settings.colorScheme, p);
   const size = settings.codeFontSize;
   return (
-    <div aria-label={t("settings.preview.code")} style={{ display: "flex", flexDirection: "column", marginTop: 12, paddingTop: 12, paddingBottom: 12, borderRadius: 12, backgroundColor: p.raised, fontFamily: codeFamily(settings.codeFont), fontSize: size, lineHeight: lineHeightFor(size, settings.lineSpacing), overflowX: "scroll" }}>
+    <div aria-label={t("settings.preview.code")} style={{ display: "flex", flexDirection: "column", marginTop: 12, paddingTop: 12, paddingBottom: 12, borderRadius: 12, backgroundColor: p.raised, fontFamily: codeFamily(settings.codeFont), fontSize: size, lineHeight: lineHeightFor(size, settings.lineSpacing), overflowX: "scroll", ...scrollbar(p) }}>
       {CODE.map((line, ix) => (
         <div key={ix} style={{ display: "flex", paddingLeft: 16, paddingRight: 16, whiteSpace: "nowrap" }}>
           {settings.lineNumbers && <div style={{ width: 28, flexShrink: 0, marginRight: 16, textAlign: "right", color: p.faint }}>{String(ix + 1)}</div>}
