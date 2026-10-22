@@ -8,30 +8,31 @@ import type { SlicePrompt } from "../chat/useChat";
 import { useCommand } from "../lib/shortcuts";
 import { useBench } from "../workbench/parts";
 import { HOVER, lineHeight } from "./look";
+import { sliceName, sliceNote, sliceTitle, universalNote } from "./slices";
 
-export type Slice = { readonly arch: string; readonly name: string; readonly note: string };
-
+/** A universal file's versions by arch, this Mac's first; names and notes are worded when shown. */
 export type SliceChoice = {
-  readonly title: string;
-  readonly note: string;
-  readonly slices: readonly Slice[];
+  readonly name: string;
+  readonly app: boolean;
+  readonly archs: readonly string[];
+  readonly host: string | null;
   readonly chosen: string;
   readonly matchThisMac: boolean;
 };
 
 const SHADOW = { offsetX: 0, offsetY: 24, blurRadius: 60, spreadRadius: 0, color: "rgba(0,0,0,0.55)" } as const;
 
-function SliceRow({ slice, on, onPick }: { readonly slice: Slice; readonly on: boolean; readonly onPick: () => void }): ReactElement {
+function SliceRow({ arch, host, on, onPick }: { readonly arch: string; readonly host: string | null; readonly on: boolean; readonly onPick: () => void }): ReactElement {
   const { p } = useTheme();
   const ring = on ? { borderWidth: 5, borderColor: p.text } : { borderWidth: 1.5, borderColor: p.line3 };
   return (
-    <div onClick={onPick} role="radio" aria-checked={on} aria-label={slice.name} style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 10, paddingBottom: 10, paddingLeft: 12, paddingRight: 12, borderRadius: 10, cursor: "pointer", hover: HOVER, backgroundColor: on ? p.sel : "transparent" }}>
+    <div onClick={onPick} role="radio" aria-checked={on} aria-label={sliceName(arch)} style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 10, paddingBottom: 10, paddingLeft: 12, paddingRight: 12, borderRadius: 10, cursor: "pointer", hover: HOVER, backgroundColor: on ? p.sel : "transparent" }}>
       <div style={{ width: 16, height: 16, flexShrink: 0, borderRadius: 8, pointerEvents: "none", ...ring }} />
       <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 500 }}>{slice.name}</div>
-        <div style={{ fontSize: 12, lineHeight: lineHeight(12), color: p.muted }}>{slice.note}</div>
+        <div style={{ fontWeight: 500 }}>{sliceName(arch)}</div>
+        <div style={{ fontSize: 12, lineHeight: lineHeight(12), color: p.muted }}>{sliceNote(arch, host)}</div>
       </div>
-      <div style={{ fontFamily: MONO, fontSize: 12, lineHeight: lineHeight(12), color: p.muted }}>{slice.arch}</div>
+      <div style={{ fontFamily: MONO, fontSize: 12, lineHeight: lineHeight(12), color: p.muted }}>{arch}</div>
     </div>
   );
 }
@@ -60,17 +61,17 @@ function SliceDialog({ prompt, onBack }: { readonly prompt: SlicePrompt; readonl
   useCommand("confirm", prompt.open);
   useCommand("dismiss", cancel);
   const { choice } = prompt;
-  const chosen = choice.slices.find((slice) => slice.arch === choice.chosen)?.name ?? choice.chosen;
+  const chosen = sliceName(choice.chosen);
   return (
     <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, backgroundColor: "rgba(0,0,0,0.45)" }}>
       <div role="dialog" aria-label={t("slice.title")} style={{ display: "flex", flexDirection: "column", gap: 14, width: "100%", maxWidth: 440, padding: 20, borderRadius: 16, backgroundColor: p.raised, boxShadow: SHADOW }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <div style={{ fontSize: 16, lineHeight: lineHeight(16), fontWeight: 600 }}>{choice.title}</div>
-          <div style={{ color: p.muted }}>{choice.note}</div>
+          <div style={{ fontSize: 16, lineHeight: lineHeight(16), fontWeight: 600 }}>{sliceTitle(choice)}</div>
+          <div style={{ color: p.muted }}>{universalNote(choice)}</div>
         </div>
         <div role="radiogroup" aria-label={t("slice.version")} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {choice.slices.map((slice) => (
-            <SliceRow key={slice.arch} slice={slice} on={slice.arch === choice.chosen} onPick={() => prompt.pick(slice.arch)} />
+          {choice.archs.map((arch) => (
+            <SliceRow key={arch} arch={arch} host={choice.host} on={arch === choice.chosen} onPick={() => prompt.pick(arch)} />
           ))}
         </div>
         <div onClick={prompt.toggleMatch} role="checkbox" aria-checked={choice.matchThisMac} style={{ display: "flex", alignItems: "center", gap: 10, paddingLeft: 2, paddingRight: 2, color: p.text3, cursor: "pointer" }}>

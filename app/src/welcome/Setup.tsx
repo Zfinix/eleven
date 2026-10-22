@@ -2,7 +2,7 @@ import { type ReactElement, useState } from "react";
 
 import type { Chat } from "../chat/useChat";
 import { appIcon } from "../components/ui";
-import { t } from "../i18n";
+import { listOf, t } from "../i18n";
 import { Shell } from "../Shell";
 import { useTheme } from "../theme";
 import { EngineStep } from "./EngineStep";
@@ -31,7 +31,7 @@ function Pill({ text }: { readonly text: string }): ReactElement {
 
 function pillText(engines: Engines): string {
   const list = busyEngines(engines).map((id) => { const install = engines.installs[id]; const name = engineNamed(id).name; return install.phase === "running" && install.progress !== null ? `${name} ${Math.round(install.progress * 100)}%` : name; });
-  return t("setup.installing", { names: list.join(", ") });
+  return t("setup.installing", { names: listOf(list) });
 }
 
 function Footer({ step, engines, onGo, onSkip }: { readonly step: StepId; readonly engines: Engines; readonly onGo: (id: StepId) => void; readonly onSkip: () => void }): ReactElement | null {

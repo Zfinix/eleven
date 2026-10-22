@@ -9,6 +9,7 @@ import { Icon, Popover, usePopover } from "../components/ui";
 import { askSavePath, deleteDocument, documentPath, renameDocument } from "../engine/document";
 import { deleteProject, forgetProject, listProjects, type ProjectEntry, renameProject } from "../engine/project";
 import type { Target } from "../engine/target";
+import { type PlainId, t } from "../i18n";
 import { errorMessage } from "../lib/guards";
 import { TYPING } from "../lib/shortcuts";
 import { useLoaded } from "../lib/useLoaded";
@@ -29,21 +30,16 @@ function size(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function kindLabel(kind: ProjectEntry["kind"]): string {
-  switch (kind) {
-    case "app":
-      return "App";
-    case "binary":
-      return "Binary";
-    case "gpu":
-      return "Shaders";
-    case "model":
-      return "Model";
-    default: {
-      const unhandled: never = kind;
-      return unhandled;
-    }
-  }
+const KIND_LABELS: Readonly<Record<ProjectEntry["kind"], PlainId>> = { app: "projects.kind.app", binary: "projects.kind.binary", gpu: "projects.kind.gpu", model: "projects.kind.model" };
+
+function chatsLabel(chats: number): string {
+  if (chats === 0) return t("projects.noChats");
+  return chats === 1 ? t("projects.oneChat") : t("projects.chats", { count: chats });
+}
+
+function deleteQuestion(chats: number, name: string): string {
+  if (chats === 0) return t("projects.deleteConfirm.none", { name });
+  return chats === 1 ? t("projects.deleteConfirm.one", { name }) : t("projects.deleteConfirm.many", { count: chats, name });
 }
 
 function ProjectIcon({ path, px }: { readonly path: string; readonly px: number }): ReactElement {
@@ -90,8 +86,7 @@ function ProjectCard({ entry, current, chats, onOpen, onChanged, onProblem }: {
   const [deleting, setDeleting] = useState(false);
   const file = documentPath(entry.id);
   const source = existsSync(entry.original) ? entry.original : (file ?? entry.original);
-  const chatsLabel = chats === 0 ? "No chats" : chats === 1 ? "1 chat" : `${chats} chats`;
-  const pills = [kindLabel(entry.kind), entry.arch, file ? size(statSync(file).size) : ""].filter(Boolean);
+  const pills = [t(KIND_LABELS[entry.kind]), entry.arch, file ? size(statSync(file).size) : ""].filter(Boolean);
   const finishRename = (): void => {
     const name = (renaming ?? "").trim();
     setRenaming(null);
@@ -105,16 +100,16 @@ function ProjectCard({ entry, current, chats, onOpen, onChanged, onProblem }: {
     }
   };
   const saveCopy = async (): Promise<void> => {
-    if (!file) return onProblem("This project hasn't been saved to a file yet. Open it and press ⌘S to save it.");
+    if (!file) return onProblem(t("projects.notSaved"));
     const to = await askSavePath(entry.name);
     if (to) copyFileSync(file, to);
   };
   const groups: readonly (readonly MenuItem[])[] = [
-    [{ label: "Open", icon: "open-tab", run: onOpen }, { label: `Show in ${FILE_MANAGER}`, icon: "folder", run: () => showInFinder(file ?? entry.original) }],
-    [{ label: "Save a copy…", icon: "copy", run: () => void saveCopy() }, { label: "Rename", icon: "rename", run: () => setRenaming(entry.name) }],
+    [{ label: t("projects.open"), icon: "open-tab", run: onOpen }, { label: t("projects.showIn", { app: FILE_MANAGER }), icon: "folder", run: () => showInFinder(file ?? entry.original) }],
+    [{ label: t("projects.saveCopy"), icon: "copy", run: () => void saveCopy() }, { label: t("projects.rename"), icon: "rename", run: () => setRenaming(entry.name) }],
     [
-      { label: "Remove from list", icon: "close", run: () => { forgetProject(entry.id); onChanged(); } },
-      ...(current ? [] : [{ label: "Delete project…", icon: "trash", run: () => setDeleting(true) }]),
+      { label: t("projects.forget"), icon: "close", run: () => { forgetProject(entry.id); onChanged(); } },
+      ...(current ? [] : [{ label: t("projects.delete"), icon: "trash", run: () => setDeleting(true) }]),
     ],
   ];
   const drop = useDropTarget();
@@ -130,33 +125,33 @@ function ProjectCard({ entry, current, chats, onOpen, onChanged, onProblem }: {
   };
   return (
     <div {...drop} style={{ position: "relative", display: "flex", flexDirection: "column", flexGrow: 1, flexBasis: CARD_MIN, minWidth: CARD_MIN, padding: 14, borderWidth: 1, borderColor: current ? p.fill : p.line2, borderRadius: 12, ...(current ? { backgroundColor: p.fill } : {}) }}>
-      <div onClick={() => renaming === null && onOpen()} role="button" aria-label={`Open ${entry.name}`} style={{ display: "flex", flexDirection: "column", gap: 12, cursor: "pointer", hover: HOVER }}>
+      <div onClick={() => renaming === null && onOpen()} role="button" aria-label={t("projects.openNamed", { name: entry.name })} style={{ display: "flex", flexDirection: "column", gap: 12, cursor: "pointer", hover: HOVER }}>
         <div style={{ pointerEvents: "none" }}><ProjectIcon path={source} px={40} /></div>
         <div style={{ display: "flex", flexDirection: "column" }}>
           {renaming === null
             ? <div style={{ fontWeight: 600, color: p.text, pointerEvents: "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{entry.name}</div>
-            : <input {...TYPING} autoFocus value={renaming} aria-label="Project name" onChange={(e) => setRenaming(e.value ?? "")} onSubmit={finishRename} onBlur={finishRename} style={{ height: 24, paddingLeft: 6, paddingRight: 6, borderRadius: 6, backgroundColor: p.fill2, fontWeight: 600, color: p.text }} />}
-          <div style={{ fontSize: 12, color: p.faint, pointerEvents: "none" }}>{`${chatsLabel} · ${ago(entry.openedAt, Date.now())}`}</div>
+            : <input {...TYPING} autoFocus value={renaming} aria-label={t("projects.name")} onChange={(e) => setRenaming(e.value ?? "")} onSubmit={finishRename} onBlur={finishRename} style={{ height: 24, paddingLeft: 6, paddingRight: 6, borderRadius: 6, backgroundColor: p.fill2, fontWeight: 600, color: p.text }} />}
+          <div style={{ fontSize: 12, color: p.faint, pointerEvents: "none" }}>{`${chatsLabel(chats)} · ${ago(entry.openedAt, Date.now())}`}</div>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4, pointerEvents: "none" }}>
           {pills.map((pill) => <Pill key={pill} text={pill} />)}
         </div>
       </div>
       {deleting && (
-        <div role="alertdialog" aria-label={`Delete ${entry.name}`} style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12, paddingTop: 12, paddingBottom: 12, paddingLeft: 12, paddingRight: 12, borderRadius: 10, backgroundColor: p.errBg }}>
-          <div style={{ fontSize: 12.5, color: p.text2 }}>{`Delete ${chatsLabel === "No chats" ? "this project" : `this project and its ${chatsLabel.replace(/^1 chat$/, "chat")}`}? Renames, notes and patches go too. ${entry.name} itself isn't touched.`}</div>
+        <div role="alertdialog" aria-label={t("projects.deleteNamed", { name: entry.name })} style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12, paddingTop: 12, paddingBottom: 12, paddingLeft: 12, paddingRight: 12, borderRadius: 10, backgroundColor: p.errBg }}>
+          <div style={{ fontSize: 12.5, color: p.text2 }}>{deleteQuestion(chats, entry.name)}</div>
           <div style={{ display: "flex", gap: 8 }}>
-            <div onClick={remove} role="button" aria-label="Delete project" style={{ display: "flex", alignItems: "center", height: 28, paddingLeft: 12, paddingRight: 12, borderRadius: 7, backgroundColor: p.error, cursor: "pointer", hover: HOVER }}>
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: "#ffffff", pointerEvents: "none" }}>Delete</div>
+            <div onClick={remove} role="button" aria-label={t("projects.deleteProject")} style={{ display: "flex", alignItems: "center", height: 28, paddingLeft: 12, paddingRight: 12, borderRadius: 7, backgroundColor: p.error, cursor: "pointer", hover: HOVER }}>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: "#ffffff", pointerEvents: "none" }}>{t("projects.deleteButton")}</div>
             </div>
-            <div onClick={() => setDeleting(false)} role="button" aria-label="Keep project" style={{ display: "flex", alignItems: "center", height: 28, paddingLeft: 12, paddingRight: 12, borderRadius: 7, backgroundColor: p.fill2, cursor: "pointer", hover: HOVER }}>
-              <div style={{ fontSize: 12.5, color: p.text3, pointerEvents: "none" }}>Cancel</div>
+            <div onClick={() => setDeleting(false)} role="button" aria-label={t("projects.keep")} style={{ display: "flex", alignItems: "center", height: 28, paddingLeft: 12, paddingRight: 12, borderRadius: 7, backgroundColor: p.fill2, cursor: "pointer", hover: HOVER }}>
+              <div style={{ fontSize: 12.5, color: p.text3, pointerEvents: "none" }}>{t("projects.cancel")}</div>
             </div>
           </div>
         </div>
       )}
       <div style={{ position: "absolute", top: 10, right: 10, display: "flex" }}>
-        <div onMouseDown={menu.onTriggerDown} onClick={menu.onTriggerClick} role="button" aria-label={`More for ${entry.name}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: 7, cursor: "pointer", hover: HOVER }}>
+        <div onMouseDown={menu.onTriggerDown} onClick={menu.onTriggerClick} role="button" aria-label={t("projects.more", { name: entry.name })} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: 7, cursor: "pointer", hover: HOVER }}>
           <Icon name="more" size={15} color={p.muted} />
         </div>
         {menu.open && (
@@ -189,16 +184,16 @@ export function ProjectsPage({ chat, onOpen }: { readonly chat: Chat; readonly o
       <div style={{ display: "flex", flexDirection: "column", gap: 20, width: "100%", maxWidth: 760 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ flexGrow: 1, minWidth: 0, fontSize: 24, lineHeight: 30, fontWeight: 600, color: p.text }}>Projects</div>
-            <div {...drop} onClick={chat.openFile} role="button" aria-label="Open a file" style={{ display: "flex", alignItems: "center", gap: 8, height: 32, flexShrink: 0, paddingLeft: 14, paddingRight: 12, borderRadius: 8, backgroundColor: p.primary, cursor: "pointer", hover: HOVER }}>
-              <div style={{ fontWeight: 600, color: p.onPrimary, pointerEvents: "none" }}>Open…</div>
+            <div style={{ flexGrow: 1, minWidth: 0, fontSize: 24, lineHeight: 30, fontWeight: 600, color: p.text }}>{t("home.projects")}</div>
+            <div {...drop} onClick={chat.openFile} role="button" aria-label={t("projects.openFile")} style={{ display: "flex", alignItems: "center", gap: 8, height: 32, flexShrink: 0, paddingLeft: 14, paddingRight: 12, borderRadius: 8, backgroundColor: p.primary, cursor: "pointer", hover: HOVER }}>
+              <div style={{ fontWeight: 600, color: p.onPrimary, pointerEvents: "none" }}>{t("home.open")}</div>
               <div style={{ fontFamily: SANS, fontSize: 11.5, fontWeight: 500, color: p.onPrimary, opacity: 0.55, pointerEvents: "none" }}>{comboText(comboFor("open", settings.keymap ?? "eleven", settings.shortcuts))}</div>
             </div>
           </div>
-          <div style={{ color: p.muted }}>Every app you open gets a project in Documents/Eleven. Renames, notes and chats save as you go.</div>
+          <div style={{ color: p.muted }}>{t("projects.intro")}</div>
         </div>
         {problem && <div {...drop} role="alert" style={{ paddingTop: 10, paddingBottom: 10, paddingLeft: 14, paddingRight: 14, borderRadius: 10, backgroundColor: p.errBg, color: p.error }}>{problem}</div>}
-        {list.length === 0 && projects.kind === "ready" && <div style={{ color: p.muted }}>No projects yet. Open an app or a binary to start one.</div>}
+        {list.length === 0 && projects.kind === "ready" && <div style={{ color: p.muted }}>{t("projects.empty")}</div>}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
           {list.map((entry) => (
             <ProjectCard key={entry.id} entry={entry} current={entry.id === chat.project} chats={chatsOf(entry.id)} onOpen={() => open(entry)} onChanged={() => setTick(tick + 1)} onProblem={setProblem} />
@@ -206,7 +201,7 @@ export function ProjectsPage({ chat, onOpen }: { readonly chat: Chat; readonly o
         </div>
         <div {...drop} style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 14, paddingBottom: 14, paddingLeft: 16, paddingRight: 16, borderRadius: 12, backgroundColor: p.fill }}>
           <Icon name="download" size={18} color={p.muted} />
-          <div style={{ flexGrow: 1, color: p.muted }}>Drop an app, a binary or a .eleven file anywhere to open it. Opening an app you already have reopens its project.</div>
+          <div style={{ flexGrow: 1, color: p.muted }}>{t("projects.drop")}</div>
         </div>
       </div>
     </div>

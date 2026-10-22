@@ -39,10 +39,10 @@ function ago(at: number, now: number): string {
 function short(at: number, now: number): string {
   const gap = Math.max(0, now - at);
   if (gap < MINUTE) return t("time.now");
-  if (gap < HOUR) return `${Math.floor(gap / MINUTE)}m`;
-  if (gap < DAY) return `${Math.floor(gap / HOUR)}h`;
-  if (gap < 7 * DAY) return `${Math.floor(gap / DAY)}d`;
-  return `${Math.floor(gap / (7 * DAY))}w`;
+  if (gap < HOUR) return t("home.short.minutes", { count: Math.floor(gap / MINUTE) });
+  if (gap < DAY) return t("home.short.hours", { count: Math.floor(gap / HOUR) });
+  if (gap < 7 * DAY) return t("home.short.days", { count: Math.floor(gap / DAY) });
+  return t("home.short.weeks", { count: Math.floor(gap / (7 * DAY)) });
 }
 
 function projectMeta(project: ProjectEntry, chats: readonly ThreadSummary[], now: number): string {

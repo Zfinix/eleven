@@ -3,17 +3,22 @@ import { type ReactElement, useEffect, useRef, useState } from "react";
 import { Composer } from "../chat/Composer";
 import type { Chat } from "../chat/useChat";
 import { Icon } from "../components/ui";
-import { t } from "../i18n";
+import { type PlainId, t } from "../i18n";
 import { useTheme } from "../theme";
 import { glass, HOVER, lineHeight, PROBLEM_WASH } from "./look";
 import { OutlineButton, Percent, PrimaryButton, Progress, StepHeading } from "./SetupParts";
 import { ready, stripFor, type Strip } from "./strip";
 import type { AgentSetup } from "./useAgentSetup";
 import type { Engines } from "./useEngines";
-import { SAMPLE_APP } from "../lib/platform";
+import { OS, type Os, SAMPLE_APP } from "../lib/platform";
 
 const CALCULATOR = SAMPLE_APP.path;
-const IDEAS = SAMPLE_APP.ideas;
+/** Questions that suit each platform's SAMPLE_APP. */
+const IDEAS: Readonly<Record<Os, readonly [PlainId, ...PlainId[]]>> = {
+  mac: ["setup.try.idea.mac.equals", "setup.try.idea.mac.history", "setup.try.idea.mac.modes"],
+  windows: ["setup.try.idea.windows.save", "setup.try.idea.windows.find", "setup.try.idea.windows.encoding"],
+  linux: ["setup.try.idea.linux.enter", "setup.try.idea.linux.parse", "setup.try.idea.linux.digits"],
+};
 
 function StripView({ strip, onAct }: { readonly strip: Strip; readonly onAct: () => void }): ReactElement {
   const { p } = useTheme();
@@ -58,7 +63,7 @@ export function tryTitle(isReady: boolean, waiting: boolean): string {
 export function TryStep({ chat, engines, setup, onSent }: { readonly chat: Chat; readonly engines: Engines; readonly setup: AgentSetup; readonly onSent: () => void }): ReactElement {
   const { thread, agents } = chat;
   const [waiting, setWaiting] = useState<string | null>(null);
-  const [seed, setSeed] = useState<{ readonly text: string }>({ text: IDEAS[0] ?? "" });
+  const [seed, setSeed] = useState<{ readonly text: string }>(() => ({ text: t(IDEAS[OS][0]) }));
   const attached = useRef(false);
   useEffect(() => {
     if (attached.current || chat.target) return;
@@ -108,7 +113,10 @@ export function TryStep({ chat, engines, setup, onSent }: { readonly chat: Chat;
       <StepHeading title={tryTitle(go, waiting !== null)} detail={t("setup.try.detail", { app: SAMPLE_APP.name })} />
       <Composer place="landing" target={chat.target} agents={agents} thread={{ ...thread, send }} onAttach={chat.openFile} onDetach={chat.detach} onPickAgent={chat.pickAgent} slot={strip && <StripView strip={strip} onAct={act} />} seed={seed} queued={waiting !== null} blocked={strip?.blocks === true} />
       <div style={{ display: "grid", gridTemplateColumns: 3, gap: 10 }}>
-        {IDEAS.map((text) => <Idea key={text} text={text} on={seed.text === text} onUse={() => setSeed({ text })} />)}
+        {IDEAS[OS].map((id) => {
+          const text = t(id);
+          return <Idea key={id} text={text} on={seed.text === text} onUse={() => setSeed({ text })} />;
+        })}
       </div>
     </>
   );
