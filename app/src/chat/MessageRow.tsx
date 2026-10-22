@@ -1,6 +1,7 @@
 import { memo, type ReactElement, useCallback, useMemo, useRef } from "react";
 
 import type { PermissionChoice } from "../agents/events";
+import { useLanguage } from "../i18n";
 import { MessageView } from "./MessageView";
 import type { Message } from "./thread";
 
@@ -22,7 +23,7 @@ export function useRowActions(actions: RowActions): RowActions {
   return useMemo(() => ({ onAnswer, onRetry, onOpen, onOpenText }), [onAnswer, onRetry, onOpen, onOpenText]);
 }
 
-/** One message; skipped on re-render unless its own message or props change. */
+/** One message; skipped on re-render unless its own message, its props or the language change. */
 export const MessageRow = memo(function MessageRow({ message, index, last, agentName, actions }: {
   readonly message: Message;
   readonly index: number;
@@ -30,6 +31,7 @@ export const MessageRow = memo(function MessageRow({ message, index, last, agent
   readonly agentName: string;
   readonly actions: RowActions;
 }): ReactElement {
+  useLanguage();
   const view = useMemo(
     () => ({
       onAnswer: (choice: PermissionChoice | null): void => {
