@@ -288,7 +288,25 @@ function isArrangement(value: unknown): value is Arrangement {
 }
 
 function isWhy(value: unknown): value is Why {
-  return isRecord(value) && WHY_KINDS.some((kind) => kind === value.kind);
+  if (!isRecord(value) || !WHY_KINDS.some((kind) => kind === value.kind)) return false;
+  switch (value.kind) {
+    case "path":
+      return typeof value.path === "string";
+    case "type":
+      return typeof value.type === "string";
+    case "neighbours":
+      return typeof value.count === "number";
+    case "beside":
+      return typeof value.file === "string";
+    case "grouped":
+      return true;
+    case "folder":
+      return typeof value.folder === "string" && typeof value.said === "string";
+    case "said":
+      return typeof value.text === "string";
+    default:
+      return false;
+  }
 }
 
 /** Older saves hold the reason as one English sentence, shown as written. */

@@ -1,3 +1,4 @@
+import { useLanguage } from "../i18n";
 import { type Loaded, useLoaded } from "../lib/useLoaded";
 import type { LoadedBy, ModelInfo, Recording, ShaderLibrary } from "./types";
 import type { GpuSource } from "./source";
@@ -21,7 +22,8 @@ export function useGpuData(source: GpuSource, key: string): Loaded<GpuData> {
 }
 
 export function useLoadedBy(source: GpuSource, library: string, name: string): Loaded<LoadedBy | null> {
-  return useLoaded(() => source.loadedBy(library, name), `${library}:${name}:loader`);
+  const language = useLanguage();
+  return useLoaded(() => source.loadedBy(library, name), `${library}:${name}:loader:${language}`);
 }
 
 export function useFunctionIr(source: GpuSource, library: string, name: string): Loaded<string> {
