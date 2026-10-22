@@ -1,6 +1,7 @@
 import { type ReactElement, useState } from "react";
 
 import type { Usage } from "../agents/events";
+import { t } from "../i18n";
 import { useTheme } from "../theme";
 import { MENU_RADIUS, MenuSurface } from "../components/ui";
 
@@ -26,16 +27,16 @@ export function ContextRing({ usage }: { readonly usage: Usage }): ReactElement 
   const percent = Math.round(fraction * 100);
   const tone = percent >= 85 ? p.error : percent >= 65 ? p.data : p.text3;
   return (
-    <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} aria-label={`${percent}% of memory used`} style={{ display: "flex", position: "relative", width: 30, height: 30, alignItems: "center", justifyContent: "center" }}>
+    <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} aria-label={t("chat.memory.used", { percent })} style={{ display: "flex", position: "relative", width: 30, height: 30, alignItems: "center", justifyContent: "center" }}>
       <svg source={TRACK} style={{ position: "absolute", left: 6, top: 6, width: 18, height: 18, color: p.line3 }} />
       {fraction > 0 && <svg source={ring(fraction)} style={{ position: "absolute", left: 6, top: 6, width: 18, height: 18, color: tone }} />}
       {hovered && (
         <anchored deferred side="top" align="center" gap={8} fit="switch" style={{ borderRadius: MENU_RADIUS }}>
           <MenuSurface width={220}>
             <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: 6 }}>
-              <div style={{ color: p.text }}>{`${percent}% of its memory used`}</div>
-              <div style={{ fontSize: 11.5, color: p.muted }}>{`${tokens(usage.used)} of ${tokens(usage.size)} tokens${usage.cost ? ` · ${usage.cost} so far` : ""}`}</div>
-              <div style={{ fontSize: 11.5, color: p.faint, marginTop: 4 }}>Start a new chat when it fills up.</div>
+              <div style={{ color: p.text }}>{t("chat.memory.title", { percent })}</div>
+              <div style={{ fontSize: 11.5, color: p.muted }}>{usage.cost ? t("chat.memory.tokensCost", { used: tokens(usage.used), size: tokens(usage.size), cost: usage.cost }) : t("chat.memory.tokens", { used: tokens(usage.used), size: tokens(usage.size) })}</div>
+              <div style={{ fontSize: 11.5, color: p.faint, marginTop: 4 }}>{t("chat.memory.hint")}</div>
             </div>
           </MenuSurface>
         </anchored>

@@ -3,6 +3,7 @@ import { type ReactElement, useState } from "react";
 
 import type { OptionChoice, SessionOption, SlashCommand } from "../agents/events";
 import { MenuRows } from "../components/MenuRows";
+import { t } from "../i18n";
 import { type Palette, useTheme } from "../theme";
 import { Icon, Row, Switch } from "../components/ui";
 import type { Skill } from "../skills/load";
@@ -33,7 +34,7 @@ function paletteItems(options: readonly SessionOption[], commands: readonly Slas
   const playbooks = skills.filter((skill) => matches(needle, skill.name, skill.description)).map((skill): PaletteItem => ({ kind: "skill", skill }));
   const agentCommands = commands.filter((command) => matches(needle, command.name, command.description)).slice(0, MAX_COMMANDS).map((command): PaletteItem => ({ kind: "command", command }));
   const switches = options.filter(isSwitch).filter((option) => matches(needle, option.name)).map((option): PaletteItem => ({ kind: "switch", option }));
-  const attach: readonly PaletteItem[] = matches(needle, "add a file", "files") ? [{ kind: "attach" }] : [];
+  const attach: readonly PaletteItem[] = matches(needle, "add a file", "files", t("chat.palette.files"), t("chat.palette.files.detail")) ? [{ kind: "attach" }] : [];
   return [...modes, ...playbooks, ...agentCommands, ...switches, ...attach];
 }
 
@@ -98,7 +99,7 @@ function ItemRow({ item, highlighted, onPick }: { readonly item: PaletteItem; re
         </div>
       );
     case "attach":
-      return <div onClick={onPick} style={look}>{line("attach", p.text3, "Files", "Add a file to look at")}</div>;
+      return <div onClick={onPick} style={look}>{line("attach", p.text3, t("chat.palette.files"), t("chat.palette.files.detail"))}</div>;
     default: {
       const unhandled: never = item;
       return unhandled;
@@ -140,12 +141,12 @@ export function CommandPalette({ options, commands, skills, onPick, onClose }: {
   return (
     <div onMouseDownOutside={onClose} style={{ display: "flex", flexDirection: "column", width: "100%", maxHeight: 300, padding: 6, borderWidth: 1, borderColor: p.sel, borderRadius: 16, backgroundColor: p.win }}>
       <Row gap={8} style={{ height: 34, flexShrink: 0, paddingLeft: 10, paddingRight: 10 }}>
-        <input autoFocus value={query} placeholder="Search playbooks, modes and files" aria-label="Search the palette" onChange={(e) => {
+        <input autoFocus value={query} placeholder={t("chat.palette.search")} aria-label={t("chat.palette.label")} onChange={(e) => {
           setQuery(e.value ?? "");
           setHighlighted(0);
         }} onKeyDown={onKeyDown} onSubmit={submit} style={{ flexGrow: 1, color: p.text, backgroundColor: p.win }} />
       </Row>
-      {items.length === 0 && <div style={{ padding: 10, color: p.faint }}>Nothing matches.</div>}
+      {items.length === 0 && <div style={{ padding: 10, color: p.faint }}>{t("chat.nothingMatches")}</div>}
       <MenuRows heights={items.map((_, ix) => ITEM_ROW + (startsSection(items, ix) ? DIVIDER : 0))} maxHeight={ROWS_MAX} reveal={at}>
         {items.map((item, ix) => (
           <div key={itemKey(item)} style={{ display: "flex", flexDirection: "column" }}>

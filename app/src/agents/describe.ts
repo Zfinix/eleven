@@ -1,45 +1,25 @@
+import { type PlainId, t } from "../i18n";
 import { stringField } from "../lib/guards";
 import { reaToolName } from "./permissions";
 
-const LABELS: Readonly<Record<string, readonly [label: string, arg?: string]>> = {
-  procedure_pseudo_code: ["Read pseudocode", "procedure"],
-  procedure_assembly: ["Read assembly", "procedure"],
-  procedure_callers: ["Found who calls", "procedure"],
-  procedure_callees: ["Found what it calls", "procedure"],
-  procedure_info: ["Read function details", "procedure"],
-  analyze_function: ["Studied a function", "procedure"],
-  open_binary: ["Opened the file", "path"],
-  binary_overview: ["Read the overview"],
-  binary_session: ["Checked the session"],
-  list_procedures: ["Listed functions"],
-  list_strings: ["Listed strings"],
-  list_segments: ["Listed segments"],
-  search_strings: ["Searched strings", "pattern"],
-  search_procedures: ["Searched functions", "pattern"],
-  find_code_for_string: ["Found code using a string", "string"],
-  xrefs: ["Found references", "address"],
-  ToolSearch: ["Looked up its tools"],
-};
-
-/** The same tools while they run, for a live status line: "Reading assembly" rather than "Read assembly". */
-const DOING: Readonly<Record<string, string>> = {
-  procedure_pseudo_code: "Reading pseudocode",
-  procedure_assembly: "Reading assembly",
-  procedure_callers: "Finding who calls",
-  procedure_callees: "Finding what it calls",
-  procedure_info: "Reading function details",
-  analyze_function: "Studying a function",
-  open_binary: "Opening the file",
-  binary_overview: "Reading the overview",
-  binary_session: "Checking the session",
-  list_procedures: "Listing functions",
-  list_strings: "Listing strings",
-  list_segments: "Listing segments",
-  search_strings: "Searching strings",
-  search_procedures: "Searching functions",
-  find_code_for_string: "Finding code using a string",
-  xrefs: "Finding references",
-  ToolSearch: "Looking up its tools",
+const LABELS: Readonly<Record<string, readonly [label: PlainId, doing: PlainId, arg?: string]>> = {
+  procedure_pseudo_code: ["tool.pseudocode", "tool.doing.pseudocode", "procedure"],
+  procedure_assembly: ["tool.assembly", "tool.doing.assembly", "procedure"],
+  procedure_callers: ["tool.callers", "tool.doing.callers", "procedure"],
+  procedure_callees: ["tool.callees", "tool.doing.callees", "procedure"],
+  procedure_info: ["tool.info", "tool.doing.info", "procedure"],
+  analyze_function: ["tool.analyze", "tool.doing.analyze", "procedure"],
+  open_binary: ["tool.open", "tool.doing.open", "path"],
+  binary_overview: ["tool.overview", "tool.doing.overview"],
+  binary_session: ["tool.session", "tool.doing.session"],
+  list_procedures: ["tool.listFunctions", "tool.doing.listFunctions"],
+  list_strings: ["tool.listStrings", "tool.doing.listStrings"],
+  list_segments: ["tool.listSegments", "tool.doing.listSegments"],
+  search_strings: ["tool.searchStrings", "tool.doing.searchStrings", "pattern"],
+  search_procedures: ["tool.searchFunctions", "tool.doing.searchFunctions", "pattern"],
+  find_code_for_string: ["tool.codeForString", "tool.doing.codeForString", "string"],
+  xrefs: ["tool.xrefs", "tool.doing.xrefs", "address"],
+  ToolSearch: ["tool.toolSearch", "tool.doing.toolSearch"],
 };
 
 /** `command` is the shell line a call ran, kept apart from `detail` so it can be drawn in the code font. */
@@ -63,34 +43,46 @@ function shortPath(value: string): string {
   return value.includes("/") ? (value.split("/").pop() ?? value) : value;
 }
 
+/** The shell line a call ran, and the agent's own words for it when it gave any. */
+function shellCall(tool: string, input: unknown, summary: string | null): { readonly command: string; readonly said: string | null } | null {
+  const command = stringField(input, "command") ?? (isToolId(tool.trim()) ? undefined : tool);
+  if (command === undefined) return null;
+  return { command: firstLine(command), said: stringField(input, "description")?.trim() || summary || null };
+}
+
 /**
  * Splits a raw tool call into the bold label and the grey detail people read.
  * Some agents send a shell command as the title with an empty input, so the title counts as the command too.
  */
 export function toolLabel(tool: string, input: unknown, summary: string | null = null): ToolLabel {
-  const command = stringField(input, "command") ?? (isToolId(tool.trim()) ? undefined : tool);
-  if (command !== undefined) {
-    const description = stringField(input, "description")?.trim() || summary;
-    return { label: description || "Run a command", detail: null, command: firstLine(command) };
-  }
+  const shell = shellCall(tool, input, summary);
+  if (shell) return { label: shell.said ?? t("tool.runCommand"), detail: null, command: shell.command };
   const name = reaToolName(tool) ?? tool;
   const known = LABELS[name];
   if (!known) return { label: humanize(name), detail: null, command: null };
-  const [label, key] = known;
+  const [label, , key] = known;
   const value = key ? stringField(input, key) : undefined;
-  return { label, detail: value ? shortPath(value) : null, command: null };
+  return { label: t(label), detail: value ? shortPath(value) : null, command: null };
+}
+
+/** A shell call the agent gave no words for, so its command line is the only detail there is. */
+function unnamedCommand(tool: string, input: unknown): string | null {
+  const shell = shellCall(tool, input, null);
+  return shell && shell.said === null ? shell.command : null;
 }
 
 export function describe(tool: string, input: unknown): string {
-  const { label, detail, command } = toolLabel(tool, input);
-  const rest = detail ?? (label === "Run a command" ? command : null);
+  const { label, detail } = toolLabel(tool, input);
+  const rest = detail ?? unnamedCommand(tool, input);
   return rest ? `${label} · ${rest}` : label;
 }
 
 /** What a running tool is doing right now, like "Reading assembly · FUN_100002404". */
 export function doing(tool: string, input: unknown): string {
-  const { label, detail, command } = toolLabel(tool, input);
-  const now = DOING[reaToolName(tool) ?? tool] ?? (label === "Run a command" ? "Running a command" : label);
-  const rest = detail ?? (label === "Run a command" ? command : null);
+  const { label, detail } = toolLabel(tool, input);
+  const bare = unnamedCommand(tool, input);
+  const known = LABELS[reaToolName(tool) ?? tool];
+  const now = known ? t(known[1]) : bare !== null ? t("tool.runningCommand") : label;
+  const rest = detail ?? bare;
   return rest ? `${now} · ${rest}` : now;
 }

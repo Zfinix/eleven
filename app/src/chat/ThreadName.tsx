@@ -1,6 +1,7 @@
 import type { EventPayload } from "@gpuix/react";
 import { type ReactElement, useState } from "react";
 
+import { t } from "../i18n";
 import { TYPING } from "../lib/shortcuts";
 import { useTheme } from "../theme";
 import { renameThread } from "./history";
@@ -18,6 +19,6 @@ export function ThreadName({ id, title, height, onDone }: { readonly id: string;
     if (event.key === "escape") onDone();
   };
   return (
-    <input autoFocus value={draft} aria-label="Thread name" onKeyDown={onKeyDown} onChange={(e) => setDraft(e.value ?? "")} onSubmit={save} onBlur={onDone} style={{ height, flexShrink: 0, paddingLeft: 9, paddingRight: 9, borderWidth: 1, borderColor: p.line3, borderRadius: 8, backgroundColor: p.deep, color: p.text }} />
+    <input autoFocus value={draft} aria-label={t("chat.threadName")} onKeyDown={onKeyDown} onChange={(e) => setDraft(e.value ?? "")} onSubmit={save} onBlur={onDone} style={{ height, flexShrink: 0, paddingLeft: 9, paddingRight: 9, borderWidth: 1, borderColor: p.line3, borderRadius: 8, backgroundColor: p.deep, color: p.text }} />
   );
 }
