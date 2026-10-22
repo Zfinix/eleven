@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 
 import { findOnPath } from "../agents/detect";
-import { exe, OS, type Os, THIS_DEVICE } from "../lib/platform";
+import { t, thisDevice } from "../i18n";
+import { exe, OS, type Os } from "../lib/platform";
 
 const run = promisify(execFile);
 const BUILD_MS = 30 * 60_000;
@@ -43,23 +44,23 @@ async function ensureCompiler(): Promise<void> {
       return;
     } catch {
       spawn("xcode-select", ["--install"], { stdio: "ignore", detached: true }).unref();
-      throw new Error("Ghidra's decompiler needs Apple's command line tools. Install them in the window that just opened, then try again.");
+      throw new Error(t("setup.error.commandLineTools"));
     }
   }
-  if (!findOnPath("make") || !findOnPath("g++")) throw new Error("Ghidra's decompiler needs make and g++. Install them with your package manager, then try again.");
+  if (!findOnPath("make") || !findOnPath("g++")) throw new Error(t("setup.error.make"));
 }
 
 /** Builds `decompile` and `sleigh` from the C++ source Ghidra ships, into its `os/<platform>` folder. */
 export async function buildDecompiler(home: string): Promise<void> {
-  if (OS === "windows") throw new Error("Ghidra's decompiler is missing. Download Ghidra again, then try again.");
+  if (OS === "windows") throw new Error(t("setup.error.noDecompiler"));
   const source = join(decompilerRoot(home), "src", "decompile", "cpp");
-  if (!existsSync(join(source, "Makefile"))) throw new Error("This Ghidra has no decompiler source to build from. Download Ghidra again, then try again.");
+  if (!existsSync(join(source, "Makefile"))) throw new Error(t("setup.error.noSource"));
   await ensureCompiler();
   const arch = OS === "mac" ? `-arch ${process.arch === "arm64" ? "arm64" : "x86_64"}` : "";
   try {
     for (const goal of ["ghidra_opt", "sleigh_opt"]) await run("make", [`-j${availableParallelism()}`, goal, `ARCH_TYPE=${arch}`], { cwd: source, timeout: BUILD_MS, maxBuffer: 1 << 26 });
   } catch {
-    throw new Error(`Couldn't build Ghidra's decompiler for ${THIS_DEVICE}. Check that the command line tools work, then try again.`);
+    throw new Error(t("setup.error.buildFailed", { device: thisDevice() }));
   }
   const target = join(decompilerRoot(home), "os", nativeDir());
   mkdirSync(target, { recursive: true });

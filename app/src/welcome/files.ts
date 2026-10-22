@@ -2,6 +2,7 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
+import { getLanguage, t } from "../i18n";
 import { type RecentOpen, recentOpens } from "./store";
 import { STARTER_FILES } from "../lib/platform";
 import { runSync } from "../lib/process";
@@ -97,10 +98,12 @@ function archLabel(kind: FileKind, path: string): string {
 
 export function ago(at: number, now: number): string {
   const days = Math.floor(new Date(now).setHours(0, 0, 0, 0) / DAY_MS) - Math.floor(new Date(at).setHours(0, 0, 0, 0) / DAY_MS);
-  if (days <= 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days < 7) return `${days} days ago`;
-  return new Date(at).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  if (days <= 0) return t("setup.ago.today");
+  if (days === 1) return t("setup.ago.yesterday");
+  if (days < 7) return t("time.days", { count: days });
+  const language = getLanguage();
+  // English keeps the system's own date order, 3 Oct or Oct 3.
+  return new Date(at).toLocaleDateString(language === "en" ? undefined : language, { day: "numeric", month: "short" });
 }
 
 function notReadyYet(kind: FileKind): boolean {

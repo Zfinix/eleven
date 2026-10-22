@@ -122,15 +122,15 @@ export function WhatsNew({ news, onClose }: {
       }
     }
   };
-  const label = item.action.kind === "none" ? (last ? t("news.done") : t("news.next")) : item.action.label;
+  const label = item.action.kind === "none" ? (last ? t("news.done") : t("news.next")) : t(item.action.label);
   const shadow = { offsetX: 0, offsetY: 16, blurRadius: 40, spreadRadius: 0, color: "rgba(0,0,0,0.35)" };
   return (
-    <div role="dialog" aria-label={item.title} style={{ position: "absolute", left: 10, bottom: 10, display: "flex", flexDirection: "column", width: WIDTH, borderWidth: 1, borderColor: p.line2, borderRadius: RADIUS, backgroundColor: p.raised2, overflow: "hidden", boxShadow: shadow }}>
+    <div role="dialog" aria-label={t(item.title)} style={{ position: "absolute", left: 10, bottom: 10, display: "flex", flexDirection: "column", width: WIDTH, borderWidth: 1, borderColor: p.line2, borderRadius: RADIUS, backgroundColor: p.raised2, overflow: "hidden", boxShadow: shadow }}>
       <Hero art={item.art} onClose={onClose} />
       <div style={{ display: "flex", flexDirection: "column", paddingTop: 18, paddingLeft: 16, paddingRight: 16, paddingBottom: 12 }}>
         <div style={{ fontSize: 12.5, color: p.muted }}>{t("news.position", { index: at + 1, count: NEWS.length })}</div>
-        <div style={{ marginTop: 2, fontSize: 18, lineHeight: 26, fontWeight: 500, color: p.text }}>{item.title}</div>
-        <div style={{ marginTop: 6, minHeight: 60, color: p.text3 }}>{item.body}</div>
+        <div style={{ marginTop: 2, fontSize: 18, lineHeight: 26, fontWeight: 500, color: p.text }}>{t(item.title)}</div>
+        <div style={{ marginTop: 6, minHeight: 60, color: p.text3 }}>{t(item.body)}</div>
         <div onClick={act} role="button" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 36, marginTop: 16, borderRadius: 10, backgroundColor: p.sel2, color: p.text, cursor: "pointer", hover: { opacity: 0.72 } }}>
           <div style={{ pointerEvents: "none" }}>{label}</div>
         </div>
