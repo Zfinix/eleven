@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 
+import { t } from "../i18n";
 import { ErrorCard } from "./kit";
 import { Icon } from "./ui";
 
@@ -9,7 +10,7 @@ export function Toast({ title, detail, raw = null, onClose }: { readonly title: 
   return (
     <div style={{ position: "absolute", right: 16, bottom: 42, display: "flex", flexDirection: "column", maxWidth: 400, borderRadius: 10, boxShadow: shadow }}>
       <ErrorCard title={title} detail={detail} raw={raw} />
-      <div onClick={onClose} role="button" aria-label="Dismiss" style={{ position: "absolute", top: 8, right: 8, display: "flex", padding: 4, cursor: "pointer", hover: { opacity: 0.72 } }}>
+      <div onClick={onClose} role="button" aria-label={t("components.dismiss")} style={{ position: "absolute", top: 8, right: 8, display: "flex", padding: 4, cursor: "pointer", hover: { opacity: 0.72 } }}>
         <Icon name="close" size={11} />
       </div>
     </div>

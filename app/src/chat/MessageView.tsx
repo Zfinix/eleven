@@ -6,6 +6,7 @@ import { SentAttachments } from "./Attachments";
 import { type MenuEntry, menuOn } from "../components/ContextMenu";
 import { JumpButton, SuggestionCard, Tooltip } from "../components/kit";
 import { Markdown } from "../components/Markdown";
+import { type PlainId, t } from "../i18n";
 import type { PermissionChoice, ToolKind } from "../agents/events";
 import { stringField } from "../lib/guards";
 import { seconds, useNow } from "../lib/useNow";
@@ -48,14 +49,14 @@ function UserMessage({ text: sent, at, attachments }: { readonly text: string; r
   const [hovered, setHovered] = useState(false);
   return (
     <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <div {...menuOn(() => [{ kind: "action", label: "Copy", icon: "copy", run: () => copyText(text) }])} style={{ display: "flex", flexDirection: "column", gap: 10, userSelect: "text", paddingTop: 10, paddingBottom: 10, paddingLeft: 14, paddingRight: 14, borderWidth: 1, borderColor: p.line2, borderRadius: 12, backgroundColor: p.raised }}>
+      <div {...menuOn(() => [{ kind: "action", label: t("chat.copy"), icon: "copy", run: () => copyText(text) }])} style={{ display: "flex", flexDirection: "column", gap: 10, userSelect: "text", paddingTop: 10, paddingBottom: 10, paddingLeft: 14, paddingRight: 14, borderWidth: 1, borderColor: p.line2, borderRadius: 12, backgroundColor: p.raised }}>
         <SentAttachments files={attachments} />
         <Markdown source={text.trim()} color={p.text} />
       </div>
       <Row gap={2} style={{ height: 24, opacity: hovered ? 1 : 0 }}>
         <Spacer />
         <div style={{ fontSize: 11.5, color: p.faint, marginRight: 4 }}>{timeOfDay(at)}</div>
-        <IconAction icon="copy" label="Copy" onClick={() => copyText(text)} />
+        <IconAction icon="copy" label={t("chat.copy")} onClick={() => copyText(text)} />
       </Row>
     </div>
   );
@@ -64,7 +65,7 @@ function UserMessage({ text: sent, at, attachments }: { readonly text: string; r
 function IoSection({ title, body, onOpen = null }: { readonly title: string; readonly body: string; readonly onOpen?: (() => void) | null }): ReactElement {
   const { p } = useTheme();
   return (
-    <div {...(onOpen ? { onClick: onOpen, role: "button", "aria-label": "Open the whole result in a tab" } : {})} style={{ display: "flex", gap: 10, paddingTop: 8, paddingBottom: 8, paddingLeft: 10, paddingRight: 6, ...(onOpen ? { cursor: "pointer", hover: { opacity: 0.72 } } : {}) }}>
+    <div {...(onOpen ? { onClick: onOpen, role: "button", "aria-label": t("chat.openResult") } : {})} style={{ display: "flex", gap: 10, paddingTop: 8, paddingBottom: 8, paddingLeft: 10, paddingRight: 6, ...(onOpen ? { cursor: "pointer", hover: { opacity: 0.72 } } : {}) }}>
       <div style={{ width: 26, flexShrink: 0, fontSize: 10.5, fontWeight: 600, color: p.faint, paddingTop: 1 }}>{title}</div>
       <div style={{ flexGrow: 1, minWidth: 0, maxHeight: 220, overflowY: "scroll", fontFamily: MONO, fontSize: 11.5, lineHeight: 17, color: p.text4 }}>{body}</div>
       {onOpen && <Icon name="open-tab" size={13} color={p.muted} />}
@@ -76,13 +77,13 @@ function IoSection({ title, body, onOpen = null }: { readonly title: string; rea
 function stepState(step: Step): string {
   switch (step.status) {
     case "running":
-      return "Working…";
+      return t("chat.step.working");
     case "failed":
-      return "Didn't work";
+      return t("chat.step.failed");
     case "done": {
       const took = Number.isFinite(step.startedAt) && step.endedAt !== null && Number.isFinite(step.endedAt) ? step.endedAt - step.startedAt : null;
-      if (took === null) return "Done";
-      return took < 10_000 ? `${Math.max(1, Math.round(took))} ms` : seconds(took);
+      if (took === null) return t("chat.step.done");
+      return took < 10_000 ? t("chat.step.ms", { count: Math.max(1, Math.round(took)) }) : seconds(took);
     }
     default: {
       const unhandled: never = step.status;
@@ -169,7 +170,7 @@ function ToolStep({ step, onOpen, onOpenText }: { readonly step: Step; readonly 
   const results = found(step);
   const title = detail ? `${label} · ${detail}` : label;
   const header = (
-    <div onClick={() => setOpen(!open)} role="button" aria-expanded={open} aria-label={open ? "Hide what it sent and got back" : "Show what it sent and got back"} style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, cursor: "pointer", hover: { opacity: 0.72 } }}>
+    <div onClick={() => setOpen(!open)} role="button" aria-expanded={open} aria-label={open ? t("chat.step.hide") : t("chat.step.show")} style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, cursor: "pointer", hover: { opacity: 0.72 } }}>
       <div style={{ flexShrink: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</div>
       {command && (
         <Tooltip label={command}>
@@ -184,14 +185,14 @@ function ToolStep({ step, onOpen, onOpenText }: { readonly step: Step; readonly 
   );
   return (
     <ChainOfThoughtStep icon={stepIcon(step)} label={header} status={step.status === "running" ? "active" : "complete"} tone={failed ? p.error : null}>
-      {failed && <div style={{ fontSize: 12, color: p.error }}>{got?.split("\n")[0]?.slice(0, 160) || "The agent will try another way."}</div>}
+      {failed && <div style={{ fontSize: 12, color: p.error }}>{got?.split("\n")[0]?.slice(0, 160) || t("chat.step.tryAnother")}</div>}
       {results.length > 0 && <ChainOfThoughtResults items={results} onPick={onOpen} />}
       {open && (
         <div style={{ display: "flex", flexDirection: "column", borderWidth: 1, borderColor: p.line2, borderRadius: 9, backgroundColor: p.deep }}>
-          {sent && <IoSection title="IN" body={sent} />}
+          {sent && <IoSection title={t("chat.step.in")} body={sent} />}
           {sent && got && <div style={{ height: 1, backgroundColor: p.line2 }} />}
-          {got && <IoSection title="OUT" body={capped(got)} onOpen={() => onOpenText(title, got)} />}
-          {!sent && !got && <IoSection title="" body={step.status === "running" ? "Waiting for the result…" : "No details."} />}
+          {got && <IoSection title={t("chat.step.out")} body={capped(got)} onOpen={() => onOpenText(title, got)} />}
+          {!sent && !got && <IoSection title="" body={step.status === "running" ? t("chat.step.waiting") : t("chat.step.noDetails")} />}
         </div>
       )}
     </ChainOfThoughtStep>
@@ -201,7 +202,7 @@ function ToolStep({ step, onOpen, onOpenText }: { readonly step: Step; readonly 
 function ThoughtStep({ text, startedAt, endedAt }: { readonly text: string; readonly startedAt: number; readonly endedAt: number | null }): ReactElement {
   const { p } = useTheme();
   const now = useNow(endedAt === null);
-  const label = endedAt === null ? `Thinking for ${seconds(now - startedAt)}` : `Thought for ${seconds(endedAt - startedAt)}`;
+  const label = endedAt === null ? t("chat.thinking", { time: seconds(now - startedAt) }) : t("chat.thought", { time: seconds(endedAt - startedAt) });
   return (
     <ChainOfThoughtStep icon="thought" label={label} status={endedAt === null ? "active" : "complete"}>
       <div style={{ fontSize: 12.5, lineHeight: 19, color: p.faint }}>{text.trim()}</div>
@@ -231,15 +232,15 @@ function splitAnswer(blocks: readonly Block[]): { readonly steps: readonly Block
 }
 
 function chainLabel(turn: AgentTurn, steps: number, now: number): string {
-  const count = `${steps} ${steps === 1 ? "step" : "steps"}`;
+  const count = steps === 1 ? t("chat.chain.oneStep") : t("chat.chain.steps", { count: steps });
   switch (turn.outcome) {
     case "running":
-      return `Working for ${seconds(now - turn.startedAt)}`;
+      return t("chat.chain.working", { time: seconds(now - turn.startedAt) });
     case "cancelled":
-      return `Stopped after ${count}`;
+      return t("chat.chain.stopped", { steps: count });
     case "done":
     case "failed":
-      return `Worked through ${count}${turn.endedAt === null ? "" : ` in ${seconds(turn.endedAt - turn.startedAt)}`}`;
+      return turn.endedAt === null ? t("chat.chain.worked", { steps: count }) : t("chat.chain.workedIn", { steps: count, time: seconds(turn.endedAt - turn.startedAt) });
     default: {
       const unhandled: never = turn.outcome;
       return unhandled;
@@ -265,12 +266,12 @@ function TurnFooter({ turn, last, onRetry }: { readonly turn: AgentTurn; readonl
   if (turn.outcome === "running" || turn.outcome === "failed") return null;
   const took = turn.endedAt === null ? "" : seconds(turn.endedAt - turn.startedAt);
   const worked = turn.blocks.some((block) => block.kind !== "text");
-  const status = turn.outcome === "cancelled" ? "Interrupted" : turn.blocks.length === 0 ? "No reply" : worked ? "" : `Answered in ${took}`;
+  const status = turn.outcome === "cancelled" ? t("chat.turn.interrupted") : turn.blocks.length === 0 ? t("chat.turn.noReply") : worked ? "" : t("chat.turn.answeredIn", { time: took });
   return (
     <Row gap={2} style={{ height: 26 }}>
       {status && <div style={{ fontSize: 11.5, color: turn.outcome === "cancelled" ? p.text4 : p.faint, marginRight: 6 }}>{status}</div>}
-      {replyText(turn) && <IconAction icon="copy" label="Copy reply" onClick={() => copyText(replyText(turn))} />}
-      {last && <IconAction icon="retry" label="Try again" onClick={onRetry} />}
+      {replyText(turn) && <IconAction icon="copy" label={t("chat.copyReply")} onClick={() => copyText(replyText(turn))} />}
+      {last && <IconAction icon="retry" label={t("chat.tryAgain")} onClick={onRetry} />}
     </Row>
   );
 }
@@ -294,11 +295,11 @@ function AgentReply({ turn, last, onRetry, onOpen, onOpenText }: {
     const procedure = block.kind === "tool" ? stringField(block.step.input, "procedure") : null;
     const output = block.kind === "tool" ? block.step.output : null;
     return [
-      ...(procedure ? [{ kind: "action", label: `Open ${procedure}`, icon: "open-tab", run: () => onOpen(procedure) } as const, { kind: "separator" } as const] : []),
-      ...(block.kind === "text" ? [{ kind: "action", label: "Copy this part", icon: "copy", run: () => copyText(block.text.trim()) } as const] : []),
-      ...(output ? [{ kind: "action", label: "Copy the tool's result", icon: "copy", run: () => copyText(output) } as const] : []),
-      ...(replyText(turn) ? [{ kind: "action", label: "Copy reply", icon: "copy", run: () => copyText(replyText(turn)) } as const] : []),
-      ...(last && !running ? [{ kind: "separator" } as const, { kind: "action", label: "Try again", icon: "retry", run: onRetry } as const] : []),
+      ...(procedure ? [{ kind: "action", label: t("chat.open", { name: procedure }), icon: "open-tab", run: () => onOpen(procedure) } as const, { kind: "separator" } as const] : []),
+      ...(block.kind === "text" ? [{ kind: "action", label: t("chat.copyPart"), icon: "copy", run: () => copyText(block.text.trim()) } as const] : []),
+      ...(output ? [{ kind: "action", label: t("chat.copyToolResult"), icon: "copy", run: () => copyText(output) } as const] : []),
+      ...(replyText(turn) ? [{ kind: "action", label: t("chat.copyReply"), icon: "copy", run: () => copyText(replyText(turn)) } as const] : []),
+      ...(last && !running ? [{ kind: "separator" } as const, { kind: "action", label: t("chat.tryAgain"), icon: "retry", run: onRetry } as const] : []),
     ];
   };
   return (
@@ -320,7 +321,7 @@ function AgentReply({ turn, last, onRetry, onOpen, onOpenText }: {
       <Sources sources={sourcesOf(blocks)} />
       {turn.outcome === "done" && mentionedFunctions(turn).length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-          {mentionedFunctions(turn).map((name) => <JumpButton key={name} label={`Open ${name}`} onClick={() => onOpen(name)} />)}
+          {mentionedFunctions(turn).map((name) => <JumpButton key={name} label={t("chat.open", { name })} onClick={() => onOpen(name)} />)}
         </div>
       )}
       <TurnFooter turn={turn} last={last} onRetry={onRetry} />
@@ -345,14 +346,16 @@ function proposal(message: PermissionMessage, agentName: string): Proposal | nul
   const input = message.input;
   const fn = stringField(input, "function");
   const name = stringField(input, "new_name");
-  if (fn && name) return { title: `Rename ${fn} to ${name}?`, reason: `${agentName} suggests this name. It's saved in your project file, not the binary.`, apply: "Rename", applied: `Renamed to ${name} everywhere.` };
+  if (fn && name) return { title: t("chat.suggest.rename", { from: fn, to: name }), reason: t("chat.suggest.rename.reason", { agent: agentName }), apply: t("chat.suggest.rename.apply"), applied: t("chat.suggest.rename.done", { name }) };
   const note = stringField(input, "note");
-  if (fn && note) return { title: `Save a note on ${fn}?`, reason: note, apply: "Save note", applied: "Saved the note." };
+  if (fn && note) return { title: t("chat.suggest.note", { name: fn }), reason: note, apply: t("chat.suggest.note.apply"), applied: t("chat.suggest.note.done") };
   const address = stringField(input, "address");
   const comment = stringField(input, "comment");
-  if (address && comment !== undefined) return { title: comment ? `Comment ${address}?` : `Remove the comment at ${address}?`, reason: comment, apply: comment ? "Comment" : "Remove", applied: comment ? "Commented." : "Removed the comment." };
+  if (address && comment !== undefined) return comment
+    ? { title: t("chat.suggest.comment", { address }), reason: comment, apply: t("chat.suggest.comment.apply"), applied: t("chat.suggest.comment.done") }
+    : { title: t("chat.suggest.uncomment", { address }), reason: comment, apply: t("chat.suggest.uncomment.apply"), applied: t("chat.suggest.uncomment.done") };
   const label = stringField(input, "label");
-  if (address && label !== undefined) return { title: `Bookmark ${label || address}?`, reason: `${agentName} wants to keep ${address} in your sidebar.`, apply: "Bookmark", applied: "Bookmarked." };
+  if (address && label !== undefined) return { title: t("chat.suggest.bookmark", { name: label || address }), reason: t("chat.suggest.bookmark.reason", { agent: agentName, address }), apply: t("chat.suggest.bookmark.apply"), applied: t("chat.suggest.bookmark.done") };
   return null;
 }
 
@@ -365,8 +368,16 @@ function SuggestionPrompt({ message, offer, onAnswer }: {
   const reject = message.choices.find((choice) => !choice.allows) ?? null;
   const answered = message.state.kind === "answered" ? message.state.label : null;
   const accepted = answered !== null && message.choices.some((choice) => choice.allows && choice.label === answered);
-  const state = answered === null ? { kind: "pending" } as const : { kind: "done", result: accepted ? offer.applied : "Skipped." } as const;
+  const state = answered === null ? { kind: "pending" } as const : { kind: "done", result: accepted ? offer.applied : t("chat.suggest.skipped"), skipped: !accepted } as const;
   return <SuggestionCard title={offer.title} reason={offer.reason} apply={offer.apply} state={state} onApply={() => onAnswer(allow)} onSkip={() => onAnswer(reject)} />;
+}
+
+/** Eleven saves these two answers in English, so a saved chat reads the same in any language. */
+const SAVED_ANSWERS: ReadonlyMap<string, PlainId> = new Map<string, PlainId>([["No answer", "chat.answer.none"], ["Not allowed", "chat.answer.refused"]]);
+
+function answeredLabel(label: string): string {
+  const id = SAVED_ANSWERS.get(label);
+  return id ? t(id) : label;
 }
 
 function PermissionCard({ message, agentName, onAnswer }: {
@@ -381,14 +392,14 @@ function PermissionCard({ message, agentName, onAnswer }: {
   const question = message.tool.trim().endsWith("?");
   const input = question ? "" : preview(message.input).replace(/\s*\n\s*/g, " ");
   const firstAllow = question ? -1 : message.choices.findIndex((choice) => choice.allows);
-  const title = question ? message.tool.trim() : `${agentName} wants to ${label.charAt(0).toLowerCase()}${label.slice(1)}${detail ? ` ${detail}` : ""}`;
+  const title = question ? message.tool.trim() : t("chat.permission.wants", { agent: agentName, action: `${label.charAt(0).toLowerCase()}${label.slice(1)}${detail ? ` ${detail}` : ""}` });
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 12, paddingBottom: 12, paddingLeft: 14, paddingRight: 14, borderWidth: 1, borderColor: p.warnLine, borderRadius: 12, backgroundColor: p.warnBg }}>
       <Row gap={8}>
         <Icon name={question ? "asks" : "shield-alert"} size={15} color={p.data} />
         <div style={{ fontWeight: 500, color: p.text }}>{title}</div>
       </Row>
-      <div style={{ fontSize: 12, color: p.text4 }}>{question ? `${agentName} needs your answer to keep going.` : "It can change things or run code, so it asks first."}</div>
+      <div style={{ fontSize: 12, color: p.text4 }}>{question ? t("chat.permission.needsAnswer", { agent: agentName }) : t("chat.permission.asksFirst")}</div>
       {input && (
         <div style={{ display: "flex", padding: 9, borderRadius: 8, backgroundColor: p.deep, fontFamily: MONO, fontSize: 11.5, lineHeight: 17, color: p.text4, overflowX: "scroll" }}>
           <div style={{ whiteSpace: "nowrap" }}>{input}</div>
@@ -397,14 +408,14 @@ function PermissionCard({ message, agentName, onAnswer }: {
       {message.state.kind === "answered" ? (
         <Row gap={6} style={{ fontSize: 12, color: p.muted }}>
           <Icon name="check" size={12} color={p.muted} />
-          <div>{message.state.label}</div>
+          <div>{answeredLabel(message.state.label)}</div>
         </Row>
       ) : (
         <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, flexGrow: 1, minWidth: 0 }}>
             {message.choices.map((choice, ix) => <ChoiceButton key={choice.id} choice={choice} primary={ix === firstAllow} onChoose={() => onAnswer(choice)} />)}
           </div>
-          <div onClick={() => onAnswer(null)} style={{ display: "flex", alignItems: "center", height: 28, flexShrink: 0, fontSize: 12, color: p.muted, cursor: "pointer", hover: { opacity: 0.72 } }}>Skip</div>
+          <div onClick={() => onAnswer(null)} style={{ display: "flex", alignItems: "center", height: 28, flexShrink: 0, fontSize: 12, color: p.muted, cursor: "pointer", hover: { opacity: 0.72 } }}>{t("kit.skip")}</div>
         </div>
       )}
     </div>
@@ -425,7 +436,7 @@ function ErrorNote({ text, onRetry }: { readonly text: string; readonly onRetry:
       </div>
       <div onClick={onRetry} style={{ display: "flex", alignItems: "center", gap: 6, height: 26, paddingLeft: 10, paddingRight: 10, borderWidth: 1, borderColor: p.line3, borderRadius: 8, fontSize: 12, color: p.text, flexShrink: 0, cursor: "pointer", hover: { opacity: 0.72 } }}>
         <Icon name="retry" size={12} color={p.text} />
-        <div>Try again</div>
+        <div>{t("chat.tryAgain")}</div>
       </div>
     </div>
   );

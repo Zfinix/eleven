@@ -7,6 +7,7 @@ import type { AgentEntry } from "../agents/registry";
 import { documentPath } from "../engine/document";
 import { listProjects, onProjectListChange, type ProjectEntry, projectId, rememberProject } from "../engine/project";
 import { prepareTarget, type Target } from "../engine/target";
+import { t } from "../i18n";
 import { errorMessage } from "../lib/guards";
 import { pickToOpen } from "../lib/pick";
 import { currentSettings, loadSettings, saveSettings, useSettings } from "../settings/store";
@@ -130,7 +131,7 @@ export function useChat(target: Target | null, onTarget: (target: Target | null)
     const open = tabs.order.includes(slot);
     const active = slot === tabs.active;
     const agent = open ? agentAt(slot) : agents.selected;
-    return useThread(agent, agents.installed.get(agent.id)?.command ?? null, target, active ? (next) => retarget(next) : (next) => at(slot).note(`The agent wanted to open ${next.name}. Switch to this chat and ask again to open it.`), open && (active || keepAgentsRunning));
+    return useThread(agent, agents.installed.get(agent.id)?.command ?? null, target, active ? (next) => retarget(next) : (next) => at(slot).note(t("chat.note.agentWantedOpen", { name: next.name })), open && (active || keepAgentsRunning));
   });
   const at = (slot: number): Thread => {
     const found = threads[slot];
@@ -140,7 +141,7 @@ export function useChat(target: Target | null, onTarget: (target: Target | null)
   const thread = at(tabs.active);
   const slotOf = (id: string): number | undefined => tabs.order.find((slot) => at(slot).id === id);
   const idleSlot = (): number | undefined => SLOT_INDEXES.find((slot) => !tabs.order.includes(slot));
-  const tooMany = (): void => thread.note(`You have ${SLOTS} chats open. Close one to start another.`);
+  const tooMany = (): void => thread.note(t("chat.note.tooMany", { count: SLOTS }));
 
   const projectOfChat = (id: string): string | null => all.find((summary) => summary.id === id)?.project ?? null;
 
@@ -223,7 +224,7 @@ export function useChat(target: Target | null, onTarget: (target: Target | null)
       retarget(next);
       return next;
     } catch (err) {
-      thread.note(`Couldn't open that file: ${errorMessage(err)}`);
+      thread.note(t("chat.note.cantOpenFile", { error: errorMessage(err) }));
       return null;
     }
   };
@@ -258,27 +259,27 @@ export function useChat(target: Target | null, onTarget: (target: Target | null)
       show(tabs.active, next, tabs.order);
       return next;
     } catch (err) {
-      thread.note(`Couldn't open ${entry.name}: ${errorMessage(err)}`);
+      thread.note(t("chat.note.cantOpen", { name: entry.name, error: errorMessage(err) }));
       return null;
     }
   };
   const openFile = async (): Promise<void> => {
     try {
-      const first = await pickToOpen(renderer, "Open");
+      const first = await pickToOpen(renderer, t("chat.picker.open"));
       if (first) choose(first);
     } catch (err) {
-      thread.note(`Couldn't show the file picker. ${errorMessage(err)}`);
+      thread.note(t("chat.note.noPicker", { error: errorMessage(err) }));
     }
   };
   const pickAgent = (id: string): void => {
     if (id === agentAt(tabs.active).id) return;
     agents.select(id);
     setTabs((prev) => ({ ...prev, agentIds: replaced(prev.agentIds, prev.active, id) }));
-    if (thread.state.messages.length > 0) thread.note("Switched agents. Your next message starts a fresh session.");
+    if (thread.state.messages.length > 0) thread.note(t("chat.note.switchedAgents"));
   };
   const list = tabs.order.map((slot): ChatTab => {
     const open = at(slot);
-    return { id: open.id, title: titleOf(open, saved) ?? "New chat", busy: open.busy, active: slot === tabs.active, agent: agentAt(slot).id, found: lastFinding(open.state.messages) };
+    return { id: open.id, title: titleOf(open, saved) ?? t("chat.untitled"), busy: open.busy, active: slot === tabs.active, agent: agentAt(slot).id, found: lastFinding(open.state.messages) };
   });
   return {
     agents: { ...agents, selected: agentAt(tabs.active) },

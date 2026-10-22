@@ -3,6 +3,7 @@ import { type ReactElement, useMemo, useRef, useState } from "react";
 
 import { MenuRows } from "../components/MenuRows";
 import { Icon, Row } from "../components/ui";
+import { t } from "../i18n";
 import { noteTyping } from "../lib/shortcuts";
 import { MONO, type Palette, useTheme } from "../theme";
 import { type Mention, type MentionIndex, type MentionKind, type MentionResult, searchMentions } from "./mentions";
@@ -76,7 +77,7 @@ export function MentionPicker({ mentions, onPick, onClose, onAttach }: {
     <div onMouseDownOutside={() => onClose(`@${query}`)} style={{ display: "flex", flexDirection: "column", width: "100%", maxHeight: 300, padding: 6, borderWidth: 1, borderColor: p.sel, borderRadius: 16, backgroundColor: p.win }}>
       <Row gap={8} style={{ height: 34, flexShrink: 0, paddingLeft: 10, paddingRight: 10 }}>
         <div style={{ color: p.muted, fontFamily: MONO }}>@</div>
-        <input autoFocus value={query} placeholder={mentions.all.length > 0 ? "Search functions, strings, bookmarks and notes" : "Add a file to mention its functions"} aria-label="Mention something in this file" onChange={(e) => {
+        <input autoFocus value={query} placeholder={mentions.all.length > 0 ? t("chat.mention.search") : t("chat.mention.noFile")} aria-label={t("chat.mention.label")} onChange={(e) => {
           setQuery(e.value ?? "");
           setHighlighted(0);
         }} onKeyDown={onKeyDown} onSubmit={submit} style={{ flexGrow: 1, color: p.text, backgroundColor: p.win }} />
@@ -84,11 +85,11 @@ export function MentionPicker({ mentions, onPick, onClose, onAttach }: {
       {mentions.all.length === 0 && (
         <div onClick={onAttach} role="button" style={{ display: "flex", alignItems: "center", gap: 10, height: ITEM_ROW, flexShrink: 0, paddingLeft: 10, paddingRight: 10, borderRadius: 8, cursor: "pointer", hover: { opacity: 0.72 } }}>
           <Icon name="attach" size={15} color={p.text3} />
-          <div style={{ color: p.text }}>Add a file</div>
-          <div style={{ color: p.muted }}>Open a binary or app to mention what's inside</div>
+          <div style={{ color: p.text }}>{t("composer.addFile")}</div>
+          <div style={{ color: p.muted }}>{t("chat.mention.addFile.detail")}</div>
         </div>
       )}
-      {mentions.all.length > 0 && items.length === 0 && <div style={{ padding: 10, color: p.faint }}>Nothing matches.</div>}
+      {mentions.all.length > 0 && items.length === 0 && <div style={{ padding: 10, color: p.faint }}>{t("chat.nothingMatches")}</div>}
       <MenuRows heights={items.map(() => ITEM_ROW)} maxHeight={ROWS_MAX} reveal={at}>
         {items.map((mention, ix) => <MentionRow key={`${mention.kind}:${mention.addr}:${mention.label}`} mention={mention} highlighted={ix === at} onPick={() => onPick(mention)} />)}
       </MenuRows>

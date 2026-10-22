@@ -1,6 +1,7 @@
 import { type ReactElement, useEffect, useMemo, useState } from "react";
 
 import { pieces } from "../engine/ask";
+import { t } from "../i18n";
 import { copyToClipboard } from "../lib/platform";
 import { syntaxFor, useCodeLook } from "../settings/look";
 import { useSettings } from "../settings/store";
@@ -22,7 +23,7 @@ function CopyButton({ text, shown }: { readonly text: string; readonly shown: bo
     <div
       onClick={() => { void copyToClipboard(text); setCopied(true); }}
       role="button"
-      aria-label="Copy this code"
+      aria-label={t("components.copyCode")}
       style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: 6, opacity: shown || copied ? 1 : 0, cursor: "pointer", hover: { opacity: 0.72 } }}
     >
       <Icon name={copied ? "check" : "copy"} size={12} color={copied ? p.string : p.muted} />

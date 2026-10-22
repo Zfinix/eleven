@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 
 import { type Attachment, sizeLabel } from "../agents/attachments";
 import { Icon } from "../components/ui";
+import { t } from "../i18n";
 import { openLink } from "../settings/system";
 import { useTheme } from "../theme";
 
@@ -24,7 +25,7 @@ export function AttachmentChip({ file, onRemove = null, onOpen = null }: { reado
       <div style={{ flexShrink: 1, minWidth: 0, fontSize: 12, color: p.text3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{file.name}</div>
       <div style={{ flexShrink: 0, fontSize: 11, color: p.faint, whiteSpace: "nowrap" }}>{sizeLabel(file.bytes)}</div>
       {onRemove && (
-        <div onClick={onRemove} role="button" aria-label={`Remove ${file.name}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, borderRadius: 4, cursor: "pointer", hover: { opacity: 0.72 } }}>
+        <div onClick={onRemove} role="button" aria-label={t("composer.remove", { name: file.name })} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, borderRadius: 4, cursor: "pointer", hover: { opacity: 0.72 } }}>
           <Icon name="close" size={9} color={p.faint} />
         </div>
       )}

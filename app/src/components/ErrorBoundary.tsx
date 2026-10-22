@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactElement, type ReactNode } from "react";
 
+import { t } from "../i18n";
 import { errorMessage } from "../lib/guards";
 import { copyToClipboard, FROM_SOURCE } from "../lib/platform";
 import { recordCrash, sendCrashes } from "../lib/telemetry";
@@ -14,7 +15,7 @@ type State = { readonly crash: Crash | null };
 function DevError({ message }: { readonly message: string }): ReactElement {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%", height: "100%", padding: 40, backgroundColor: "#171717", color: "#ededed" }}>
-      <div style={{ fontSize: 16 }}>Something broke while drawing this screen. Save a fix and it reloads.</div>
+      <div style={{ fontSize: 16 }}>{t("components.crash.dev")}</div>
       <div style={{ fontFamily: MONO, fontSize: 12, color: "#e06c75" }}>{message}</div>
     </div>
   );
@@ -26,11 +27,11 @@ function CrashPage({ crash, onHome }: { readonly crash: Crash; readonly onHome: 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, width: "100%", height: "100%", paddingLeft: 24, paddingRight: 24, backgroundColor: p.card, color: p.text }}>
       <img src={appIcon(p.icon)} style={{ width: 56, height: 56 }} />
-      <div style={{ fontSize: 18, fontWeight: 500 }}>This screen stopped working</div>
-      <div style={{ maxWidth: 420, textAlign: "center", color: p.muted }}>Your projects and chats are saved. Go back to Home to keep working. If it happens again, copy the details and send them to us.</div>
+      <div style={{ fontSize: 18, fontWeight: 500 }}>{t("components.crash.title")}</div>
+      <div style={{ maxWidth: 420, textAlign: "center", color: p.muted }}>{t("components.crash.detail")}</div>
       <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-        <Button label="Back to Home" tone="primary" icon="back" onClick={onHome} />
-        <Button label="Copy details" tone="outline" icon="copy" onClick={() => void copyToClipboard(crash.details)} />
+        <Button label={t("components.crash.home")} tone="primary" icon="back" onClick={onHome} />
+        <Button label={t("components.crash.copy")} tone="outline" icon="copy" onClick={() => void copyToClipboard(crash.details)} />
       </div>
     </div>
   );

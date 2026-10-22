@@ -10,6 +10,7 @@ import type { AgentEntry } from "../agents/registry";
 import { rememberPick, savedPicks } from "../agents/picks";
 import { AgentSession } from "../agents/session";
 import { hidePaths } from "../bridge/privacy";
+import { t } from "../i18n";
 import { currentSettings, type Settings } from "../settings/store";
 import { errorMessage, stringField } from "../lib/guards";
 import { entryProcedure, loadProcedures } from "../engine/procedures";
@@ -121,7 +122,7 @@ async function entryName(target: Target, opened: { current: Opened | null }): Pr
 
 async function rizinCode(path: string, procedure: string): Promise<string> {
   const fn = (await rizinFunctions(path)).find((candidate) => candidate.name === procedure);
-  if (!fn) throw new Error(`Rizin found no function named ${procedure}.`);
+  if (!fn) throw new Error(t("chat.noFunction", { name: procedure }));
   try {
     return await rizinPseudocode(path, fn.addr);
   } catch {
@@ -132,7 +133,7 @@ async function rizinCode(path: string, procedure: string): Promise<string> {
 async function jadxCode(target: Target, procedure: string): Promise<string> {
   const app = await openJadx(target.path, projectId(target));
   const fn = app.functions.find((candidate) => candidate.name === procedure);
-  if (!fn) throw new Error(`This app has no method named ${procedure}.`);
+  if (!fn) throw new Error(t("chat.noMethod", { name: procedure }));
   return app.code(fn.addr, "pseudo");
 }
 
@@ -177,7 +178,7 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
       adopted.current = { from: path, path: next.path };
       latest.current.onTarget(next);
     } catch (err) {
-      dispatch({ type: "note", text: `Eleven couldn't show ${path}: ${errorMessage(err)}`, tone: "info" });
+      dispatch({ type: "note", text: t("chat.note.cantShow", { path, error: errorMessage(err) }), tone: "info" });
     }
   };
 
@@ -254,7 +255,7 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
       const name = await entryName(opening, opened);
       if (name) dispatch({ type: "openTab", procedure: name });
     } catch (err) {
-      dispatch({ type: "note", text: `The code view couldn't open ${opening.name}: ${errorMessage(err)}`, tone: "info" });
+      dispatch({ type: "note", text: t("chat.note.codeViewFailed", { name: opening.name, error: errorMessage(err) }), tone: "info" });
     }
   };
 
@@ -278,9 +279,9 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
   const controlGoal = async (live: AgentSession, action: GoalControl): Promise<void> => {
     try {
       await live.controlGoal(action);
-      dispatch({ type: "note", text: action === "pause" ? "Goal paused." : "Goal cleared.", tone: "info" });
+      dispatch({ type: "note", text: action === "pause" ? t("chat.note.goalPaused") : t("chat.note.goalCleared"), tone: "info" });
     } catch (err) {
-      dispatch({ type: "note", text: `Couldn't ${action} the goal: ${errorMessage(err)}`, tone: "error" });
+      dispatch({ type: "note", text: action === "pause" ? t("chat.note.pauseFailed", { error: errorMessage(err) }) : t("chat.note.clearFailed", { error: errorMessage(err) }), tone: "error" });
     }
   };
 

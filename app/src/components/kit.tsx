@@ -242,7 +242,7 @@ export function SuggestionCard({ title, reason, apply, state, onApply, onSkip }:
   readonly title: string;
   readonly reason: string;
   readonly apply: string;
-  readonly state: { readonly kind: "pending" } | { readonly kind: "done"; readonly result: string };
+  readonly state: { readonly kind: "pending" } | { readonly kind: "done"; readonly result: string; readonly skipped: boolean };
   readonly onApply: () => void;
   readonly onSkip: () => void;
 }): ReactElement {
@@ -257,7 +257,7 @@ export function SuggestionCard({ title, reason, apply, state, onApply, onSkip }:
           <Button label={t("kit.skip")} tone="outline" size="compact" onClick={onSkip} />
         </div>
       ) : (
-        <div style={{ marginTop: 6, fontSize: 12, color: state.result === "Skipped." ? p.muted : p.string }}>{state.result}</div>
+        <div style={{ marginTop: 6, fontSize: 12, color: state.skipped ? p.muted : p.string }}>{state.result}</div>
       )}
     </div>
   );

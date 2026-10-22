@@ -1,6 +1,7 @@
 import { type ReactElement, useState } from "react";
 
 import type { OptionChoice, SessionOption } from "../agents/events";
+import { t } from "../i18n";
 import { useTheme } from "../theme";
 import { Chip, Icon, MenuSurface, Popover, Row, usePopover } from "../components/ui";
 import { TYPING } from "../lib/shortcuts";
@@ -90,15 +91,15 @@ function SearchableChoices({ option, onPick }: { readonly option: SessionOption;
       {option.choices.length > SEARCH_ABOVE && (
         <Row gap={8} style={{ height: 30, flexShrink: 0, paddingLeft: 9, paddingRight: 9, marginBottom: 4, borderRadius: 8, backgroundColor: p.fill }}>
           <Icon name="search" size={13} />
-          <input {...TYPING} autoFocus value={query} placeholder={`Search ${option.choices.length}`} onChange={(e) => setQuery(e.value ?? "")} style={{ flexGrow: 1, fontSize: 12.5, color: p.text, backgroundColor: p.fill }} />
+          <input {...TYPING} autoFocus value={query} placeholder={t("chat.option.search", { count: option.choices.length })} onChange={(e) => setQuery(e.value ?? "")} style={{ flexGrow: 1, fontSize: 12.5, color: p.text, backgroundColor: p.fill }} />
         </Row>
       )}
       <div style={{ display: "flex", flexDirection: "column", overflowY: "scroll", flexGrow: 1, minHeight: 0 }}>
         {shown.map((choice) => (
           <ChoiceRow key={choice.value} icon={option.category === "mode" ? modeIcon(choice) : null} choice={choice} selected={choice.value === option.current} onPick={() => onPick(choice.value)} />
         ))}
-        {matches.length > shown.length && <div style={{ paddingTop: 4, paddingLeft: 9, paddingBottom: 2, fontSize: 11.5, color: p.faint }}>{`${matches.length - shown.length} more. Type to narrow.`}</div>}
-        {matches.length === 0 && <div style={{ padding: 9, color: p.muted }}>Nothing matches.</div>}
+        {matches.length > shown.length && <div style={{ paddingTop: 4, paddingLeft: 9, paddingBottom: 2, fontSize: 11.5, color: p.faint }}>{t("chat.option.more", { count: matches.length - shown.length })}</div>}
+        {matches.length === 0 && <div style={{ padding: 9, color: p.muted }}>{t("chat.nothingMatches")}</div>}
       </div>
     </>
   );

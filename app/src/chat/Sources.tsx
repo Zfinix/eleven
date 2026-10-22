@@ -1,6 +1,7 @@
 import { type ReactElement, useState } from "react";
 
 import { MenuSurface, MENU_RADIUS } from "../components/ui";
+import { t } from "../i18n";
 import { stringField } from "../lib/guards";
 import { useLoaded } from "../lib/useLoaded";
 import { openLink } from "../settings/system";
@@ -59,7 +60,7 @@ function SourceChip({ source }: { readonly source: Source }): ReactElement {
   const [hovered, setHovered] = useState(false);
   const path = source.href.replace(/^https?:\/\/[^/]+/, "") || "/";
   return (
-    <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onClick={() => openLink(source.href)} role="link" aria-label={`Open ${source.href}`} style={{ display: "flex", alignItems: "center", gap: 4, height: 20, maxWidth: 160, paddingLeft: 3, paddingRight: 8, borderRadius: 10, backgroundColor: hovered ? p.sel2 : p.fill2, fontSize: 12, color: hovered ? p.text : p.muted, cursor: "pointer" }}>
+    <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onClick={() => openLink(source.href)} role="link" aria-label={t("chat.open", { name: source.href })} style={{ display: "flex", alignItems: "center", gap: 4, height: 20, maxWidth: 160, paddingLeft: 3, paddingRight: 8, borderRadius: 10, backgroundColor: hovered ? p.sel2 : p.fill2, fontSize: 12, color: hovered ? p.text : p.muted, cursor: "pointer" }}>
       <Badge domain={source.domain} size={14} />
       <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", pointerEvents: "none" }}>{source.domain}</div>
       {hovered && (
@@ -84,7 +85,7 @@ function SourceChip({ source }: { readonly source: Source }): ReactElement {
 export function Sources({ sources }: { readonly sources: readonly Source[] }): ReactElement | null {
   if (sources.length === 0) return null;
   return (
-    <div role="list" aria-label="Sources" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
+    <div role="list" aria-label={t("chat.sources")} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
       {sources.map((source) => <SourceChip key={source.href} source={source} />)}
     </div>
   );
