@@ -4,7 +4,7 @@ import type { Chat } from "../chat/useChat";
 import { appIcon } from "../components/ui";
 import { t } from "../i18n";
 import { Shell } from "../Shell";
-import { useTheme } from "../theme";
+import { scrollbar, useTheme } from "../theme";
 import { EngineStep } from "./EngineStep";
 import { KeymapStep } from "./KeymapStep";
 import { AgentStep } from "./AgentStep";
@@ -76,7 +76,7 @@ export function Setup({ chat, onDone }: { readonly chat: Chat; readonly onDone: 
   };
   return (
     <Shell side={null} bare onDrop={(e) => step === "try" && e.paths?.[0] && chat.choose(e.paths[0])}>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexGrow: 1, minHeight: 0, overflowY: "scroll", paddingTop: 48, paddingBottom: 48, paddingLeft: 16, paddingRight: 16, fontSize: 13, lineHeight: lineHeight(13) }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexGrow: 1, minHeight: 0, overflowY: "scroll", ...scrollbar(p), paddingTop: 48, paddingBottom: 48, paddingLeft: 16, paddingRight: 16, fontSize: 13, lineHeight: lineHeight(13) }}>
         <div style={{ flexGrow: 1 }} />
         <div style={{ display: "flex", flexDirection: "column", gap: 20, width: "100%", maxWidth: 640, flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>

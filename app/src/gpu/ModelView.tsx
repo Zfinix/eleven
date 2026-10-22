@@ -2,7 +2,7 @@ import { type ReactElement, useState } from "react";
 
 import { useSize } from "../lib/useSize";
 import { TYPING } from "../lib/shortcuts";
-import { type Palette, useTheme } from "../theme";
+import { type Palette, scrollbar, useTheme } from "../theme";
 import { useCodeLook } from "../settings/look";
 import { Icon } from "../components/ui";
 import { alertColors, text } from "./look";
@@ -281,7 +281,7 @@ function Tensors({ model, picked, onPick }: { readonly model: ModelInfo; readonl
           <div key={c.label} style={{ flexGrow: c.grow, flexBasis: 0, minWidth: 0, paddingLeft: ix === 0 ? 16 : 12, paddingRight: ix === TENSOR_COLUMNS.length - 1 ? 16 : 12, textAlign: c.right ? "right" : "left" }}>{c.label}</div>
         ))}
       </div>
-      <div role="grid" aria-label="Tensors" style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0, overflowY: "scroll" }}>
+      <div role="grid" aria-label="Tensors" style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0, overflowY: "scroll", ...scrollbar(p) }}>
         {body.length > 0 ? body : <div style={{ padding: 18, color: p.muted }}>{`No tensors match “${filter}”.`}</div>}
       </div>
     </div>
@@ -326,7 +326,7 @@ function Template({ model }: { readonly model: ModelInfo }): ReactElement {
         <div style={{ fontWeight: 600, ...text(14) }}>Chat template</div>
         <div style={{ color: p.muted }}>{hidden ? "The runtime fills this in for every conversation. The highlighted line goes in front of it." : "The runtime fills this in for every conversation."}</div>
       </div>
-      <div role="region" aria-label="tokenizer.chat_template" style={{ display: "flex", flexDirection: "column", paddingTop: 10, paddingBottom: 10, borderWidth: 1, borderColor: p.line2, borderRadius: 10, backgroundColor: p.deep, fontFamily: family, ...text(12), overflowX: "scroll" }}>
+      <div role="region" aria-label="tokenizer.chat_template" style={{ display: "flex", flexDirection: "column", paddingTop: 10, paddingBottom: 10, borderWidth: 1, borderColor: p.line2, borderRadius: 10, backgroundColor: p.deep, fontFamily: family, ...text(12), overflowX: "scroll", ...scrollbar(p) }}>
         {lines.map((line, ix) => (
           <div key={ix} style={{ display: "flex", backgroundColor: hidden && line.includes(hidden) ? p.warnBg : "transparent" }}>
             <div style={{ width: 40, flexShrink: 0, paddingRight: 12, textAlign: "right", color: p.faint, userSelect: "none" }}>{`${ix + 1}`}</div>

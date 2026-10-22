@@ -5,7 +5,7 @@ import { copyToClipboard } from "../lib/platform";
 import { syntaxFor, useCodeLook } from "../settings/look";
 import { useSettings } from "../settings/store";
 import { openLink } from "../settings/system";
-import { nativeTheme, useTheme } from "../theme";
+import { nativeTheme, scrollbar, useTheme } from "../theme";
 import { Icon } from "./ui";
 
 const SHOWN_MS = 1600;
@@ -44,7 +44,7 @@ export function FencedCode({ fence, lines, language = "" }: { readonly fence: st
         <div style={{ flexGrow: 1, minWidth: 0, fontSize: 11, color: p.faint }}>{fence}</div>
         <CopyButton text={code} shown={hovered} />
       </div>
-      <div style={{ display: "flex", paddingLeft: 12, paddingRight: 12, paddingBottom: 8, overflowX: "scroll" }}>
+      <div style={{ display: "flex", paddingLeft: 12, paddingRight: 12, paddingBottom: 8, overflowX: "scroll", ...scrollbar(p) }}>
         <code code={code} language={fence || language} theme={theme} />
       </div>
     </div>

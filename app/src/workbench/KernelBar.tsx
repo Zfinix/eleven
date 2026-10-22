@@ -11,7 +11,7 @@ import type { Loaded } from "../gpu/useGpu";
 import { errorMessage } from "../lib/guards";
 import { useNow } from "../lib/useNow";
 import { useCodeLook } from "../settings/look";
-import { SANS, useTheme } from "../theme";
+import { SANS, scrollbar, useTheme } from "../theme";
 import { copy } from "./actions";
 import type { AskPlace } from "./ask/place";
 import { exportKernel } from "./export";
@@ -160,7 +160,7 @@ function Column({ label, children }: { readonly label: string; readonly children
   const { p } = useTheme();
   const look = useCodeLook();
   return (
-    <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, flexBasis: 0, minWidth: 0, overflow: "scroll", paddingTop: 4, paddingBottom: 24, fontFamily: look.family, fontSize: look.size, lineHeight: look.lineHeight }}>
+    <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, flexBasis: 0, minWidth: 0, overflow: "scroll", ...scrollbar(p), paddingTop: 4, paddingBottom: 24, fontFamily: look.family, fontSize: look.size, lineHeight: look.lineHeight }}>
       {label && <div style={{ flexShrink: 0, paddingLeft: 18, paddingBottom: 6, fontFamily: SANS, fontSize: 11.5, color: p.faint }}>{label}</div>}
       {children}
     </div>

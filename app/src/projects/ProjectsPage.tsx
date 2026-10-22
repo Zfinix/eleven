@@ -16,7 +16,7 @@ import { comboFor, comboText } from "../keys/keymaps";
 import { useSettings } from "../settings/store";
 import { showInFinder } from "../settings/system";
 import { useDropTarget } from "../Shell";
-import { SANS, useTheme } from "../theme";
+import { SANS, scrollbar, useTheme } from "../theme";
 import { ago } from "../welcome/files";
 import { FILE_MANAGER } from "../lib/platform";
 
@@ -185,7 +185,7 @@ export function ProjectsPage({ chat, onOpen }: { readonly chat: Chat; readonly o
   };
   const list = projects.kind === "ready" ? projects.value : [];
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexGrow: 1, minHeight: 0, overflowY: "scroll", paddingTop: 56, paddingBottom: 56, paddingLeft: 32, paddingRight: 32 }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexGrow: 1, minHeight: 0, overflowY: "scroll", ...scrollbar(p), paddingTop: 56, paddingBottom: 56, paddingLeft: 32, paddingRight: 32 }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 20, width: "100%", maxWidth: 760 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>

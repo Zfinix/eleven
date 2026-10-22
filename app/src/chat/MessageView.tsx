@@ -10,7 +10,7 @@ import type { PermissionChoice, ToolKind } from "../agents/events";
 import { stringField } from "../lib/guards";
 import { seconds, useNow } from "../lib/useNow";
 import { useSettings } from "../settings/store";
-import { MONO, useTheme } from "../theme";
+import { MONO, scrollbar, useTheme } from "../theme";
 import { Icon, Row, Spacer } from "../components/ui";
 import type { Block, Message, Step } from "./thread";
 import { ChainOfThought, ChainOfThoughtResults, ChainOfThoughtStep } from "./ChainOfThought";
@@ -66,7 +66,7 @@ function IoSection({ title, body, onOpen = null }: { readonly title: string; rea
   return (
     <div {...(onOpen ? { onClick: onOpen, role: "button", "aria-label": "Open the whole result in a tab" } : {})} style={{ display: "flex", gap: 10, paddingTop: 8, paddingBottom: 8, paddingLeft: 10, paddingRight: 6, ...(onOpen ? { cursor: "pointer", hover: { opacity: 0.72 } } : {}) }}>
       <div style={{ width: 26, flexShrink: 0, fontSize: 10.5, fontWeight: 600, color: p.faint, paddingTop: 1 }}>{title}</div>
-      <div style={{ flexGrow: 1, minWidth: 0, maxHeight: 220, overflowY: "scroll", fontFamily: MONO, fontSize: 11.5, lineHeight: 17, color: p.text4 }}>{body}</div>
+      <div style={{ flexGrow: 1, minWidth: 0, maxHeight: 220, overflowY: "scroll", ...scrollbar(p), fontFamily: MONO, fontSize: 11.5, lineHeight: 17, color: p.text4 }}>{body}</div>
       {onOpen && <Icon name="open-tab" size={13} color={p.muted} />}
     </div>
   );
@@ -390,7 +390,7 @@ function PermissionCard({ message, agentName, onAnswer }: {
       </Row>
       <div style={{ fontSize: 12, color: p.text4 }}>{question ? `${agentName} needs your answer to keep going.` : "It can change things or run code, so it asks first."}</div>
       {input && (
-        <div style={{ display: "flex", padding: 9, borderRadius: 8, backgroundColor: p.deep, fontFamily: MONO, fontSize: 11.5, lineHeight: 17, color: p.text4, overflowX: "scroll" }}>
+        <div style={{ display: "flex", padding: 9, borderRadius: 8, backgroundColor: p.deep, fontFamily: MONO, fontSize: 11.5, lineHeight: 17, color: p.text4, overflowX: "scroll", ...scrollbar(p) }}>
           <div style={{ whiteSpace: "nowrap" }}>{input}</div>
         </div>
       )}

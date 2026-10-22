@@ -4,7 +4,7 @@ import { chatTitle } from "../chat/useChat";
 import { Tooltip } from "../components/kit";
 import { CodeView } from "../components/code";
 import { DALVIK } from "../engine/jadx";
-import { useTheme } from "../theme";
+import { scrollbar, useTheme } from "../theme";
 import { Icon, Spacer } from "../components/ui";
 import { type MenuEntry, openMenu } from "../components/ContextMenu";
 import { CODE_LANGUAGES, type CodeLanguage, useSettings } from "../settings/store";
@@ -155,6 +155,7 @@ function ThreadView(): ReactElement {
 }
 
 function Body({ tab }: { readonly tab: Tab | undefined }): ReactElement {
+  const { p } = useTheme();
   const language = useSettings().settings.codeLanguage;
   if (!tab) return <EmptyPane />;
   switch (tab.kind) {
@@ -195,7 +196,7 @@ function Body({ tab }: { readonly tab: Tab | undefined }): ReactElement {
       return <ResourceView file={tab.file} />;
     case "text":
       return (
-        <div style={{ display: "flex", alignItems: "flex-start", flexGrow: 1, minWidth: 0, minHeight: 0, overflow: "scroll" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", flexGrow: 1, minWidth: 0, minHeight: 0, overflow: "scroll", ...scrollbar(p) }}>
           <CodeView code={tab.text} syntax="code" />
         </div>
       );

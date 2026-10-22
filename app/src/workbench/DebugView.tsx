@@ -1,7 +1,7 @@
 import { useCommand } from "../lib/shortcuts";
 import { type ReactElement, useEffect, useRef, useState } from "react";
 
-import { useTheme } from "../theme";
+import { scrollbar, useTheme } from "../theme";
 import { type Debug, useDebug, type DebugStatus, type LoadedScope, type OutputLine } from "../debug/useDebug";
 import type { StackFrame, Thread, Variable } from "../debug/dap";
 import { ask } from "./actions";
@@ -239,7 +239,7 @@ function Session({ debug, page, setPage, onAsk }: { readonly debug: Debug; reado
       <div role="tablist" style={{ display: "flex", flexWrap: "wrap", gap: 2, paddingLeft: 10, paddingRight: 10, paddingBottom: 6 }}>
         {PAGES.map((item) => <SegItem key={item.page} label={item.label} on={page === item.page} onBg={p.sel2} padding={9} onClick={() => setPage(item.page)} />)}
       </div>
-      <div style={{ flexGrow: 1, minHeight: 0, overflow: "scroll", paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 12 }}>
+      <div style={{ flexGrow: 1, minHeight: 0, overflow: "scroll", ...scrollbar(p), paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 12 }}>
         {page === "stack" && (stopped ? <div style={{ display: "flex", flexDirection: "column", gap: 12 }}><Frames frames={stopped.frames} /><Scopes scopes={stopped.scopes.filter((scope) => !isRegisters(scope))} load={debug.loadVars} /></div> : waiting)}
         {page === "threads" && (stopped ? <Threads threads={stopped.threads} current={stopped.thread} /> : waiting)}
         {page === "registers" && (stopped ? <Scopes scopes={stopped.scopes.filter(isRegisters)} load={debug.loadVars} /> : waiting)}
@@ -302,7 +302,7 @@ export function DebugView(): ReactElement {
   if (status.kind === "starting" || status.kind === "running" || status.kind === "stopped") return <Session debug={debug} page={page} setPage={setPage} onAsk={askStopped} />;
   const breaking = breakFn !== "" && stopAtFunction;
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "scroll", padding: 16, gap: 12 }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "scroll", ...scrollbar(p), padding: 16, gap: 12 }}>
       {status.kind === "idle" && (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 10 }}>
           <div style={{ color: p.muted, maxWidth: 520 }}>{breaking ? `Run ${program.name} under the debugger and stop when it reaches ${breakFn}. It runs the file as it is on disk, so it has to be a native ${program.arch} program.` : `Run ${program.name} under the debugger. It stops at your breakpoints, and it has to be a native ${program.arch} program.`}</div>

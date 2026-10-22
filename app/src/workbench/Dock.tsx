@@ -2,7 +2,7 @@ import { type ReactElement, useState } from "react";
 
 import type { ThreadSummary } from "../chat/history";
 import type { ChatTab } from "../chat/useChat";
-import { useTheme } from "../theme";
+import { scrollbar, useTheme } from "../theme";
 import { AgentLogo, Dot, Icon, MenuSurface, Popover, usePopover } from "../components/ui";
 import { TYPING } from "../lib/shortcuts";
 import { ago } from "../welcome/files";
@@ -71,7 +71,7 @@ function PastChats({ onDone }: { readonly onDone: () => void }): ReactElement {
         <Icon name="search" size={13} color={p.muted} />
         <input {...TYPING} autoFocus value={query} placeholder={`Search chats in ${program.name}`} onChange={(e) => setQuery(e.value ?? "")} style={{ flexGrow: 1, fontSize: 12.5, color: p.text, backgroundColor: p.fill }} />
       </div>
-      <div style={{ display: "flex", flexDirection: "column", overflowY: "scroll", minHeight: 0 }}>
+      <div style={{ display: "flex", flexDirection: "column", overflowY: "scroll", ...scrollbar(p), minHeight: 0 }}>
         {shown.map((summary) => <PastChat key={summary.id} summary={summary} when={ago(summary.updatedAt, now)} onOpen={() => { onDone(); chat.openThread(summary.id); }} onDelete={() => chat.deleteChats([summary.id])} />)}
         {shown.length === 0 && <div style={{ paddingTop: 12, paddingBottom: 12, paddingLeft: 8, fontSize: 12.5, color: p.muted }}>{words ? "No chats match that." : "No other chats on this file yet."}</div>}
       </div>
@@ -132,7 +132,7 @@ export function Dock(): ReactElement {
     <div role="complementary" aria-label="Agent and inspector" style={{ position: "relative", display: "flex", flexDirection: "column", width: wb.s.sizes.dock, flexShrink: 0, borderLeftWidth: 1, borderColor: p.fill, backgroundColor: p.card }}>
       <ResizeHandle edge="dock" />
       <Header />
-      <div style={fillsSpace(tool) ? { display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0 } : { display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0, overflow: "scroll", paddingTop: 4, paddingLeft: 8, paddingRight: 8, paddingBottom: 10 }}>
+      <div style={fillsSpace(tool) ? { display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0 } : { display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0, overflow: "scroll", ...scrollbar(p), paddingTop: 4, paddingLeft: 8, paddingRight: 8, paddingBottom: 10 }}>
         <ToolBody tool={tool} />
       </div>
     </div>

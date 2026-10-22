@@ -10,7 +10,7 @@ import { errorMessage } from "../lib/guards";
 import { useNow } from "../lib/useNow";
 import { syntaxFor, useCodeLook } from "../settings/look";
 import { useSettings } from "../settings/store";
-import { useTheme } from "../theme";
+import { scrollbar, useTheme } from "../theme";
 import { copy } from "./actions";
 import type { Refs } from "./model";
 import { type Bench, TextButton, useBench } from "./parts";
@@ -192,11 +192,12 @@ export function Working({ code, step, shape, title, syntax }: {
   readonly title: string;
   readonly syntax: Syntax;
 }): ReactElement {
+  const { p } = useTheme();
   const written = code.length > 0 ? code.split("\n") : [];
   return (
     <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0 }}>
       <Status title={title} step={step} />
-      <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0, paddingTop: 4, paddingBottom: 28, overflowY: "scroll" }}>
+      <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0, paddingTop: 4, paddingBottom: 28, overflowY: "scroll", ...scrollbar(p) }}>
         {written.map((line, ix) => <WrittenLine key={ix} text={line} number={ix + 1} caret={ix === written.length - 1} syntax={syntax} />)}
         <Skeleton lines={shape.slice(written.length)} from={written.length} />
       </div>

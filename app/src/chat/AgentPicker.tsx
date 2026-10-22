@@ -2,7 +2,7 @@ import { type ReactElement, useState } from "react";
 
 import type { AgentIcon } from "../agents/icons";
 import type { AgentEntry } from "../agents/registry";
-import { useTheme } from "../theme";
+import { scrollbar, useTheme } from "../theme";
 import { AgentLogo, Icon, MenuSurface, Popover, Row, usePopover } from "../components/ui";
 import type { Agents } from "./useAgents";
 import { TYPING } from "../lib/shortcuts";
@@ -37,7 +37,7 @@ function AgentMenu({ agents, onPick }: { readonly agents: Agents; readonly onPic
         <Icon name="search" size={13} />
         <input {...TYPING} autoFocus value={query} placeholder={`Search ${agents.list.length} agents`} onChange={(e) => setQuery(e.value ?? "")} style={{ flexGrow: 1, fontSize: 12.5, color: p.text, backgroundColor: p.fill }} />
       </Row>
-      <div style={{ display: "flex", flexDirection: "column", overflowY: "scroll", maxHeight: ROWS_MAX, minHeight: 0 }}>
+      <div style={{ display: "flex", flexDirection: "column", overflowY: "scroll", ...scrollbar(p), maxHeight: ROWS_MAX, minHeight: 0 }}>
         {shown.map((agent) => (
           <AgentRow key={agent.id} agent={agent} icon={agents.icons.get(agent.id) ?? null} installed={agents.installed.has(agent.id)} selected={agent.id === agents.selected.id} onPick={() => onPick(agent.id)} />
         ))}

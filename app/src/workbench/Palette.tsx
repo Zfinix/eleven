@@ -8,7 +8,7 @@ import { patchBytes } from "./patch";
 import { YOU } from "../engine/edits";
 import { loadProject, updateProject } from "../engine/project";
 import { copyText } from "../chat/useThread";
-import { SANS, useTheme } from "../theme";
+import { SANS, scrollbar, useTheme } from "../theme";
 import type { CommandId } from "../keys/commands";
 import { HOVER, MONO_STYLE, overlay, useBench } from "./parts";
 import { noteTyping, runCommand } from "../lib/shortcuts";
@@ -259,7 +259,7 @@ export function Palette(): ReactElement {
             <Cap cap="esc" />
           </div>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", maxHeight: 560, overflowY: "scroll", paddingTop: 6, paddingBottom: 8, paddingLeft: 8, paddingRight: 8 }}>
+        <div style={{ display: "flex", flexDirection: "column", maxHeight: 560, overflowY: "scroll", ...scrollbar(p), paddingTop: 6, paddingBottom: 8, paddingLeft: 8, paddingRight: 8 }}>
           {groups.map((group) => (
             <div key={group.title || "goto"} role="group" aria-label={group.title || "Go to"} style={{ display: "flex", flexDirection: "column", flexShrink: 0, paddingTop: 6 }}>
               {group.title && <div style={{ paddingTop: 6, paddingBottom: 4, paddingLeft: 10, paddingRight: 10, fontSize: 12, fontWeight: 500, color: p.muted }}>{group.title}</div>}

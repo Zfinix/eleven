@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 
-import { useTheme } from "../theme";
+import { scrollbar, useTheme } from "../theme";
 import { useCodeLook } from "../settings/look";
 import { Icon } from "../components/ui";
 import { text } from "./look";
@@ -50,7 +50,7 @@ export function ProfileView({ recording, span, onPick, onAsk }: {
 }): ReactElement {
   const { p } = useTheme();
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14, flexGrow: 1, minHeight: 0, overflowY: "scroll", paddingTop: 16, paddingBottom: 16, paddingLeft: 18, paddingRight: 18 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 14, flexGrow: 1, minHeight: 0, overflowY: "scroll", ...scrollbar(p), paddingTop: 16, paddingBottom: 16, paddingLeft: 18, paddingRight: 18 }}>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 10, flexShrink: 0 }}>
         <div style={{ fontWeight: 600, ...text(18) }}>{recording.title}</div>
         <div style={{ flexGrow: 1, paddingBottom: 2.3, color: p.muted }}>{recording.source}</div>

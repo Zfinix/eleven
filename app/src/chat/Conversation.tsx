@@ -5,7 +5,7 @@ import type { PlanItem } from "../agents/events";
 import { Tooltip } from "../components/kit";
 import { type PlainId, t } from "../i18n";
 import { seconds, useNow } from "../lib/useNow";
-import { useTheme } from "../theme";
+import { scrollbar, useTheme } from "../theme";
 import { Icon, Row, Spacer } from "../components/ui";
 import { MessageRow, useRowActions } from "./MessageRow";
 import type { Draft, Message, ThreadState } from "./thread";
@@ -145,13 +145,14 @@ export function Conversation({ thread, title, agentName, composer, onWorkbench }
   readonly composer: ReactNode;
   readonly onWorkbench: (() => void) | null;
 }): ReactElement {
+  const { p } = useTheme();
   const { state } = thread;
   const shownAgent = state.agent.kind === "working" || state.agent.kind === "ready" ? state.agent.name || agentName : agentName;
   const actions = useRowActions({ onAnswer: thread.answer, onRetry: thread.retry, onOpen: thread.openFunction, onOpenText: thread.openText });
   return (
     <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, flexBasis: 440, minWidth: 0 }}>
       <Header state={state} title={title} agentName={shownAgent} onWorkbench={onWorkbench} />
-      <virtual-list followTail alignment="top" estimatedItemHeight={80} style={{ flexGrow: 1, minHeight: 0 }}>
+      <virtual-list followTail alignment="top" estimatedItemHeight={80} style={{ ...scrollbar(p), flexGrow: 1, minHeight: 0 }}>
         {state.messages.map((message, ix) => (
           <Centered key={ix} top={ix === 0 ? 22 : 0}>
             <MessageRow message={message} index={ix} agentName={shownAgent} last={ix === state.messages.length - 1} actions={actions} />

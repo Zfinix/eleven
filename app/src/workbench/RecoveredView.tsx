@@ -12,7 +12,7 @@ import { ASSETS } from "../lib/assets";
 import { errorMessage } from "../lib/guards";
 import { useLoaded } from "../lib/useLoaded";
 import { showInFinder, tildePath } from "../settings/system";
-import { useTheme } from "../theme";
+import { scrollbar, useTheme } from "../theme";
 import { ask, copy } from "./actions";
 import type { SourceText } from "./model";
 import { type Bench, ELLIPSIS, HOVER, MONO_STYLE, TextButton, useBench } from "./parts";
@@ -259,7 +259,7 @@ function Evidence({ trace, saved, onRecreate, onShowFile, onAsk }: {
     : "The binary holds this file’s compiled code, not its text. These are the parts Eleven traced back to it.";
   const hint = trace.fns.length ? `Writes the whole file in ${language.label} from the parts below` : `${agent.name} looks for the code itself`;
   return (
-    <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0, overflowY: "scroll" }}>
+    <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0, overflowY: "scroll", ...scrollbar(p) }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 22, maxWidth: 760, paddingTop: 28, paddingBottom: 40, paddingLeft: 32, paddingRight: 32 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

@@ -4,7 +4,7 @@ import { blockOf, tensorRole } from "../gpu/models/facts";
 import { bytes } from "../gpu/models/read";
 import { useLoaded } from "../lib/useLoaded";
 import { TYPING } from "../lib/shortcuts";
-import { useTheme } from "../theme";
+import { scrollbar, useTheme } from "../theme";
 import { Icon } from "../components/ui";
 import { ask, BLOCK_COLORS } from "./actions";
 import type { HexRow, Refs } from "./model";
@@ -45,7 +45,7 @@ function TensorInspector({ name, tensor }: { readonly name: string; readonly ten
   const { gpuData } = bench;
   const model = gpuData.kind === "ready" ? gpuData.value.models.find((m) => m.name === name) : undefined;
   const picked = model?.tensors.find((t) => t.name === tensor);
-  const box = { display: "flex", flexDirection: "column", gap: 18, flexGrow: 1, minHeight: 0, overflowY: "scroll", paddingTop: 4, paddingLeft: 14, paddingRight: 14, paddingBottom: 18 } as const;
+  const box = { display: "flex", flexDirection: "column", gap: 18, flexGrow: 1, minHeight: 0, overflowY: "scroll", ...scrollbar(p), paddingTop: 4, paddingLeft: 14, paddingRight: 14, paddingBottom: 18 } as const;
   if (!model || !picked) {
     return (
       <div style={box}>
@@ -98,7 +98,7 @@ function CodeInspector(): ReactElement {
   const callers = refs.kind === "ready" ? refs.value.callers.length : null;
   const calls = refs.kind === "ready" ? refs.value.callees.map(nameOf).join(", ") : "";
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18, flexGrow: 1, minHeight: 0, overflowY: "scroll", paddingTop: 4, paddingLeft: 14, paddingRight: 14, paddingBottom: 18 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 18, flexGrow: 1, minHeight: 0, overflowY: "scroll", ...scrollbar(p), paddingTop: 4, paddingLeft: 14, paddingRight: 14, paddingBottom: 18 }}>
       <div role="region" aria-label="Selection" style={{ display: "flex", flexDirection: "column" }}>
         <Heading text="Selection" />
         <Pair label="Address" value={at} mono />

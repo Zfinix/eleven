@@ -9,7 +9,7 @@ import { useAgents } from "../chat/useAgents";
 import { t, thisDevice } from "../i18n";
 import { signedIn } from "../welcome/agentSetup";
 import { Shell } from "../Shell";
-import { useTheme } from "../theme";
+import { scrollbar, useTheme } from "../theme";
 import { copyText, ghidraVersion, latestRelease, rizinVersion } from "./actions";
 import { isNewer } from "../lib/version";
 import { buildPages, type Ctx, rowMatches } from "./catalog";
@@ -149,7 +149,7 @@ export function SettingsScreen({ initial = "general", onBack, onSetup }: { reado
   return (
     <Shell side={<Nav page={page} query={query} shown={shown} badges={badges} onQuery={(next) => { setQuery(next); setConfirm(null); }} onOpen={open} onBack={onBack} />}>
       <div style={{ position: "relative", display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0 }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexGrow: 1, minHeight: 0, overflowY: "scroll", paddingTop: 40, paddingBottom: 56, paddingLeft: 28, paddingRight: 28 }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexGrow: 1, minHeight: 0, overflowY: "scroll", ...scrollbar(p), paddingTop: 40, paddingBottom: 56, paddingLeft: 28, paddingRight: 28 }}>
           <div style={{ display: "flex", flexDirection: "column", width: "100%", maxWidth: 720 }}>
             {needle !== "" ? (
               <>

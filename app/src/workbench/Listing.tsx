@@ -5,7 +5,7 @@ import { useListWindow } from "../lib/useListWindow";
 import { useLoaded } from "../lib/useLoaded";
 import { showAddress, useCodeLook } from "../settings/look";
 import { useSettings } from "../settings/store";
-import { useTheme } from "../theme";
+import { scrollbar, useTheme } from "../theme";
 import { subjectMenu } from "./actions";
 import { StaticLines } from "./CodeLines";
 import type { Fn } from "./model";
@@ -44,7 +44,7 @@ export function Listing(): ReactElement {
   const shown = useListWindow(fns.length, NEARBY);
   if (fns.length === 0) return <div style={{ padding: 16, color: p.muted }}>Ghidra is still finding functions.</div>;
   return (
-    <virtual-list itemCount={fns.length} windowStart={shown.start} estimatedItemHeight={lineHeight * GUESS_LINES} onVisibleRange={shown.onVisibleRange} style={{ flexGrow: 1, minHeight: 0, paddingTop: 10, paddingBottom: 28, fontFamily: look.family, fontSize: look.size, lineHeight }}>
+    <virtual-list itemCount={fns.length} windowStart={shown.start} estimatedItemHeight={lineHeight * GUESS_LINES} onVisibleRange={shown.onVisibleRange} style={{ ...scrollbar(p), flexGrow: 1, minHeight: 0, paddingTop: 10, paddingBottom: 28, fontFamily: look.family, fontSize: look.size, lineHeight }}>
       {fns.slice(shown.start, shown.end).map((fn) => <Chunk key={fn.addr} fn={fn} />)}
     </virtual-list>
   );

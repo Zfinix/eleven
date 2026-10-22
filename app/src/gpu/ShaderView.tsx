@@ -3,7 +3,7 @@ import type { ReactElement } from "react";
 import { type Syntax as Grammar, tokenize } from "../components/code";
 import { type Syntax, syntaxFor, useCodeLook } from "../settings/look";
 import { useSettings } from "../settings/store";
-import { type Palette, SANS, useTheme } from "../theme";
+import { type Palette, SANS, scrollbar, useTheme } from "../theme";
 import { type AskRow, PinDot, useAskRows } from "../workbench/ask/AskThread";
 import type { AskPlace } from "../workbench/ask/place";
 import type { KernelNote } from "./kernelRewrite";
@@ -189,7 +189,7 @@ export function ShaderView({ fn, stage, api, ir, loadedBy, onOpen, onAsk, ask, e
       {extras.status}
       <div style={{ display: "flex", flexGrow: 1, minHeight: 0 }}>
       {extras.body ?? (
-        <div style={{ display: "flex", flexDirection: "column", flexGrow: 999, flexBasis: 420, minWidth: 0, overflow: "scroll", paddingTop: 4, paddingBottom: 14, fontFamily: look.family, fontSize: look.size, lineHeight: look.lineHeight }}>
+        <div style={{ display: "flex", flexDirection: "column", flexGrow: 999, flexBasis: 420, minWidth: 0, overflow: "scroll", ...scrollbar(p), paddingTop: 4, paddingBottom: 14, fontFamily: look.family, fontSize: look.size, lineHeight: look.lineHeight }}>
           <IrBody ir={ir} name={fn.name} grammar={api === "cuda" ? "ptx" : null} notes={extras.notes} ask={ask} />
         </div>
       )}
