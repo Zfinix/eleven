@@ -290,7 +290,7 @@ function isSavedFile(value: unknown): boolean {
 }
 
 function isArrangement(value: unknown): value is Arrangement {
-  return isRecord(value) && Array.isArray(value.files) && value.files.every(isSavedFile) && Array.isArray(value.unplaced);
+  return isRecord(value) && Array.isArray(value.files) && value.files.every(isSavedFile) && Array.isArray(value.unplaced) && value.unplaced.every((fn) => typeof fn === "string");
 }
 
 function isWhy(value: unknown): value is Why {
