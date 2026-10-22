@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { cellAt, chunksOf, lineText, spansOf, wordRanges } from "../src/workbench/lineCells";
+import { cellAt, chunksOf, columnAt, lineText, spansOf } from "../src/workbench/lineCells";
 
 const cells = [
   { text: "if", color: "#kw", token: { text: "if", addr: null }, opens: null },
@@ -14,50 +14,54 @@ test("the line draws as one string", () => {
   expect(lineText(cells)).toBe("if (count) run");
 });
 
-test("spans cover only the coloured runs", () => {
-  expect(spansOf(cells, "#plain")).toEqual([[0, 2, "#kw"], [11, 14, "#call"]]);
+test("spans colour every character, merging neighbours of one colour", () => {
+  expect(spansOf(cells)).toEqual([[0, 2, "#kw"], [2, 11, "#plain"], [11, 14, "#call"]]);
 });
 
-test("neighbouring cells of one colour merge into one span", () => {
-  const same = [
-    { text: "a", color: "#x", token: null, opens: null },
-    { text: "b", color: "#x", token: null, opens: null },
-  ];
-  expect(spansOf(same, "#plain")).toEqual([[0, 2, "#x"]]);
+test("spans leave no gap, so nothing falls back to an inherited colour", () => {
+  const spans = spansOf(cells);
+  expect(spans[0]?.[0]).toBe(0);
+  expect(spans.at(-1)?.[1]).toBe(lineText(cells).length);
+  for (const [ix, span] of spans.entries()) if (ix > 0) expect(span[0]).toBe(spans[ix - 1]?.[1] ?? -1);
 });
 
 test("a column finds the cell it lands in", () => {
   expect(cellAt(cells, 0)?.text).toBe("if");
   expect(cellAt(cells, 4)?.text).toBe("count");
-  expect(cellAt(cells, 12)?.opens).toBe("0x100");
   expect(cellAt(cells, 99)).toBeNull();
   expect(cellAt(cells, -1)).toBeNull();
 });
 
-test("the picked word lights up everywhere it appears", () => {
-  const twice = [
-    { text: "x", color: "#p", token: null, opens: null },
-    { text: " = ", color: "#p", token: null, opens: null },
-    { text: "x", color: "#p", token: null, opens: null },
-  ];
-  expect(wordRanges(twice, "x")).toEqual([[0, 1], [4, 5]]);
-  expect(wordRanges(twice, null)).toEqual([]);
+test("a click's column comes from the run's own box", () => {
+  const box = { x: 100, width: 140 };
+  expect(columnAt(box, 100, 14)).toBe(0);
+  expect(columnAt(box, 145, 14)).toBe(4);
+  expect(columnAt(box, 239, 14)).toBe(13);
+  expect(columnAt({ x: 0, width: 0 }, 5, 10)).toBe(-1);
+  expect(columnAt(box, 100, 0)).toBe(-1);
 });
 
-test("a renamed word lights up under the name the line holds", () => {
-  const renamed = [
-    { text: "decryptKey", color: "#d", token: { text: "FUN_1000", addr: "0x1000" }, opens: null },
-  ];
-  expect(wordRanges(renamed, "FUN_1000")).toEqual([[0, 10]]);
+test("links keep their own element so they can be labelled and clicked", () => {
+  const chunks = chunksOf(cells);
+  expect(chunks.map((chunk) => chunk.kind)).toEqual(["text", "own"]);
+  expect(chunks[1]?.kind === "own" && chunks[1].cell.opens).toBe("0x100");
 });
 
-test("plain cells merge into one chunk and links keep their own", () => {
-  const mixed = [
-    { text: "bl ", color: "#p", token: null, opens: null },
-    { text: "setup", color: "#l", token: { text: "FUN_1", addr: "0x1" }, opens: "0x1" },
-    { text: " ; go", color: "#c", token: null, opens: null },
+test("text that is not fixed width keeps its own element, so clicks stay exact", () => {
+  const wide = [
+    { text: 'puts("', color: "#s", token: null, opens: null },
+    { text: "日本語テキスト", color: "#s", token: { text: "日本語テキスト", addr: null }, opens: null },
+    { text: '")', color: "#s", token: null, opens: null },
   ];
-  const chunks = chunksOf(mixed);
-  expect(chunks.map((chunk) => chunk.kind)).toEqual(["text", "link", "text"]);
-  expect(chunks[1]?.kind === "link" && chunks[1].cell.opens).toBe("0x1");
+  const chunks = chunksOf(wide);
+  expect(chunks.map((chunk) => chunk.kind)).toEqual(["text", "own", "text"]);
+});
+
+test("an emoji in a string literal does not shift the columns after it", () => {
+  const emoji = [
+    { text: "msg = ", color: "#p", token: null, opens: null },
+    { text: "🎉", color: "#s", token: null, opens: null },
+    { text: " end", color: "#p", token: { text: "end", addr: null }, opens: null },
+  ];
+  expect(chunksOf(emoji).map((chunk) => chunk.kind)).toEqual(["text", "own", "text"]);
 });

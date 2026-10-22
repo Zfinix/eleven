@@ -10,11 +10,11 @@ import { LIGHT, type Palette, scrollbar, useTheme } from "../theme";
 import { useListWindow } from "../lib/useListWindow";
 import { useLoaded } from "../lib/useLoaded";
 import { showAddress, syntaxFor, useCodeLook } from "../settings/look";
-import { useSettings } from "../settings/store";
+import { type Settings, useSettings } from "../settings/store";
 import { useCommand } from "../lib/shortcuts";
 import { copyText } from "../settings/actions";
 import { goTo, isFunction, menuGroups, subjectMenu } from "./actions";
-import { type Cell, cellAt, chunksOf, lineText, spansOf } from "./lineCells";
+import { type Cell, cellAt, chunksOf, columnAt, lineText, spansOf } from "./lineCells";
 import { currentMatch, FindBar, lineMatcher } from "./Find";
 import { arrowSvg, LANE_WIDTH, laneCount, type LanePiece, layoutJumps, piecesByLine } from "./arrows";
 import type { HexRow } from "./model";
@@ -216,9 +216,8 @@ function Line({ fn, view, text, number, focused, margin, found = "no", spans = n
     const id = event.elementId;
     const box = id === undefined ? null : renderer?.getElementBounds?.(id);
     const drawn = lineText(run);
-    if (!box || drawn.length === 0 || box.width <= 0) return run[0] ?? null;
-    const advance = box.width / drawn.length;
-    return cellAt(run, Math.floor(((event.x ?? 0) - box.x) / advance)) ?? run[0] ?? null;
+    if (!box) return run[0] ?? null;
+    return cellAt(run, columnAt(box, event.x ?? 0, drawn.length)) ?? run[0] ?? null;
   };
   const menuFor = (cell: Cell | null, event: EventPayload): void => {
     if (cell) wb.select(subject(cell.token));
@@ -241,9 +240,12 @@ function Line({ fn, view, text, number, focused, margin, found = "no", spans = n
       <div style={{ display: "flex", whiteSpace: "nowrap" }}>
         {chunks.length === 0 && <div {...subjectMenu(bench, subject(null), (event) => pick(null, event))}> </div>}
         {chunks.map((chunk, ix) => {
-          if (chunk.kind === "link") {
+          if (chunk.kind === "own") {
             const { cell } = chunk;
-            const target = cell.opens ?? "";
+            const target = cell.opens;
+            if (!target) {
+              return <div key={ix} {...subjectMenu(bench, subject(cell.token), (event) => pick(cell.token, event))} style={{ color: cell.color, whiteSpace: "nowrap" }}>{cell.text}</div>;
+            }
             return (
               <Tooltip key={ix} label={t("workbench.view.code.goTo", { name: cell.text })} side="top">
                 <div {...subjectMenu(bench, subject(cell.token), () => openFn(target, false))} role="link" aria-label={t("workbench.view.open", { name: cell.text })} style={{ color: cell.color, whiteSpace: "nowrap", textDecoration: "underline", cursor: "pointer" }}>{cell.text}</div>
@@ -251,7 +253,7 @@ function Line({ fn, view, text, number, focused, margin, found = "no", spans = n
             );
           }
           return (
-            <div key={ix} onClick={onRunClick(chunk.cells)} onAuxClick={onRunMenu(chunk.cells)} spans={spansOf(chunk.cells, p.text3)} style={{ color: p.text3, whiteSpace: "nowrap" }}>{lineText(chunk.cells)}</div>
+            <div key={ix} onClick={onRunClick(chunk.cells)} onAuxClick={onRunMenu(chunk.cells)} spans={spansOf(chunk.cells)} style={{ color: p.text3, whiteSpace: "nowrap" }}>{lineText(chunk.cells)}</div>
           );
         })}
         {comment && <div style={{ color: p.comment, whiteSpace: "nowrap" }}>{`   ; ${comment}`}</div>}
@@ -261,6 +263,20 @@ function Line({ fn, view, text, number, focused, margin, found = "no", spans = n
     </div>
   );
   return ask?.below ? <div style={{ display: "flex", flexDirection: "column" }}>{row}{ask.below}</div> : row;
+}
+
+/**
+ * The word as the line draws it: a renamed symbol under its new name, and an
+ * instruction's own address in the format the view shows. The highlight
+ * searches drawn text, so a query built from the raw token would miss.
+ */
+function drawnWord(bench: Bench, settings: Settings, selected: Subject | null, fn: string): string | null {
+  if (selected?.kind !== "line" || selected.fn !== fn) return null;
+  const token = selected.token;
+  if (!token) return null;
+  if (!token.addr) return token.text;
+  if (selected.addr && sameAddress(token.addr, selected.addr)) return showAddress(token.addr, settings);
+  return bench.nameOf(token.addr);
 }
 
 /** Jumps and selection for one function's lines, shared by the scrolling view and the whole-file listing. */
@@ -277,9 +293,15 @@ function useJumpMargin(fn: string, view: View, lines: readonly string[], lineHei
 
 /** One function's assembly without its own scrolling, for the whole-file listing. */
 export function StaticLines({ fn, lines }: { readonly fn: string; readonly lines: readonly string[] }): ReactElement {
+  const { p } = useTheme();
+  const bench = useBench();
+  const { settings } = useSettings();
   const margin = useJumpMargin(fn, "asm", lines, useCodeLook().lineHeight);
+  // The listing draws whole functions without a list of its own, so it
+  // declares the picked name's highlight the same way the scrolling view does.
+  const lit = drawnWord(bench, settings, bench.wb.s.selected, fn);
   return (
-    <div style={{ display: "flex", flexDirection: "column" }}>
+    <div {...(lit ? { highlight: { query: lit, wholeWord: true, caseSensitive: true, color: p.sel2 } } : {})} style={{ display: "flex", flexDirection: "column" }}>
       {lines.map((line, ix) => <Line key={ix} fn={fn} view="asm" text={line} number={ix + 1} focused={false} margin={margin(ix)} />)}
     </div>
   );
@@ -306,7 +328,8 @@ function Lines({ fn, view, lines, focusLine }: { readonly fn: string; readonly v
   const look = useCodeLook();
   const { lineHeight } = look;
   const { p } = useTheme();
-  const eleven = useSettings().settings.colorScheme === "Eleven";
+  const { settings } = useSettings();
+  const eleven = settings.colorScheme === "Eleven";
   const painted = useSpans(view === "pseudo" && eleven ? lines : [], p === LIGHT ? "light" : "dark");
   const shown = useListWindow(lines.length);
   const list = useScrollToPicked(fn, lines);
@@ -330,13 +353,11 @@ function Lines({ fn, view, lines, focusLine }: { readonly fn: string; readonly v
   // The picked name lights up through one search over the list. Declaring a
   // highlight per row instead makes the native search resolve every row
   // separately, which took the whole view from milliseconds to seconds.
-  const litWord = highlightedWord(wb.s.selected, fn);
-  const litAddr = wb.s.selected?.kind === "line" ? (wb.s.selected.token?.addr ?? null) : null;
-  const lit = litWord && litAddr && !bench.addrOf(litWord) ? (wb.s.names.get(litAddr) ?? litWord) : litWord;
+  const lit = drawnWord(bench, settings, wb.s.selected, fn);
   return (
     <>
       {wb.s.finding && <FindBar count={find.count} problem={find.problem} />}
-      <virtual-list ref={list} itemCount={lines.length} windowStart={shown.start} estimatedItemHeight={lineHeight} onVisibleRange={shown.onVisibleRange} {...(lit ? { highlight: { query: lit, wholeWord: true, color: p.sel2 } } : {})} style={{ flexGrow: 1, minHeight: 0, paddingTop: 10, paddingBottom: 28, fontFamily: look.family, fontSize: look.size, lineHeight, ...scrollbar(p) }}>
+      <virtual-list ref={list} itemCount={lines.length} windowStart={shown.start} estimatedItemHeight={lineHeight} onVisibleRange={shown.onVisibleRange} {...(lit ? { highlight: { query: lit, wholeWord: true, caseSensitive: true, color: p.sel2 } } : {})} style={{ flexGrow: 1, minHeight: 0, paddingTop: 10, paddingBottom: 28, fontFamily: look.family, fontSize: look.size, lineHeight, ...scrollbar(p) }}>
         {lines.slice(shown.start, shown.end).map((line, ix) => (
           <Line key={shown.start + ix} fn={fn} view={view} text={line} number={shown.start + ix + 1} focused={shown.start + ix === focusLine} margin={margin(shown.start + ix)} found={found(shown.start + ix)} spans={painted?.[shown.start + ix] ?? null} bytes={bytesOf(shown.start + ix)} ask={askRow(shown.start + ix + 1)} />
         ))}
