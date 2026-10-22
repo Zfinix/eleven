@@ -1,6 +1,7 @@
 import type { StyleDesc } from "@gpuix/react";
 import type { ReactElement } from "react";
 
+import { type PlainId, t } from "../i18n";
 import { useListWindow } from "../lib/useListWindow";
 import { useLoaded } from "../lib/useLoaded";
 import { showAddress, useCodeLook } from "../settings/look";
@@ -56,10 +57,10 @@ export function HexView({ addr }: { readonly addr: string }): ReactElement {
   const width = Number(settings.hexRow);
   const loaded = useLoaded(() => program.hex(addr), `${program.id}:${addr}:hex`);
   if (loaded.kind !== "ready") {
-    if (loaded.kind === "failed") return <div style={{ padding: 16 }}><ErrorCard title="Couldn't read the bytes" detail="This address may not be backed by the file. Try an address inside a segment." raw={loaded.message} /></div>;
-    return <div style={{ padding: 16, color: p.muted }}>Reading bytes…</div>;
+    if (loaded.kind === "failed") return <div style={{ padding: 16 }}><ErrorCard title={t("workbench.chrome.bytes.failed")} detail={t("workbench.chrome.bytes.failedDetail")} raw={loaded.message} /></div>;
+    return <div style={{ padding: 16, color: p.muted }}>{t("workbench.chrome.bytes.reading")}</div>;
   }
-  if (loaded.value.length === 0) return <Centered><EmptyState title={`No bytes at ${addr}`} hint="Nothing in the file is mapped here. Try an address inside a segment." /></Centered>;
+  if (loaded.value.length === 0) return <Centered><EmptyState title={t("workbench.chrome.bytes.none", { addr })} hint={t("workbench.chrome.bytes.noneHint")} /></Centered>;
   const base = BigInt(loaded.value[0]?.addr ?? addr);
   const all = loaded.value.flatMap((row) => row.bytes.split(" ").map((pair) => parseInt(pair, 16)));
   const rows = Array.from({ length: Math.ceil(all.length / width) }, (_, r) => {
@@ -97,7 +98,7 @@ export function HexView({ addr }: { readonly addr: string }): ReactElement {
                 const index = r * width + c;
                 const menuFor = inRange(index) && range ? span(range[0], range[1]) : span(index, index);
                 return (
-                  <div key={c} {...subjectMenu(bench, menuFor, (e) => pick(index, e.modifiers?.shift === true))} aria-label={`Byte ${hexAt(base, index)}`} style={{ paddingLeft: 3, paddingRight: 3, color: p.text3, ...tint(index) }}>
+                  <div key={c} {...subjectMenu(bench, menuFor, (e) => pick(index, e.modifiers?.shift === true))} aria-label={t("workbench.chrome.byte", { addr: hexAt(base, index) })} style={{ paddingLeft: 3, paddingRight: 3, color: p.text3, ...tint(index) }}>
                     {pair}
                   </div>
                 );
@@ -111,11 +112,13 @@ export function HexView({ addr }: { readonly addr: string }): ReactElement {
   );
 }
 
-const COLUMNS: Readonly<Record<ListKind, readonly [string, string]>> = {
-  strings: ["Address", "String"],
-  imports: ["Library", "Symbol"],
-  segments: ["Segment", "Range"],
+const COLUMNS: Readonly<Record<ListKind, readonly [PlainId, PlainId]>> = {
+  strings: ["workbench.chrome.col.address", "workbench.chrome.col.string"],
+  imports: ["workbench.chrome.col.library", "workbench.chrome.col.symbol"],
+  segments: ["workbench.chrome.col.segment", "workbench.chrome.col.range"],
 };
+
+const NONE: Readonly<Record<ListKind, PlainId>> = { strings: "workbench.chrome.noStrings", imports: "workbench.chrome.noImports", segments: "workbench.chrome.noSegments" };
 
 const FIRST_COLUMN = 156;
 const ROW_HEIGHT = 31;
@@ -164,10 +167,10 @@ function Table({ list }: { readonly list: ListKind }): ReactElement {
   return (
     <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0, paddingTop: 8, paddingLeft: 12, paddingRight: 12 }}>
       <div style={{ display: "flex", flexShrink: 0, color: p.muted, fontSize: 12 }}>
-        <div style={{ width: FIRST_COLUMN, flexShrink: 0, paddingTop: 6, paddingBottom: 6, paddingLeft: 8, paddingRight: 8 }}>{first}</div>
-        <div style={{ paddingTop: 6, paddingBottom: 6, paddingLeft: 8, paddingRight: 8 }}>{second}</div>
+        <div style={{ width: FIRST_COLUMN, flexShrink: 0, paddingTop: 6, paddingBottom: 6, paddingLeft: 8, paddingRight: 8 }}>{t(first)}</div>
+        <div style={{ paddingTop: 6, paddingBottom: 6, paddingLeft: 8, paddingRight: 8 }}>{t(second)}</div>
       </div>
-      {rows.length === 0 && <Centered><EmptyState title={`No ${list} in this file`} hint={`${program.engine} found none. Ask the agent to look another way, like reading the bytes.`} /></Centered>}
+      {rows.length === 0 && <Centered><EmptyState title={t(NONE[list])} hint={t("workbench.chrome.noneHint", { engine: program.engine })} /></Centered>}
       {rows.length > 0 && <virtual-list itemCount={rows.length} windowStart={shown.start} estimatedItemHeight={ROW_HEIGHT} onVisibleRange={shown.onVisibleRange} style={{ flexGrow: 1, minHeight: 0, paddingBottom: 24 }}>
         {rows.slice(shown.start, shown.end).map((row, ix) => (
           <div key={shown.start + ix} {...subjectMenu(bench, rowSubject(list, row, program[list][shown.start + ix]))} role="row" aria-label={row.b} style={{ display: "flex", userSelect: "text", borderTopWidth: 1, borderColor: p.raised2 }}>
@@ -176,7 +179,7 @@ function Table({ list }: { readonly list: ListKind }): ReactElement {
           </div>
         ))}
       </virtual-list>}
-      {rows.length < every.length && <div style={{ flexShrink: 0, paddingTop: 8, paddingBottom: 10, paddingLeft: 8, fontSize: 12, color: p.faint }}>{`Showing the first ${rows.length.toLocaleString()} of ${every.length.toLocaleString()}. Press ${MOD}K to search them all.`}</div>}
+      {rows.length < every.length && <div style={{ flexShrink: 0, paddingTop: 8, paddingBottom: 10, paddingLeft: 8, fontSize: 12, color: p.faint }}>{t("workbench.chrome.showingFirst", { shown: rows.length.toLocaleString(), total: every.length.toLocaleString(), shortcut: `${MOD}K` })}</div>}
     </div>
   );
 }
@@ -193,7 +196,7 @@ export function TableView({ list }: { readonly list: ListKind }): ReactElement {
 export function EmptyPane(): ReactElement {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", minHeight: 300, padding: 24 }}>
-      <EmptyState title="No tabs open" hint={`Pick a function in the sidebar, or press ${MOD}K to search.`} />
+      <EmptyState title={t("workbench.chrome.noTabs")} hint={t("workbench.chrome.noTabsHint", { shortcut: `${MOD}K` })} />
     </div>
   );
 }

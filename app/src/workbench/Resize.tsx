@@ -1,6 +1,7 @@
 import type { EventPayload, StyleDesc } from "@gpuix/react";
 import type { ReactElement } from "react";
 
+import { type PlainId, t } from "../i18n";
 import { useTheme } from "../theme";
 import { clampSize, type Edge, saveSizes } from "./sizes";
 import { useBench } from "./parts";
@@ -9,7 +10,7 @@ import type { PaneDrag } from "./state";
 
 const VERTICAL: Readonly<Record<Edge, boolean>> = { sidebar: false, dock: false, details: true };
 const GROWS: Readonly<Record<Edge, 1 | -1>> = { sidebar: 1, dock: -1, details: -1 };
-const LABEL: Readonly<Record<Edge, string>> = { sidebar: "Resize sidebar", dock: "Resize agent panel", details: "Resize details panel" };
+const LABEL: Readonly<Record<Edge, PlainId>> = { sidebar: "workbench.chrome.resize.sidebar", dock: "workbench.chrome.resize.dock", details: "workbench.chrome.resize.details" };
 const PLACE = {
   sidebar: { right: -3, top: 0, bottom: 0, width: 6 },
   dock: { left: -3, top: 0, bottom: 0, width: 6 },
@@ -27,7 +28,7 @@ export function ResizeHandle({ edge }: { readonly edge: Edge }): ReactElement {
     if (at !== undefined) wb.patch({ resizing: { edge, start: at, from: wb.s.sizes[edge] } });
   };
   return (
-    <div onMouseDown={grab} aria-label={LABEL[edge]} style={{ position: "absolute", ...PLACE[edge], cursor: vertical ? "row-resize" : "col-resize", backgroundColor: active ? p.line3 : "transparent", hover: { backgroundColor: p.line2 } }} />
+    <div onMouseDown={grab} aria-label={t(LABEL[edge])} style={{ position: "absolute", ...PLACE[edge], cursor: vertical ? "row-resize" : "col-resize", backgroundColor: active ? p.line3 : "transparent", hover: { backgroundColor: p.line2 } }} />
   );
 }
 
@@ -56,7 +57,7 @@ export function PaneDivider({ path, index, vertical, length }: { readonly path: 
   const line = vertical ? { height: 1 } : { width: 1 };
   const grip: StyleDesc = vertical ? { top: -4, left: 0, right: 0, height: 9, cursor: "row-resize" } : { left: -4, top: 0, bottom: 0, width: 9, cursor: "col-resize" };
   return (
-    <div onMouseDown={grab} aria-label="Resize split" style={{ position: "relative", ...line, flexShrink: 0, backgroundColor: active ? p.line3 : p.fill }}>
+    <div onMouseDown={grab} aria-label={t("workbench.chrome.resize.split")} style={{ position: "relative", ...line, flexShrink: 0, backgroundColor: active ? p.line3 : p.fill }}>
       <div style={{ position: "absolute", ...grip, hover: { backgroundColor: p.line2 } }} />
     </div>
   );

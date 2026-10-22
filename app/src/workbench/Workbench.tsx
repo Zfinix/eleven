@@ -8,6 +8,7 @@ import { type GpuData, useGpuData } from "../gpu/useGpu";
 import type { Chat } from "../chat/useChat";
 import type { Loaded } from "../lib/useLoaded";
 import { useCommand } from "../lib/shortcuts";
+import { t } from "../i18n";
 import { useSize } from "../lib/useSize";
 import { useAgentView } from "./useAgentView";
 import { useDocument, useOpenInWorkbench } from "./useDocument";
@@ -52,7 +53,7 @@ const EDGES = 24;
 
 type Opening = { readonly program: Program; readonly problem: OpenProblem | null; readonly since: number | null };
 
-const NOTHING_YET = (): Promise<never> => Promise.reject(new Error("This file is still opening."));
+const NOTHING_YET = (): Promise<never> => Promise.reject(new Error(t("workbench.chrome.stillOpening")));
 
 function pendingProgram(target: Target): Program {
   return {
@@ -170,7 +171,7 @@ function useRetyping(program: Program, wb: WorkbenchState): void {
             else kept.set(addr, was);
             applied = kept;
             updateProject(program.id, (project) => setValue(project, "types", addr, was), null);
-            wb.notify(`Couldn't change ${addr}. ${errorMessage(err)}`, null);
+            wb.notify(t("workbench.chrome.changeFailed", { addr, error: errorMessage(err) }), null);
           }
         }
         wb.reread();
@@ -189,13 +190,13 @@ function useBenchValue(program: Program, onBack: () => void, openTarget: (target
     wb.patch({ paletteOpen: false });
     void (async (): Promise<void> => {
       try {
-        const first = await pickToOpen(renderer, "Compare with");
+        const first = await pickToOpen(renderer, t("workbench.chrome.compareWith"));
         if (!first) return;
         const loaded = await loadProgram(prepareTarget(first));
         setCompare(loaded);
         wb.open({ kind: "diff" }, false);
       } catch (err) {
-        chat.thread.note(`Couldn't open that file to compare. ${errorMessage(err)}`);
+        chat.thread.note(t("workbench.chrome.compareFailed", { error: errorMessage(err) }));
       }
     })();
   };
@@ -231,16 +232,16 @@ function useBenchValue(program: Program, onBack: () => void, openTarget: (target
   const addrOf = (name: string): string | null => (byAddr.has(name) ? name : (byName.get(name) ?? renamed.get(name) ?? null));
   useAgentView(program, wb, tab, focusAddr, nameOf(focusAddr));
   useWorkbenchCommands(wb, tab);
-  const step = (run: (id: string) => Edit | null, verb: string, none: string): void => {
+  const step = (run: (id: string) => Edit | null, done: (edit: string) => string, none: string): void => {
     try {
       const edit = run(program.id);
-      wb.notify(edit ? `${verb}: ${describeEdit(edit, nameOf, (addr) => byAddr.get(addr) ?? addr)}` : none, null);
+      wb.notify(edit ? done(describeEdit(edit, nameOf, (addr) => byAddr.get(addr) ?? addr)) : none, null);
     } catch (err) {
       wb.notify(errorMessage(err), null);
     }
   };
-  useCommand("undo", () => step((id) => undo(id), "Undid", "Nothing to undo."));
-  useCommand("redo", () => step((id) => redo(id), "Redid", "Nothing to redo."));
+  useCommand("undo", () => step((id) => undo(id), (edit) => t("workbench.chrome.undid", { edit }), t("workbench.chrome.nothingToUndo")));
+  useCommand("redo", () => step((id) => redo(id), (edit) => t("workbench.chrome.redid", { edit }), t("workbench.chrome.nothingToRedo")));
   const agentTab = chat.thread.state.tabs[chat.thread.state.active]?.procedure ?? null;
   useEffect(() => {
     const addr = agentTab ? addrOf(agentTab) : null;
@@ -313,7 +314,7 @@ function Editor({ problem, since }: { readonly problem: OpenProblem | null; read
         {s.rightOpen && s.docks.right.length > 0 && <Dock />}
       </div>
       <StatusBar />
-      {problem && problem.raw !== dismissed && <Toast title="Couldn't read the functions in this file" detail={problem.advice} raw={problem.raw} onClose={() => setDismissed(problem.raw)} />}
+      {problem && problem.raw !== dismissed && <Toast title={t("workbench.chrome.readFailed")} detail={problem.advice} raw={problem.raw} onClose={() => setDismissed(problem.raw)} />}
       <UndoToast />
       {s.paletteOpen && <Palette />}
       <SliceOverlay />
