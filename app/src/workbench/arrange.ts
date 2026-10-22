@@ -13,6 +13,8 @@ import { type SourceFiles, stemOf, traceStatic } from "./sources";
 /** How a file got its place: its path is in the binary, it sits next to files that are, or the agent grouped it. */
 export type Placement = "exact" | "neighbour" | "guess";
 
+const PLACEMENTS: readonly Placement[] = ["exact", "neighbour", "guess"];
+
 export type ArrangedFile = {
   /** The key the source tab opens it by: the path as the binary spells it, `<Type>.swift`, or the agent's name. */
   readonly key: string;
@@ -283,8 +285,12 @@ function savedFile(projectId: string): string {
   return join(cacheRoot(), "arrange", `${projectId}.json`);
 }
 
+function isSavedFile(value: unknown): boolean {
+  return isRecord(value) && typeof value.key === "string" && typeof value.path === "string" && PLACEMENTS.some((placement) => placement === value.placement) && Array.isArray(value.fns) && value.fns.every((fn) => typeof fn === "string");
+}
+
 function isArrangement(value: unknown): value is Arrangement {
-  return isRecord(value) && Array.isArray(value.files) && Array.isArray(value.unplaced);
+  return isRecord(value) && Array.isArray(value.files) && value.files.every(isSavedFile) && Array.isArray(value.unplaced);
 }
 
 function isWhy(value: unknown): value is Why {
