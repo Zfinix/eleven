@@ -145,7 +145,7 @@ function ViewAs({ shown, agent, onPick }: { readonly shown: Shown; readonly agen
 }
 
 /** "Claude is explaining acc_f32", shimmering, with the step it's on beside it. */
-function Busy({ title, step }: { readonly title: string; readonly step: string | null }): ReactElement {
+export function Busy({ title, step }: { readonly title: string; readonly step: string | null }): ReactElement {
   const { p } = useTheme();
   const now = useNow(true, FRAME_MS);
   return (

@@ -70,7 +70,7 @@ function proposeRename(b: Bench, from: string, to: string, quote: Quote): Turn["
 }
 
 /** The chat's agent, with the model picked for quick answers in Settings, else the one the chat is using. */
-function requestFor(b: Bench): QuickAsk {
+export function requestFor(b: Bench): QuickAsk {
   const agent = b.chat.agents.selected;
   const settings = currentSettings();
   const chatModel = b.chat.thread.state.options.find((option) => option.category === "model")?.current ?? null;

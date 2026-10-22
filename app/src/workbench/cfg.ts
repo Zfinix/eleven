@@ -28,7 +28,7 @@ function addressOf(text: string): bigint {
   return BigInt(text);
 }
 
-function linesIn(assembly: readonly string[], block: Block): readonly (readonly [string, string])[] {
+export function linesIn(assembly: readonly string[], block: Block): readonly (readonly [string, string])[] {
   const start = addressOf(block.start);
   const end = addressOf(block.end);
   return assembly.flatMap((line) => {

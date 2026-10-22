@@ -20,6 +20,7 @@ import { highlightedWord } from "./CodeLines";
 import { splitWords, type Subject, type Token, wordAddress } from "./subject";
 import { MOD } from "../lib/platform";
 import { t } from "../i18n";
+import { edgeKey, visitText, type Walker, WalkBar, walkMarks, useWalk } from "./WalkBar";
 
 const PADDING = 24;
 const FONT_SIZE = 11.5;
@@ -58,7 +59,19 @@ function Instruction({ fn, addr, text }: { readonly fn: string; readonly addr: s
   );
 }
 
-function BlockBox({ fn, placed, entry, group, zoom, text, onPinch }: { readonly fn: string; readonly placed: Placed; readonly entry: boolean; readonly group: BlockGroup | null; readonly zoom: number; readonly text: Text; readonly onPinch: (event: EventPayload) => void }): ReactElement {
+type Visit = { readonly steps: readonly number[]; readonly current: boolean };
+
+function StepBadge({ visit, zoom }: { readonly visit: Visit; readonly zoom: number }): ReactElement {
+  const { p } = useTheme();
+  const label = visit.steps.length === 1 ? t("workbench.walk.visit", { steps: String(visit.steps[0]) }) : t("workbench.walk.visits", { steps: visit.steps.join(", ") });
+  return (
+    <div aria-label={label} style={{ flexShrink: 0, paddingLeft: 6 * zoom, paddingRight: 6 * zoom, borderRadius: 8 * zoom, backgroundColor: visit.current ? p.link : p.sel2, color: visit.current ? p.card : p.link, fontSize: 10.5 * zoom, lineHeight: 15 * zoom, whiteSpace: "nowrap" }}>
+      {visitText(visit.steps)}
+    </div>
+  );
+}
+
+function BlockBox({ fn, placed, entry, group, visit, zoom, text, onPinch }: { readonly fn: string; readonly placed: Placed; readonly entry: boolean; readonly group: BlockGroup | null; readonly visit: Visit | null; readonly zoom: number; readonly text: Text; readonly onPinch: (event: EventPayload) => void }): ReactElement {
   const { p } = useTheme();
   const bench = useBench();
   const { wb } = bench;
@@ -69,14 +82,17 @@ function BlockBox({ fn, placed, entry, group, zoom, text, onPinch }: { readonly 
   const color = wb.s.colors.get(start);
   const picked = wb.s.selected?.kind === "block" && wb.s.selected.start === start;
   const gathered = wb.s.blockPicks.includes(start);
-  const edge = gathered ? p.link : picked ? p.text3 : (color ?? (entry ? p.line3 : p.sel));
+  const edge = gathered || visit ? p.link : picked ? p.text3 : (color ?? (entry ? p.line3 : p.sel));
   const click = (event: EventPayload): void => {
     if (event.modifiers?.shift) wb.patch({ blockPicks: gathered ? wb.s.blockPicks.filter((b) => b !== start) : [...wb.s.blockPicks, start] });
     else wb.patch({ selected: subject, blockPicks: [] });
   };
   return (
-    <div {...subjectMenu(bench, subject, click)} onPinch={onPinch} aria-label={group ? t("workbench.graph.group", { name: group.label }) : t("workbench.graph.block", { address: start })} style={{ userSelect: "text", position: "absolute", left: (placed.x + PADDING) * zoom, top: (placed.y + PADDING) * zoom, width: BLOCK_WIDTH * zoom, height: placed.height * zoom, display: "flex", flexDirection: "column", overflow: "hidden", paddingTop: 8 * zoom, paddingBottom: 8 * zoom, paddingLeft: 10 * zoom, paddingRight: 10 * zoom, borderWidth: color || gathered ? 2 : 1, borderColor: edge, borderRadius: 9 * zoom, backgroundColor: group ? p.raised2 : p.raised, fontSize: text.size * zoom, lineHeight: text.lineHeight * zoom }}>
-      <div style={{ color: color ?? p.link, marginBottom: 2 * zoom, overflow: "hidden", whiteSpace: "nowrap" }}>{group ? group.label : shownStart}</div>
+    <div {...subjectMenu(bench, subject, click)} onPinch={onPinch} aria-label={group ? t("workbench.graph.group", { name: group.label }) : t("workbench.graph.block", { address: start })} style={{ userSelect: "text", position: "absolute", left: (placed.x + PADDING) * zoom, top: (placed.y + PADDING) * zoom, width: BLOCK_WIDTH * zoom, height: placed.height * zoom, display: "flex", flexDirection: "column", overflow: "hidden", paddingTop: 8 * zoom, paddingBottom: 8 * zoom, paddingLeft: 10 * zoom, paddingRight: 10 * zoom, borderWidth: color || gathered || visit?.current ? 2 : 1, borderColor: edge, borderRadius: 9 * zoom, backgroundColor: visit?.current ? p.sel : group ? p.raised2 : p.raised, fontSize: text.size * zoom, lineHeight: text.lineHeight * zoom }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 * zoom, marginBottom: 2 * zoom }}>
+        <div style={{ flexGrow: 1, flexShrink: 1, minWidth: 0, color: color ?? p.link, overflow: "hidden", whiteSpace: "nowrap" }}>{group ? group.label : shownStart}</div>
+        {visit && <StepBadge visit={visit} zoom={zoom} />}
+      </div>
       {group && <div style={{ color: p.faint }}>{t("workbench.graph.folded", { count: group.blocks.length, address: shownStart })}</div>}
       {placed.lines.map((line, ix) => <Instruction key={ix} fn={fn} addr={placed.addrs[ix] ?? start} text={line} />)}
       {placed.hidden > 0 && <div style={{ color: p.faint }}>{placed.hidden === 1 ? t("workbench.graph.oneMoreLine") : t("workbench.graph.moreLines", { count: placed.hidden })}</div>}
@@ -84,15 +100,18 @@ function BlockBox({ fn, placed, entry, group, zoom, text, onPinch }: { readonly 
   );
 }
 
-function Edges({ layout, zoom }: { readonly layout: Layout; readonly zoom: number }): ReactElement {
+/** Edges coloured by kind; during a walk the ones it took turn blue and the rest dim. */
+function Edges({ layout, walked, zoom }: { readonly layout: Layout; readonly walked: ReadonlySet<string> | null; readonly zoom: number }): ReactElement {
   const { p } = useTheme();
   const colors = { taken: p.string, fallthrough: p.error, always: p.gutter, back: p.link } as const;
   const images = useMemo(() => edgeImages(layout), [layout]);
   return (
     <>
-      {images.map((edge, ix) => (
-        <svg key={ix} source={edge.source} style={{ position: "absolute", left: (PADDING + edge.x) * zoom, top: (PADDING + edge.y) * zoom, width: edge.width * zoom, height: edge.height * zoom, color: colors[edge.kind], pointerEvents: "none" }} />
-      ))}
+      {images.map((edge, ix) => {
+        const at = layout.edges[ix];
+        const taken = walked !== null && at !== undefined && walked.has(edgeKey(at.from.block.start, at.to.block.start));
+        return <svg key={ix} source={edge.source} style={{ position: "absolute", left: (PADDING + edge.x) * zoom, top: (PADDING + edge.y) * zoom, width: edge.width * zoom, height: edge.height * zoom, color: taken ? p.link : colors[edge.kind], opacity: walked === null || taken ? 1 : 0.45, pointerEvents: "none" }} />;
+      })}
     </>
   );
 }
@@ -146,8 +165,10 @@ function Minimap({ layout, view, onJump, onPinch }: { readonly layout: Layout; r
   );
 }
 
-function GraphTools({ fn, layout, blocks, zoom, onZoom, onFit, onPinch }: {
+function GraphTools({ fn, layout, blocks, zoom, walking, onWalk, onZoom, onFit, onPinch }: {
   readonly fn: string;
+  readonly walking: boolean;
+  readonly onWalk: () => void;
   readonly layout: Layout;
   readonly blocks: ReadonlyMap<string, PdfBlock>;
   readonly zoom: number;
@@ -180,6 +201,7 @@ function GraphTools({ fn, layout, blocks, zoom, onZoom, onFit, onPinch }: {
         </Tooltip>
         <IconButton icon="zoom-in" label={t("workbench.graph.zoomIn", { key: MOD.replace("+", "") })} size={24} iconSize={13} radius={6} onClick={() => onZoom(ZOOM_STEP)} />
       </div>
+      {!walking && <Button label={t("workbench.walk.open")} tone="outline" size="small" icon="spark" onClick={onWalk} />}
       <Button label={t("workbench.graph.exportPdf")} tone="outline" size="small" icon="external" onClick={exportPdf} />
     </div>
   );
@@ -263,7 +285,7 @@ function useCanvas(content: Size): {
   };
 }
 
-function FlowGraph({ fn, dossier, assembly }: { readonly fn: string; readonly dossier: Dossier; readonly assembly: string }): ReactElement {
+function FlowGraph({ fn, dossier, assembly, walker }: { readonly fn: string; readonly dossier: Dossier; readonly assembly: string; readonly walker: Walker }): ReactElement {
   const { p } = useTheme();
   const { wb, nameOf } = useBench();
   const mine = wb.s.groups.filter((g) => g.fn === fn);
@@ -278,20 +300,36 @@ function FlowGraph({ fn, dossier, assembly }: { readonly fn: string; readonly do
   const canvas = useCanvas(content);
   const { zoom } = canvas.camera;
   const groupAt = (start: string): BlockGroup | null => mine.find((g) => g.blocks.includes(start)) ?? null;
+  const homeOf = (start: string): string => {
+    const group = groupAt(start);
+    return group ? (layout.blocks.find((placed) => group.blocks.includes(placed.block.start))?.block.start ?? start) : start;
+  };
+  const marks = walker.open && walker.run.kind === "ready" ? walkMarks(walker.run.walk, walker.at, homeOf) : null;
+  const here = marks?.current ? layout.blocks.find((placed) => placed.block.start === marks.current) : undefined;
+  useEffect(() => {
+    if (here && canvas.size.width > 0) canvas.jump(here.x + PADDING + BLOCK_WIDTH / 2, here.y + PADDING + here.height / 2);
+  }, [here?.block.start, walker.at, walker.run]);
   const pdfBlocks = new Map(layout.blocks.map((placed) => {
     const group = groupAt(placed.block.start);
     return [placed.block.start, { start: placed.block.start, title: group ? group.label : placed.block.start === entry ? `${nameOf(fn)} · ${placed.block.start}` : placed.block.start, lines: placed.lines, color: wb.s.colors.get(placed.block.start) ?? null }] as const;
   }));
   return (
-    <div style={{ position: "relative", display: "flex", flexGrow: 1, minHeight: 0 }}>
-      <div ref={canvas.box} {...canvas.handlers} role="application" aria-label={t("workbench.graph.label")} style={{ position: "relative", flexGrow: 1, minWidth: 0, overflow: "hidden", backgroundColor: p.deep, cursor: canvas.dragging ? "grabbing" : "grab" }}>
-        <div style={{ position: "absolute", left: canvas.camera.x, top: canvas.camera.y, width: content.width * zoom, height: content.height * zoom, fontFamily: text.family, fontSize: text.size * zoom, pointerEvents: "none" }}>
-          <Edges layout={layout} zoom={zoom} />
-          {layout.blocks.map((placed) => <BlockBox key={placed.block.start} fn={fn} placed={placed} entry={placed.block.start === entry} group={groupAt(placed.block.start)} zoom={zoom} text={text} onPinch={canvas.handlers.onPinch} />)}
+    <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0 }}>
+      {walker.open && <WalkBar walker={walker} onWalk={() => walker.start(dossier.blocks, assembly)} />}
+      <div style={{ position: "relative", display: "flex", flexGrow: 1, minHeight: 0 }}>
+        <div ref={canvas.box} {...canvas.handlers} role="application" aria-label={t("workbench.graph.label")} style={{ position: "relative", flexGrow: 1, minWidth: 0, overflow: "hidden", backgroundColor: p.deep, cursor: canvas.dragging ? "grabbing" : "grab" }}>
+          <div style={{ position: "absolute", left: canvas.camera.x, top: canvas.camera.y, width: content.width * zoom, height: content.height * zoom, fontFamily: text.family, fontSize: text.size * zoom, pointerEvents: "none" }}>
+            <Edges layout={layout} walked={marks?.edges ?? null} zoom={zoom} />
+            {layout.blocks.map((placed) => {
+              const steps = marks?.visits.get(placed.block.start);
+              const visit = steps ? { steps, current: marks?.current === placed.block.start } : null;
+              return <BlockBox key={placed.block.start} fn={fn} placed={placed} entry={placed.block.start === entry} group={groupAt(placed.block.start)} visit={visit} zoom={zoom} text={text} onPinch={canvas.handlers.onPinch} />;
+            })}
+          </div>
         </div>
+        <GraphTools fn={fn} layout={layout} blocks={pdfBlocks} zoom={zoom} walking={walker.open} onWalk={walker.show} onZoom={canvas.zoomBy} onFit={canvas.fit} onPinch={canvas.handlers.onPinch} />
+        {settings.minimap && <Minimap layout={layout} view={visibleRect(canvas.camera, canvas.size)} onJump={canvas.jump} onPinch={canvas.handlers.onPinch} />}
       </div>
-      <GraphTools fn={fn} layout={layout} blocks={pdfBlocks} zoom={zoom} onZoom={canvas.zoomBy} onFit={canvas.fit} onPinch={canvas.handlers.onPinch} />
-      {settings.minimap && <Minimap layout={layout} view={visibleRect(canvas.camera, canvas.size)} onJump={canvas.jump} onPinch={canvas.handlers.onPinch} />}
     </div>
   );
 }
@@ -300,6 +338,7 @@ function FlowGraph({ fn, dossier, assembly }: { readonly fn: string; readonly do
 export function Graph({ addr }: { readonly addr: string }): ReactElement {
   const { p } = useTheme();
   const { program, wb } = useBench();
+  const walker = useWalk(addr);
   const load = async (): Promise<{ readonly dossier: Dossier; readonly assembly: string } | null> => {
     if (!program.dossier) return null;
     const [dossier, assembly] = await Promise.all([program.dossier(addr), program.code(addr, "asm")]);
@@ -309,5 +348,5 @@ export function Graph({ addr }: { readonly addr: string }): ReactElement {
   if (graph.kind === "loading") return <div style={{ padding: 16, color: p.muted }}>{t("workbench.graph.drawing")}</div>;
   if (graph.kind === "failed") return <div style={{ padding: 16 }}><ErrorCard title={t("workbench.graph.failed")} detail={t("workbench.graph.failedDetail", { engine: program.engine })} raw={graph.message} /></div>;
   if (!graph.value) return <div style={{ padding: 16, color: p.muted }}>{program.arch === DALVIK ? t("workbench.graph.android") : t("workbench.graph.waiting")}</div>;
-  return <FlowGraph fn={addr} dossier={graph.value.dossier} assembly={graph.value.assembly} />;
+  return <FlowGraph fn={addr} dossier={graph.value.dossier} assembly={graph.value.assembly} walker={walker} />;
 }
