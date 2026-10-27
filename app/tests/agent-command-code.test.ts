@@ -52,35 +52,58 @@ const { mkdirSync, writeFileSync } = await import("node:fs");
 const { join } = await import("node:path");
 const entry = registry.fallbackAgents().find((agent) => agent.id === "commandcode");
 const facts = { native: { path: "/x/commandcode", args: ["acp"] }, downloaded: false, installing: false, failed: false };
-const read = () => ({ signedIn: setup.signedIn(entry), status: setup.agentStatus(entry, facts).kind });
-const before = read();
-mkdirSync(join(process.env.HOME, ".commandcode"), { recursive: true });
-writeFileSync(join(process.env.HOME, ".commandcode", "auth.json"), JSON.stringify({ apiKey: "test-key" }));
-const after = read();
-console.log(JSON.stringify({ before, after }));
+if (process.env.ELEVEN_AUTH !== undefined) {
+  mkdirSync(join(process.env.HOME, ".commandcode"), { recursive: true });
+  writeFileSync(join(process.env.HOME, ".commandcode", "auth.json"), process.env.ELEVEN_AUTH);
+}
+console.log(JSON.stringify({ signedIn: setup.signedIn(entry), status: setup.agentStatus(entry, facts).kind }));
 `;
 
-test("Command Code login state comes from its auth file under home", () => {
-  const result = Bun.spawnSync({
-    cmd: [process.execPath, "-e", CHECK],
-    env: {
-      ...process.env,
-      HOME: home,
-      ELEVEN_SETUP: join(import.meta.dir, "..", "src", "welcome", "agentSetup.ts"),
-      ELEVEN_REGISTRY: join(import.meta.dir, "..", "src", "agents", "registry.ts"),
-    },
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  expect(result.exitCode).toBe(0);
+type CheckOptions = { readonly home: string; readonly auth?: string; readonly apiKey?: string };
+type CheckResult = { readonly signedIn: unknown; readonly status: string };
+
+function runCheck(options: CheckOptions): CheckResult {
+  const env: Record<string, string | undefined> = {
+    ...process.env,
+    HOME: options.home,
+    ELEVEN_SETUP: join(import.meta.dir, "..", "src", "welcome", "agentSetup.ts"),
+    ELEVEN_REGISTRY: join(import.meta.dir, "..", "src", "agents", "registry.ts"),
+  };
+  delete env.COMMAND_CODE_API_KEY;
+  delete env.ELEVEN_AUTH;
+  if (options.auth !== undefined) env.ELEVEN_AUTH = options.auth;
+  if (options.apiKey !== undefined) env.COMMAND_CODE_API_KEY = options.apiKey;
+  const result = Bun.spawnSync({ cmd: [process.execPath, "-e", CHECK], env, stdout: "pipe", stderr: "pipe" });
   const output = result.stdout.toString();
+  expect(result.exitCode).toBe(0);
   const parsed: unknown = JSON.parse(output);
-  if (!isRecord(parsed) || !isRecord(parsed.before) || !isRecord(parsed.after)) throw new Error(`Unexpected login check output: ${output}`);
-  const before = parsed.before;
-  const after = parsed.after;
-  if (typeof before.status !== "string" || typeof after.status !== "string") throw new Error(`Unexpected login check output: ${output}`);
-  expect(before.signedIn).toBe(false);
-  expect(["ready", "signin"]).toContain(before.status);
-  expect(after.signedIn).toBe(true);
-  expect(after.status).toBe("ready");
+  if (!isRecord(parsed) || typeof parsed.status !== "string") throw new Error(`Unexpected login check output: ${output}`);
+  return { signedIn: parsed.signedIn, status: parsed.status };
+}
+
+test("Command Code without an auth file is not signed in", () => {
+  const result = runCheck({ home: join(home, "missing") });
+  expect(result.signedIn).toBe(false);
+  expect(["ready", "signin"]).toContain(result.status);
+});
+
+test("Command Code with a null or empty apiKey is not signed in", () => {
+  const nullKey = runCheck({ home: join(home, "null-key"), auth: JSON.stringify({ apiKey: null }) });
+  expect(nullKey.signedIn).toBe(false);
+  expect(["ready", "signin"]).toContain(nullKey.status);
+  const emptyKey = runCheck({ home: join(home, "empty-key"), auth: JSON.stringify({ apiKey: "" }) });
+  expect(emptyKey.signedIn).toBe(false);
+  expect(["ready", "signin"]).toContain(emptyKey.status);
+});
+
+test("Command Code with an apiKey in its auth file is ready", () => {
+  const result = runCheck({ home: join(home, "signed-in"), auth: JSON.stringify({ apiKey: "test-key" }) });
+  expect(result.signedIn).toBe(true);
+  expect(result.status).toBe("ready");
+});
+
+test("Command Code with only COMMAND_CODE_API_KEY is signed in", () => {
+  const result = runCheck({ home: join(home, "env-key"), apiKey: "test-key" });
+  expect(result.signedIn).toBe(true);
+  expect(result.status).toBe("ready");
 });
