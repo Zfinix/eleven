@@ -1,9 +1,10 @@
 import "./fixtures/isolate";
 import { afterAll, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { loadIcon } from "../src/agents/icons";
 import { fallbackAgents, parseRegistry, sortAgents, type AgentEntry } from "../src/agents/registry";
 import { isRecord } from "../src/lib/guards";
 
@@ -33,6 +34,15 @@ test("Command Code ranks between opencode and Aster and starts its own command",
   const ids = sorted.map((item) => item.id);
   expect(ids.indexOf("commandcode")).toBeGreaterThan(ids.indexOf("opencode"));
   expect(ids.indexOf("commandcode")).toBeLessThan(ids.indexOf("aster"));
+});
+
+test("Command Code ships one logo for light windows and a second for dark ones", async () => {
+  const icon = await loadIcon(commandCode(fallbackAgents()));
+  if (icon?.kind !== "color") throw new Error("Command Code should use a shipped logo");
+  expect(existsSync(icon.light)).toBe(true);
+  expect(existsSync(icon.dark)).toBe(true);
+  expect(icon.dark).not.toBe(icon.light);
+  expect(readFileSync(icon.dark, "utf8")).not.toBe(readFileSync(icon.light, "utf8"));
 });
 
 const CHECK = `
