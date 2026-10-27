@@ -35,6 +35,7 @@ const LOGINS: Readonly<Record<string, Login>> = {
   "codex-acp": { signedIn: () => Boolean(process.env.OPENAI_API_KEY) || hasFile(".codex", "auth.json"), cli: "codex", args: ["login"], logout: ["logout"], npx: "@openai/codex" },
   gemini: { signedIn: () => Boolean(process.env.GEMINI_API_KEY) || hasFile(".gemini", "oauth_creds.json"), cli: "gemini", args: [], npx: "@google/gemini-cli" },
   opencode: { signedIn: () => hasFile(".local", "share", "opencode", "auth.json"), cli: "opencode", args: ["auth", "login"], logout: ["auth", "logout"], npx: "opencode-ai" },
+  commandcode: { signedIn: () => fileHas("apiKey", ".commandcode", "auth.json"), cli: "commandcode", args: ["login"], logout: ["logout"], npx: null },
   goose: { signedIn: () => hasFile(".config", "goose", "config.yaml"), cli: "goose", args: ["configure"], npx: null },
 };
 

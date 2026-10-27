@@ -54,6 +54,14 @@ export function customAgentEntry(command: string): AgentEntry | null {
 /** Agents Eleven knows about that aren't in the public registry. */
 const LOCAL_AGENTS: readonly AgentEntry[] = [
   {
+    id: "commandcode",
+    name: "Command Code",
+    description: "Your local Command Code agent",
+    version: "local",
+    iconUrl: null,
+    distribution: { kind: "command", command: "commandcode", args: ["acp"] },
+  },
+  {
     id: "aster",
     name: "Aster",
     description: "Your local Aster agent",
@@ -66,7 +74,7 @@ const LOCAL_AGENTS: readonly AgentEntry[] = [
 export const DEFAULT_AGENT_ID = "claude-acp";
 
 /** The order agents appear in the picker; everything else follows alphabetically. */
-const FEATURED = ["claude-acp", "codex-acp", "grok-build", "antigravity-acp", "gemini", "github-copilot-cli", "cursor", "goose", "opencode", "aster"] as const;
+const FEATURED = ["claude-acp", "codex-acp", "grok-build", "antigravity-acp", "gemini", "github-copilot-cli", "cursor", "goose", "opencode", "commandcode", "aster"] as const;
 
 export function platformKey(): string {
   const os = process.platform === "darwin" ? "darwin" : process.platform === "win32" ? "windows" : "linux";
