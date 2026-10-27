@@ -66,6 +66,7 @@ function runCheck(options: CheckOptions): CheckResult {
   const env: Record<string, string | undefined> = {
     ...process.env,
     HOME: options.home,
+    USERPROFILE: options.home,
     ELEVEN_SETUP: join(import.meta.dir, "..", "src", "welcome", "agentSetup.ts"),
     ELEVEN_REGISTRY: join(import.meta.dir, "..", "src", "agents", "registry.ts"),
   };
