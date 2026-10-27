@@ -166,6 +166,7 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
   const requested = useRef(new Set<string>());
   const prompted = useRef(false);
   const adopted = useRef<{ readonly from: string; readonly path: string } | null>(null);
+  const agentKey = useRef<string | null>(null);
   const tools = useRef(new Map<string, string>());
   const latest = useRef({ target, onTarget });
   latest.current = { target, onTarget };
@@ -207,6 +208,13 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
     prompted.current = false;
   };
 
+  /** The first run only records the agent, so mounting keeps the startup rule it had. */
+  const agentChanged = (): boolean => {
+    const changed = agentKey.current !== null && agentKey.current !== agent.id;
+    agentKey.current = agent.id;
+    return changed;
+  };
+
   useEffect(() => stopSession, []);
 
   useEffect(() => {
@@ -221,11 +229,12 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
     opened.current = null;
     requested.current.clear();
     dispatch({ type: "retarget" });
+    const switched = agentChanged();
     const agentOpenedIt = target !== null && target.path === adopted.current?.path;
     adopted.current = null;
-    if (agentOpenedIt) return;
+    if (agentOpenedIt && !switched) return;
     stopSession();
-    if (live && (target === null || currentSettings().startAgentWithProject)) ensureSession();
+    if (live && (switched || target === null || currentSettings().startAgentWithProject)) ensureSession();
   }, [agent.id, native?.path, target?.path]);
 
   useEffect(() => {
