@@ -6,6 +6,7 @@ export const AGENT_CLI: Readonly<Record<string, string>> = {
   "antigravity-acp": "agy",
   gemini: "gemini",
   opencode: "opencode",
+  commandcode: "commandcode",
   goose: "goose",
   cursor: "cursor-agent",
   "crow-cli": "crow-cli",
