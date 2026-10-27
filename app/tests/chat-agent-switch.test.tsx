@@ -25,15 +25,15 @@ const MODEL: SessionOption = {
   legacyMode: false,
 };
 
-type Run = { readonly agentId: string; stopped: boolean };
+type Run = { readonly agentId: string; readonly native: NativeCommand | null; stopped: boolean };
 
 const runs: Run[] = [];
 
 class FakeAgentSession {
   readonly run: Run;
 
-  constructor(agent: AgentEntry, _native: NativeCommand | null, _cwd: string, sink: (event: AgentEvent) => void) {
-    this.run = { agentId: agent.id, stopped: false };
+  constructor(agent: AgentEntry, native: NativeCommand | null, _cwd: string, sink: (event: AgentEvent) => void) {
+    this.run = { agentId: agent.id, native, stopped: false };
     runs.push(this.run);
     sink({ kind: "options", options: [MODEL] });
   }
@@ -67,13 +67,16 @@ const SECOND = targetNamed("second.bin");
 let shown: Thread | null = null;
 let chooseAgent: ((id: string) => void) | null = null;
 let openTarget: ((target: Target) => void) | null = null;
+let detectCommand: ((native: NativeCommand) => void) | null = null;
 
 function Chat(): ReactElement {
   const [agentId, setAgentId] = useState(CLAUDE.id);
   const [target, setTarget] = useState(FIRST);
+  const [native, setNative] = useState<NativeCommand | null>(null);
   chooseAgent = setAgentId;
   openTarget = setTarget;
-  const thread = useThread(agentId === CODEX.id ? CODEX : CLAUDE, null, target, () => {}, true);
+  detectCommand = setNative;
+  const thread = useThread(agentId === CODEX.id ? CODEX : CLAUDE, native, target, () => {}, true);
   shown = thread;
   return <div>{`${target.name} ${thread.state.options.length}`}</div>;
 }
@@ -121,6 +124,36 @@ test("opening another file with the gate off starts no session", async () => {
   await until(ui, () => shown !== null);
   openTarget?.(SECOND);
   await until(ui, () => ui.renderer.getAllText().join(" ").includes(SECOND.name));
+  expect(runs).toEqual([]);
+  ui.unmount();
+});
+
+test("the command arriving after a switch restarts the session even with the gate off", async () => {
+  const command: NativeCommand = { path: "/usr/local/bin/codex-acp", args: [] };
+  const ui = createTestRoot({ width: 600, height: 200 });
+  ui.render(<Chat />);
+  await until(ui, () => shown !== null);
+
+  chooseAgent?.(CODEX.id);
+  await until(ui, () => runs.length === 1);
+  expect(runs[0]?.native).toBeNull();
+
+  detectCommand?.(command);
+  await until(ui, () => runs.length === 2);
+  expect(runs.map((run) => run.native)).toEqual([null, command]);
+  expect(runs[0]?.stopped).toBe(true);
+  expect(runs[1]?.stopped).toBe(false);
+  await until(ui, () => shown?.state.options.length === 1);
+  ui.unmount();
+});
+
+test("the command arriving with no session running starts none with the gate off", async () => {
+  const ui = createTestRoot({ width: 600, height: 200 });
+  ui.render(<Chat />);
+  await until(ui, () => shown !== null);
+  detectCommand?.({ path: "/usr/local/bin/claude-acp", args: [] });
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  ui.renderer.flush();
   expect(runs).toEqual([]);
   ui.unmount();
 });
