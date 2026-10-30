@@ -7,6 +7,8 @@
 
 <h1 align="center">Eleven</h1>
 
+<p align="center"><a href="https://github.com/reacher-z/Awesome-REA"><img src="https://raw.githubusercontent.com/reacher-z/Awesome-REA/main/assets/featured-by-awesome-rea-inline.svg" alt="Featured by Awesome REA" width="184" height="20"></a></p>
+
 <p align="center">An agent-first reverse-engineering app for macOS, Windows and Linux.</p>
 
 <div align="center">
