@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import { type ReactElement, useMemo } from "react";
 
 import { type Syntax as Grammar, tokenize } from "../components/code";
 import { type Syntax, syntaxFor, useCodeLook } from "../settings/look";
@@ -7,6 +7,8 @@ import { type Palette, SANS, scrollbar, useTheme } from "../theme";
 import { type PlainId, t } from "../i18n";
 import { type AskRow, PinDot, useAskRows } from "../workbench/ask/AskThread";
 import type { AskPlace } from "../workbench/ask/place";
+import { contentWidth, type Span, spansOf } from "../workbench/lineCells";
+import { useListWindow } from "../lib/useListWindow";
 import type { KernelNote } from "./kernelRewrite";
 import { shortName, text } from "./look";
 import type { Binding, GpuApi, LoadedBy, ShaderFunction } from "./types";
@@ -42,14 +44,19 @@ function toneColor(tone: IrTone, p: Palette, c: Syntax): string {
   }
 }
 
-/** One line of shader code: PTX and rewrites in their grammar's colors, LLVM-style IR by what the line does. */
-function IrLine({ line, number, grammar, note, surprise, row }: { readonly line: string; readonly number: number; readonly grammar: Grammar | null; readonly note: KernelNote | null; readonly surprise: boolean; readonly row: AskRow | null }): ReactElement {
+type Painted = { readonly text: string; readonly color: string; readonly spans: readonly Span[] | null };
+
+/** PTX and rewrites in their grammar's colors, LLVM-style IR by what the line does. */
+function paint(line: string, grammar: Grammar | null, p: Palette, colors: Syntax): Painted {
+  if (!grammar || line.length === 0) return { text: line, color: toneColor(toneOf(line), p, colors), spans: null };
+  const cells = tokenize(line, grammar, p, colors).map((part) => ({ text: part.text, color: part.kind === "text" ? part.color : colors.call, token: null, opens: null }));
+  return { text: line, color: p.text3, spans: spansOf(cells) };
+}
+
+/** One line of shader code, drawn as one element with its colours as spans. */
+function IrLine({ line, number, note, surprise, row }: { readonly line: Painted; readonly number: number; readonly note: KernelNote | null; readonly surprise: boolean; readonly row: AskRow | null }): ReactElement {
   const { p } = useTheme();
-  const { colorScheme, lineNumbers } = useSettings().settings;
-  const colors = syntaxFor(colorScheme, p);
-  const code = grammar && line.length > 0
-    ? tokenize(line, grammar, p, colors).map((part, ix) => <div key={ix} style={{ color: part.kind === "text" ? part.color : colors.call, whiteSpace: "nowrap" }}>{part.text}</div>)
-    : <div style={{ whiteSpace: "nowrap", color: toneColor(toneOf(line), p, colors) }}>{line}</div>;
+  const { lineNumbers } = useSettings().settings;
   const pick = row ? { onClick: row.pick } : {};
   const tint = row?.picked ? { backgroundColor: p.sel2 } : surprise ? { backgroundColor: p.fill } : {};
   const shown = (
@@ -57,7 +64,7 @@ function IrLine({ line, number, grammar, note, surprise, row }: { readonly line:
       {lineNumbers
         ? <div {...pick} style={{ position: "relative", display: "flex", justifyContent: "flex-end", width: 62, flexShrink: 0, paddingRight: 14, color: row?.picked ? p.text : p.gutter, userSelect: "none" }}>{row?.pinned && <PinDot />}{String(number)}</div>
         : <div {...pick} style={{ position: "relative", width: 18, flexShrink: 0 }}>{row?.pinned && <PinDot />}</div>}
-      <div style={{ display: "flex", flexShrink: 1, minWidth: 0, overflow: "hidden" }}>{code}</div>
+      <div {...(line.spans ? { spans: line.spans } : {})} style={{ flexShrink: 0, whiteSpace: "nowrap", color: line.color }}>{line.text}</div>
       {row?.bar}
       <div {...pick} style={{ flexGrow: 1, minWidth: 24, alignSelf: "stretch" }} />
       {note && (
@@ -72,11 +79,28 @@ function IrLine({ line, number, grammar, note, surprise, row }: { readonly line:
 
 /** Numbered code lines, with plain-words notes beside the first line of each group when there are any. */
 export function CodeLinesOf({ code, grammar, notes = [], ask = null }: { readonly code: string; readonly grammar: Grammar | null; readonly notes?: readonly KernelNote[]; readonly ask?: AskPlace | null }): ReactElement {
-  const lines = code.split("\n");
+  const { p } = useTheme();
+  const { colorScheme } = useSettings().settings;
+  const lines = useMemo(() => code.split("\n"), [code]);
+  const painted = useMemo(() => {
+    const colors = syntaxFor(colorScheme, p);
+    return lines.map((line) => paint(line, grammar, p, colors));
+  }, [lines, grammar, p, colorScheme]);
+  const look = useCodeLook();
   const rows = useAskRows(ask, lines);
+  const shown = useListWindow(lines.length);
   const startsAt = new Map(notes.map((n) => [n.from, n]));
   const inSurprise = (line: number): boolean => notes.some((n) => n.surprise && line >= n.from && line <= n.to);
-  return <>{lines.map((line, ix) => <IrLine key={ix} line={line} number={ix + 1} grammar={grammar} note={startsAt.get(ix + 1) ?? null} surprise={inSurprise(ix + 1)} row={rows(ix + 1)} />)}</>;
+  // Rows are exactly this wide, so notes, which need the whole view, go without sideways scrolling.
+  const wide = useMemo(() => (notes.length > 0 ? 0 : contentWidth(lines, look.size * 0.62, 62)), [lines, notes.length, look.size]);
+  return (
+    <virtual-list itemCount={lines.length} windowStart={shown.start} estimatedItemHeight={look.lineHeight} onVisibleRange={shown.onVisibleRange} contentWidth={wide} style={{ flexGrow: 1, minHeight: 0, overflowX: "scroll", paddingTop: 4, paddingBottom: 24, fontFamily: look.family, fontSize: look.size, lineHeight: look.lineHeight, ...scrollbar(p) }}>
+      {painted.slice(shown.start, shown.end).map((line, ix) => {
+        const number = shown.start + ix + 1;
+        return <IrLine key={number} line={line} number={number} note={startsAt.get(number) ?? null} surprise={inSurprise(number)} row={rows(number)} />;
+      })}
+    </virtual-list>
+  );
 }
 
 function LoadedByCard({ loadedBy, onOpen }: { readonly loadedBy: Loaded<LoadedBy | null>; readonly onOpen: (symbol: string) => void }): ReactElement {
@@ -231,7 +255,7 @@ export function ShaderView({ fn, stage, api, ir, loadedBy, onOpen, onAsk, ask, e
       {extras.status}
       <div style={{ display: "flex", flexGrow: 1, minHeight: 0 }}>
       {extras.body ?? (
-        <div style={{ display: "flex", flexDirection: "column", flexGrow: 999, flexBasis: 420, minWidth: 0, overflow: "scroll", ...scrollbar(p), paddingTop: 4, paddingBottom: 14, fontFamily: look.family, fontSize: look.size, lineHeight: look.lineHeight }}>
+        <div style={{ display: "flex", flexDirection: "column", flexGrow: 999, flexBasis: 420, minWidth: 0, minHeight: 0, fontFamily: look.family, fontSize: look.size, lineHeight: look.lineHeight }}>
           <IrBody ir={ir} name={fn.name} grammar={api === "cuda" ? "ptx" : null} notes={extras.notes} ask={ask} />
         </div>
       )}
