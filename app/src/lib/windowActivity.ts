@@ -19,10 +19,11 @@ function subscribe(listener: () => void): () => void {
 }
 
 function windowActive(): boolean {
+  if (process.env.ELEVEN_TTY_VIEWER) return true;
   return currentDesktop()?.isWindowActive() ?? true;
 }
 
-/** Whether the window is in front. Always true where there is no native window. */
+/** Whether the window is in front. Always true where there is no native window, or when the terminal shows a hidden one. */
 export function useWindowActive(): boolean {
   return useSyncExternalStore(subscribe, windowActive, windowActive);
 }

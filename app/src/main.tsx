@@ -9,6 +9,8 @@ if (process.argv.includes("--eleven-mcp")) {
 } else if (process.argv.includes("--eleven-highlight")) {
   const { runHighlighter } = await import("./components/highlightServer");
   await runHighlighter();
+} else if (process.argv.includes("--tty")) {
+  await import("./tty/main");
 } else {
   await import("./window");
 }
