@@ -44,6 +44,8 @@ mkdir -p "$modules/native-$platform"
 cp "$gpuix/packages/native/gpuix-native.$platform.node" "$modules/native-$platform/"
 # macOS refuses to dlopen a copied binary whose signature no longer covers it.
 if [ "$(uname -s)" = "Darwin" ]; then
+  codesign --remove-signature "$modules/native-$platform/gpuix-native.$platform.node"
+  bun "$app_dir/script/align-linkedit.ts" "$modules/native-$platform/gpuix-native.$platform.node"
   codesign --force --sign - "$modules/native-$platform/gpuix-native.$platform.node"
 fi
 [ -f "$modules/native-$platform/package.json" ] || printf '{ "name": "@gpuix/native-%s", "version": "0.0.0", "main": "gpuix-native.%s.node" }\n' "$platform" "$platform" > "$modules/native-$platform/package.json"
