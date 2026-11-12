@@ -10,7 +10,7 @@ permissions:
 
 env:
   BUN_VERSION: 1.4.3
-  REA_REF: feat/set-code-type
+  REA_REF: eleven
   GPUIX_REF: eleven
   HUSKY: "0"
 
