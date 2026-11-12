@@ -1,17 +1,43 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 
+import { activeEngine } from "../analysis/engines";
 import { isRecord } from "../lib/guards";
-import { pathSetting } from "../settings/store";
+import { type BundledRizin, cutterRizin } from "./cutter";
+import { currentSettings, pathSetting } from "../settings/store";
 import type { Caller, Fn, HexRow, Refs, TableRow } from "../workbench/model";
 import type { CodeType } from "./codeTypes";
+import { hexRowsOf } from "./hexRows";
 import { start, stop } from "../lib/process";
 
 export function rizinProgram(): string {
   return pathSetting("rizinPath", "ELEVEN_RIZIN") ?? "rizin";
 }
 
+export function radare2Program(): string {
+  return pathSetting("radare2Path", "ELEVEN_RADARE2") ?? "r2";
+}
+
+export type PipeTool = "rizin" | "radare2";
+
+/** The program a session runs: the one picked in Settings, else Cutter's rizin when Cutter is installed, since it carries rz-ghidra. */
+function launchOf(tool: PipeTool): BundledRizin {
+  if (tool === "radare2") return { program: radare2Program(), env: {}, setup: [] };
+  if (currentSettings().rizinPath) return { program: currentSettings().rizinPath, env: {}, setup: [] };
+  return cutterRizin() ?? { program: rizinProgram(), env: {}, setup: [] };
+}
+
+/** radare2 when it's the engine in use. Otherwise rizin, which also gives Ghidra its quick first look. */
+export function pipeTool(): PipeTool {
+  return activeEngine()?.id === "radare2" ? "radare2" : "rizin";
+}
+
+/** The command line that runs the tool by hand, for telling an agent how to read the file the same way. */
+export function pipeCommand(path: string): string {
+  return pipeTool() === "radare2" ? `${radare2Program()} -q -c "aaa; afl" ${path}` : `${rizinProgram()} -q -c "aaa; afl" ${path}`;
+}
+
 /**
- * A long-lived rizin process for one file: it analyzes the binary once, then
+ * A long-lived rizin or radare2 process for one file: it analyzes the binary once, then
  * answers many commands over the rzpipe protocol (each reply ends with NUL),
  * so opening function after function stays instant instead of re-analyzing.
  */
@@ -21,8 +47,12 @@ class RizinSession {
   private buffer = "";
   private readonly ready: Promise<void>;
 
-  constructor(path: string) {
-    this.proc = start(rizinProgram(), ["-q0", "-e", "scr.color=0", path]);
+  readonly setup: readonly string[];
+
+  constructor(tool: PipeTool, path: string) {
+    const launch = launchOf(tool);
+    this.setup = launch.setup;
+    this.proc = start(launch.program, ["-q0", "-e", "scr.color=0", path], { env: { ...process.env, ...launch.env } });
     this.proc.stderr.resume();
     this.proc.stdout.setEncoding("utf8");
     this.proc.stdout.on("data", (chunk: string) => this.receive(chunk));
@@ -63,10 +93,14 @@ export function rizinLightOn(path: string): void {
   light.add(path);
 }
 
+function sessionKey(tool: PipeTool, path: string): string {
+  return `${tool}\0${path}`;
+}
+
 /** Ends the rizin session for a file once something better reads it. */
 export async function rizinClose(path: string): Promise<void> {
-  const pending = sessions.get(path);
-  sessions.delete(path);
+  const pending = sessions.get(sessionKey("rizin", path));
+  sessions.delete(sessionKey("rizin", path));
   light.delete(path);
   if (pending) (await pending).close();
 }
@@ -80,17 +114,20 @@ export function rizinReplayOn(path: string, saved: () => readonly (readonly [str
 
 /** The analyzed rizin session for a file, created and auto-analyzed once, then reused. */
 function analyzed(path: string): Promise<RizinSession> {
-  let pending = sessions.get(path);
+  const tool = pipeTool();
+  const key = sessionKey(tool, path);
+  let pending = sessions.get(key);
   if (!pending) {
     pending = (async () => {
-      const session = new RizinSession(path);
+      const session = new RizinSession(tool, path);
+      for (const command of session.setup) await session.cmd(command);
       await session.cmd(light.has(path) ? "aa" : "aaa");
       for (const [addr, type] of replays.get(path)?.() ?? []) {
         for (const command of rizinTypeCommands(addr, type, null)) await session.cmd(command);
       }
       return session;
     })();
-    sessions.set(path, pending);
+    sessions.set(key, pending);
   }
   return pending;
 }
@@ -123,12 +160,19 @@ export function rizinEntry(fns: readonly Fn[]): Fn | null {
   return named[0] ?? fns.find((fn) => fn.kind === "function") ?? null;
 }
 
+/** A function's start in `aflj`: rizin calls it `offset`, radare2 `addr`. */
+function functionStart(item: Readonly<Record<string, unknown>>): number | null {
+  const at = item.offset ?? item.addr;
+  return typeof at === "number" ? at : null;
+}
+
 /** Every function rizin finds. Imports and thunks are marked so the UI dims them. */
 export async function rizinFunctions(path: string): Promise<readonly Fn[]> {
   return array(await json(path, "aflj")).flatMap((item) => {
-    if (!isRecord(item) || typeof item.offset !== "number" || typeof item.name !== "string") return [];
+    const at = isRecord(item) ? functionStart(item) : null;
+    if (!isRecord(item) || at === null || typeof item.name !== "string") return [];
     const kind = /^(sym\.imp|reloc|fcn\.imp)/.test(item.name) ? "thunk" : "function";
-    return [{ addr: hex(item.offset), name: item.name, kind }];
+    return [{ addr: hex(at), name: item.name, kind }];
   });
 }
 
@@ -148,18 +192,9 @@ export async function rizinSegments(path: string): Promise<readonly TableRow[]> 
 }
 
 export async function rizinBytes(path: string, addr: string, length: number): Promise<readonly HexRow[]> {
-  const raw = (await (await analyzed(path)).cmd(`p8 ${length} @ ${addr}`)).trim();
-  const bytes = (raw.match(/.{2}/g) ?? []).map((pair) => parseInt(pair, 16));
-  const base = Number(addr);
-  return Array.from({ length: Math.ceil(bytes.length / 16) }, (_, row) => {
-    const slice = bytes.slice(row * 16, row * 16 + 16);
-    return {
-      addr: hex(base + row * 16),
-      bytes: slice.map((b) => b.toString(16).padStart(2, "0")).join(" "),
-      ascii: slice.map((b) => (b >= 32 && b < 127 ? String.fromCharCode(b) : ".")).join(""),
-    };
-  });
+  return hexRowsOf((await (await analyzed(path)).cmd(`p8 ${length} @ ${addr}`)).trim(), addr);
 }
+
 
 export function rizinDisassembly(path: string, addr: string): Promise<string> {
   return text(path, `pdf @ ${addr}`);
@@ -173,17 +208,32 @@ export async function rizinRefs(path: string, addr: string): Promise<Refs> {
   return { callers, callees };
 }
 
-/** Whether a rizin decompiler plugin (rz-ghidra's pdg or jsdec's pdc) is installed for pseudocode. */
-export async function rizinHasDecompiler(path: string): Promise<boolean> {
-  return /\bpdg\b|\bpdc\b/.test(await (await analyzed(path)).cmd("Lc"));
+/** The command a decompiler plugin adds, from the core plugins listed: Ghidra's pdg (rz-ghidra, r2ghidra), r2dec's pdd or jsdec's pdc. */
+export function decompilerCommand(plugins: string): string | null {
+  if (/ghidra|\bpdg\b/i.test(plugins)) return "pdg";
+  if (/r2dec|\bpdd\b/i.test(plugins)) return "pdd";
+  if (/jsdec|\bpdc\b/i.test(plugins)) return "pdc";
+  return null;
 }
 
-/** Pseudocode for one function via rz-ghidra (pdg); throws a plain message when no decompiler plugin is installed. */
+async function decompiler(path: string): Promise<string | null> {
+  return decompilerCommand(await (await analyzed(path)).cmd("Lc"));
+}
+
+/** Whether a decompiler plugin is installed for pseudocode. */
+export async function rizinHasDecompiler(path: string): Promise<boolean> {
+  return (await decompiler(path)) !== null;
+}
+
+/** Pseudocode for one function from the decompiler plugin; throws a plain message when none is installed. */
 export async function rizinPseudocode(path: string, addr: string): Promise<string> {
-  if (!(await rizinHasDecompiler(path))) {
-    throw new Error("This engine needs a decompiler plugin for pseudocode. Install rz-ghidra (pdg) or jsdec (pdc).");
+  const command = await decompiler(path);
+  if (command === null) {
+    throw new Error(pipeTool() === "radare2"
+      ? "radare2 needs a decompiler plugin for pseudocode. Install r2ghidra or r2dec, for example with r2pm -ci r2ghidra."
+      : "This engine needs a decompiler plugin for pseudocode. Install rz-ghidra (pdg) or jsdec (pdc).");
   }
-  return text(path, `pdg @ ${addr}`);
+  return text(path, `${command} @ ${addr}`);
 }
 
 const DATA_SIZE: Readonly<Record<"byte" | "word" | "dword" | "qword", number>> = { byte: 1, word: 2, dword: 4, qword: 8 };
@@ -219,6 +269,6 @@ export async function rizinRetype(path: string, addr: string, next: CodeType | n
   const session = await analyzed(path);
   for (const command of rizinTypeCommands(addr, next, previous)) await session.cmd(command);
   if (next !== "procedure") return;
-  const starts = array(await json(path, "aflj")).some((item) => isRecord(item) && item.offset === Number(addr));
-  if (!starts) throw new Error(`Rizin can't start a function at ${addr} because it sits inside another one. Switch to Ghidra in Settings, Analysis to split it.`);
+  const starts = array(await json(path, "aflj")).some((item) => isRecord(item) && functionStart(item) === Number(addr));
+  if (!starts) throw new Error(`${pipeTool() === "radare2" ? "radare2" : "Rizin"} can't start a function at ${addr} because it sits inside another one. Switch to Ghidra in Settings, Analysis to split it.`);
 }

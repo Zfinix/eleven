@@ -11,6 +11,7 @@ import { SerialQueue } from "../lib/serial";
 import { cacheDir } from "../settings/actions";
 import { currentSettings, pathSetting, type Settings } from "../settings/store";
 import { hasObjcMessages } from "./binaryInfo";
+import { idaRegistration } from "./ida";
 import { nodeCommand } from "./toolchain";
 import { activeProvider } from "../analysis/engines";
 import type { CodeType } from "./codeTypes";
@@ -105,6 +106,7 @@ export function reaEnv(s: Settings = currentSettings(), objc = false): Record<st
   const inherited = (process.env.REA_GHIDRA_DISABLED_ANALYZERS ?? "").split(",").map((name) => name.trim()).filter(Boolean);
   const disabled = [...new Set([...inherited, ...(s.rebuildSwitches ? [] : ["Decompiler Switch Analysis"]), ...(s.swiftNames ? [] : ["Demangler Swift"]), ...(objc && !s.objcCalls ? [OBJC_MESSAGES] : [])])];
   const analyzed = join(s.cacheDir || cacheDir(), "ghidra-analysis");
+  const ida = idaRegistration();
   return {
     REA_GHIDRA_STARTUP_TIMEOUT_MS: String(ghidraStartupMs(s)),
     REA_JADX_OPERATION_TIMEOUT_MS: String(ghidraStartupMs(s)),
@@ -112,6 +114,7 @@ export function reaEnv(s: Settings = currentSettings(), objc = false): Record<st
     ...(isAbsolute(analyzed) ? { REA_GHIDRA_ANALYSIS_CACHE: analyzed } : {}),
     ...(memory ? { GHIDRA_MAXMEM: memory } : {}),
     ...(disabled.length > 0 ? { REA_GHIDRA_DISABLED_ANALYZERS: disabled.join(",") } : {}),
+    ...(ida ? { REA_IDA_MCP_CONFIG: ida } : {}),
   };
 }
 
@@ -273,14 +276,14 @@ class Rea {
     return normalized;
   }
 
-  /** Ghidra's full dossier for one function: blocks, callers, callees, references, comments. Cached as JSON. */
+  /** Ghidra's full dossier for one function: blocks, callers, callees, references, comments. REA 6.8 sends it as the normalized result. Cached as JSON. */
   async analyze(target: Opened, procedure: string): Promise<unknown> {
     const file = join(cacheDir(), target.sha256, "ghidra", "dossier", `${procedure.replace(/[:/]/g, "_")}.json`);
     const cached = await readCachedText(file);
     if (cached !== null) return JSON.parse(cached);
     await this.ensureOpen(target.path);
     const reply = await this.call("analyze_function", { procedure, detail: "complete" });
-    const value = recordField(recordField(reply, "raw_result"), "value") ?? null;
+    const value = recordField(recordField(reply, "raw_result"), "value") ?? recordField(reply, "normalized_result") ?? null;
     if (!value) throw new Error("REA didn't describe this function.");
     await mkdir(dirname(file), { recursive: true });
     await writeFile(file, JSON.stringify(value));

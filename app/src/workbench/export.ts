@@ -26,6 +26,13 @@ function safe(name: string): string {
   return name.replace(/[^\w.-]/g, "_").slice(0, 80);
 }
 
+/** Where a file another program writes for this one goes, in its exports folder. */
+export async function exportPath(program: Program, file: string): Promise<string> {
+  const dir = join(exportDir(), safe(program.name));
+  await mkdir(dir, { recursive: true });
+  return join(dir, file);
+}
+
 async function write(program: Program, file: string, body: string): Promise<string> {
   const dir = join(exportDir(), safe(program.name));
   await mkdir(dir, { recursive: true });

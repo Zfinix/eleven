@@ -2,17 +2,19 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 
+import { binjaInstalled } from "../engine/binja";
+import { idaRegistration } from "../engine/ida";
 import { supportPath } from "../lib/support";
 import { currentSettings } from "../settings/store";
 
 export type ProviderId = "ghidra" | "hopper" | "ida";
 
-export type EngineId = ProviderId | "rizin" | "r2ghidra" | "libghidra" | "ghidra-rs" | "ghidrust" | "sleigh";
+export type EngineId = ProviderId | "rizin" | "radare2" | "binaryninja" | "r2ghidra" | "libghidra" | "ghidra-rs" | "ghidrust" | "sleigh";
 
 export type EngineStatus = "ready" | "experimental";
 
-/** How Eleven reads a binary with this engine: through REA's providers, or the native rizin backend. */
-export type BackendId = "rea" | "rizin";
+/** How Eleven reads a binary with this engine: through REA's providers, rizin or radare2 kept running over a pipe, or Binary Ninja's Python API. */
+export type BackendId = "rea" | "pipe" | "binja";
 
 export type Engine = {
   readonly id: EngineId;
@@ -39,6 +41,11 @@ export function rizinInstalled(): boolean {
   return chosen ? existsSync(chosen) : onPath("rizin");
 }
 
+export function radare2Installed(): boolean {
+  const chosen = currentSettings().radare2Path || process.env.ELEVEN_RADARE2;
+  return chosen ? existsSync(chosen) : onPath("r2");
+}
+
 function onPath(bin: string): boolean {
   const dirs = (process.env.PATH ?? "").split(delimiter).concat("/opt/homebrew/bin", "/usr/local/bin");
   return dirs.some((dir) => dir && existsSync(join(dir, bin)));
@@ -47,14 +54,16 @@ function onPath(bin: string): boolean {
 /** The engine store: backends Eleven can read binaries with. Each is a separate download; turn the ones you want on. */
 export const ENGINES: readonly Engine[] = [
   { id: "ghidra", name: "Ghidra", blurb: "Open-source, every architecture, deep decompiler. Runs on the JVM, so it is slower to open.", repo: "https://ghidra-sre.org", status: "ready", backend: "rea", provider: "ghidra", getHint: "Download Ghidra and set GHIDRA_INSTALL_DIR to it.", installed: () => !!process.env.GHIDRA_INSTALL_DIR && existsSync(process.env.GHIDRA_INSTALL_DIR) },
-  { id: "rizin", name: "Rizin", blurb: "Native, no JVM. Opens in under a second: functions, strings, segments, bytes, disassembly. Add rz-ghidra or jsdec for pseudocode.", repo: "https://rizin.re", status: "ready", backend: "rizin", provider: null, getHint: "Eleven ships with Rizin.", installed: rizinInstalled },
+  { id: "rizin", name: "Rizin", blurb: "Native, no JVM. Opens in under a second: functions, strings, segments, bytes, disassembly. Add rz-ghidra or jsdec for pseudocode.", repo: "https://rizin.re", status: "ready", backend: "pipe", provider: null, getHint: "Eleven ships with Rizin.", installed: rizinInstalled },
+  { id: "radare2", name: "radare2", blurb: "Native, no JVM, the project Rizin forked from. Add r2ghidra or r2dec for pseudocode.", repo: "https://www.radare.org", status: "ready", backend: "pipe", provider: null, getHint: "Install radare2, for example with brew install radare2.", installed: radare2Installed },
   { id: "hopper", name: "Hopper", blurb: "Native macOS, fast on Mach-O. A paid app you install yourself.", repo: "https://www.hopperapp.com", status: "ready", backend: "rea", provider: "hopper", getHint: "Install Hopper Disassembler into Applications.", installed: hopperInstalled },
-  { id: "ida", name: "IDA", blurb: "Industry standard, deepest analysis. Needs your own license.", repo: "https://hex-rays.com/ida-pro", status: "ready", backend: "rea", provider: "ida", getHint: "Set REA_IDA_MCP_CONFIG to your IDA MCP registration.", installed: () => !!process.env.REA_IDA_MCP_CONFIG || (!!currentSettings().idaPath && existsSync(currentSettings().idaPath)) },
-  { id: "r2ghidra", name: "r2ghidra", blurb: "Adds Ghidra's native decompiler (pdg) to Rizin for Ghidra-quality pseudocode, no JVM.", repo: "https://github.com/rizinorg/rz-ghidra", status: "experimental", backend: "rizin", provider: null, getHint: "Build rz-ghidra from the rizinorg tap.", installed: () => false },
-  { id: "libghidra", name: "libghidra", blurb: "Embeds Ghidra's SLEIGH and decompiler natively. No Java, no network.", repo: "https://github.com/0xeb/libghidra", status: "experimental", backend: "rizin", provider: null, getHint: "Build libghidra from source.", installed: () => false },
-  { id: "ghidra-rs", name: "Ghidra (Rust port)", blurb: "koute's pure-Rust port of the Ghidra decompiler.", repo: "https://github.com/koute/ghidra-decompiler", status: "experimental", backend: "rizin", provider: null, getHint: "Clone and cargo build the port.", installed: () => false },
-  { id: "ghidrust", name: "Ghidrust", blurb: "From-scratch Rust: IR to SSA to typed C. No JVM.", repo: "https://github.com/oofz/Ghidrust", status: "experimental", backend: "rizin", provider: null, getHint: "Clone and cargo build Ghidrust.", installed: () => false },
-  { id: "sleigh", name: "SLEIGH (Rust)", blurb: "Ghidra's SLEIGH in Rust via jingle_sleigh/libsla: disassembly and P-code, not pseudocode yet.", repo: "https://crates.io/crates/jingle_sleigh", status: "experimental", backend: "rizin", provider: null, getHint: "cargo add jingle_sleigh or libsla.", installed: () => false },
+  { id: "ida", name: "IDA", blurb: "Industry standard, deepest analysis. Needs your own license.", repo: "https://hex-rays.com/ida-pro", status: "ready", backend: "rea", provider: "ida", getHint: "Install IDA Pro 9 and ida-pro-mcp, or pick your IDA MCP registration in Settings.", installed: () => idaRegistration() !== null },
+  { id: "binaryninja", name: "Binary Ninja", blurb: "Fast, clean intermediate languages and pseudo C. Needs a Commercial or Ultimate license for its headless API.", repo: "https://binary.ninja", status: "ready", backend: "binja", provider: null, getHint: "Install Binary Ninja into Applications.", installed: binjaInstalled },
+  { id: "r2ghidra", name: "r2ghidra", blurb: "Adds Ghidra's native decompiler (pdg) to Rizin for Ghidra-quality pseudocode, no JVM.", repo: "https://github.com/rizinorg/rz-ghidra", status: "experimental", backend: "pipe", provider: null, getHint: "Build rz-ghidra from the rizinorg tap.", installed: () => false },
+  { id: "libghidra", name: "libghidra", blurb: "Embeds Ghidra's SLEIGH and decompiler natively. No Java, no network.", repo: "https://github.com/0xeb/libghidra", status: "experimental", backend: "pipe", provider: null, getHint: "Build libghidra from source.", installed: () => false },
+  { id: "ghidra-rs", name: "Ghidra (Rust port)", blurb: "koute's pure-Rust port of the Ghidra decompiler.", repo: "https://github.com/koute/ghidra-decompiler", status: "experimental", backend: "pipe", provider: null, getHint: "Clone and cargo build the port.", installed: () => false },
+  { id: "ghidrust", name: "Ghidrust", blurb: "From-scratch Rust: IR to SSA to typed C. No JVM.", repo: "https://github.com/oofz/Ghidrust", status: "experimental", backend: "pipe", provider: null, getHint: "Clone and cargo build Ghidrust.", installed: () => false },
+  { id: "sleigh", name: "SLEIGH (Rust)", blurb: "Ghidra's SLEIGH in Rust via jingle_sleigh/libsla: disassembly and P-code, not pseudocode yet.", repo: "https://crates.io/crates/jingle_sleigh", status: "experimental", backend: "pipe", provider: null, getHint: "cargo add jingle_sleigh or libsla.", installed: () => false },
 ];
 
 const ENGINE_IDS = new Set<string>(ENGINES.map((e) => e.id));

@@ -138,7 +138,7 @@ function ExportsSub({ onDone }: { readonly onDone: () => void }): ReactElement {
   );
 }
 
-const ENGINE_LOGOS: Readonly<Partial<Record<EngineId, string>>> = { ghidra: "ghidra.png", rizin: "rizin.svg", hopper: "hopper.png", ida: "ida.png" };
+const ENGINE_LOGOS: Readonly<Partial<Record<EngineId, string>>> = { ghidra: "ghidra.png", rizin: "rizin.svg", radare2: "radare2.png", hopper: "hopper.png", ida: "ida.png", binaryninja: "binaryninja.png" };
 
 function EngineLogo({ id, dim }: { readonly id: EngineId; readonly dim: boolean }): ReactElement | null {
   const file = ENGINE_LOGOS[id];

@@ -34,7 +34,7 @@ export const PERMISSION_PRESETS = {
   free: { read: "Allow", view: "Allow", rename: "Allow", notes: "Allow", patch: "Ask", gpu: "Allow", debug: "Allow", shell: "Ask" },
 } as const satisfies Readonly<Record<string, PermissionTable>>;
 
-export const PATH_KEYS = ["exportDir", "lldbDap", "ghidraDir", "javaHome", "reaPath", "rizinPath", "cacheDir", "hopperPath", "idaPath", "skillsDir"] as const;
+export const PATH_KEYS = ["exportDir", "lldbDap", "ghidraDir", "javaHome", "reaPath", "rizinPath", "radare2Path", "cacheDir", "hopperPath", "idaPath", "binjaPath", "cutterPath", "skillsDir"] as const;
 
 /** Languages the pseudocode view can rewrite a function into; Pseudocode is the engine's own output. */
 export const CODE_LANGUAGES = ["Pseudocode", "C", "C++", "Rust", "Go", "Swift", "Python", "TypeScript", "Java", "C#", "Zig"] as const;
@@ -137,9 +137,13 @@ export type Settings = {
   readonly javaHome: string;
   readonly reaPath: string;
   readonly rizinPath: string;
+  readonly radare2Path: string;
   readonly cacheDir: string;
   readonly hopperPath: string;
+  /** IDA.app, or the JSON registration of an IDA MCP server that REA reads. */
   readonly idaPath: string;
+  readonly binjaPath: string;
+  readonly cutterPath: string;
   readonly skillsDir: string;
 };
 
@@ -227,9 +231,12 @@ export const DEFAULT_SETTINGS: Settings = {
   javaHome: "",
   reaPath: "",
   rizinPath: "",
+  radare2Path: "",
   cacheDir: "",
   hopperPath: "",
   idaPath: "",
+  binjaPath: "",
+  cutterPath: "",
   skillsDir: "",
 };
 
@@ -337,9 +344,12 @@ const SETTINGS: z.ZodType<Settings> = z.object({
   javaHome: z.string().catch(D.javaHome),
   reaPath: z.string().catch(D.reaPath),
   rizinPath: z.string().catch(D.rizinPath),
+  radare2Path: z.string().catch(D.radare2Path),
   cacheDir: z.string().catch(D.cacheDir),
   hopperPath: z.string().catch(D.hopperPath),
   idaPath: z.string().catch(D.idaPath),
+  binjaPath: z.string().catch(D.binjaPath),
+  cutterPath: z.string().catch(D.cutterPath),
   skillsDir: z.string().catch(D.skillsDir),
 });
 

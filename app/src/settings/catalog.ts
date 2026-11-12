@@ -10,7 +10,9 @@ import { forgetAnswers } from "../agents/remembered";
 import { activeEngine, chooseEngine, type EngineId } from "../analysis/engines";
 import type { Agents } from "../chat/useAgents";
 import { appIcon } from "../components/ui";
+import { cutterLinked, linkCutter, openCutterSessions } from "../engine/cutter";
 import { adoptToolchain } from "../engine/toolchain";
+import { errorMessage } from "../lib/guards";
 import { RECORDINGS_DIR } from "../gpu/trace";
 import { LANGUAGE_NAMES, LANGUAGE_SETTINGS, type LanguageSetting, type PlainId, t, thisDevice } from "../i18n";
 import { loadSkills } from "../skills/load";
@@ -51,9 +53,12 @@ export type Ctx = {
 const ENGINES_DIR = join(ASSETS, "engines");
 export const ENGINE_LOGO = {
   rizin: join(ENGINES_DIR, "rizin.svg"),
+  radare2: join(ENGINES_DIR, "radare2.png"),
   ghidra: join(ENGINES_DIR, "ghidra.png"),
   hopper: join(ENGINES_DIR, "hopper.png"),
   ida: join(ENGINES_DIR, "ida.png"),
+  binaryninja: join(ENGINES_DIR, "binaryninja.png"),
+  cutter: join(ENGINES_DIR, "cutter.png"),
 } as const;
 
 function btn(label: string, act: () => void, style: Action["style"] = "plain"): Action {
@@ -217,7 +222,10 @@ function input(c: Ctx, key: "customAgent" | "customToolServer", title: string, d
   };
 }
 
-type EngineRowId = "rizin" | "ghidra" | "hopper" | "ida";
+type EngineRowId = "rizin" | "radare2" | "ghidra" | "hopper" | "ida" | "binaryninja";
+
+/** Paid engines Eleven only reads through: removing them is the user's business, and IDA's path may be their own registration file. */
+const KEPT: ReadonlySet<EngineRowId> = new Set(["ida", "binaryninja"]);
 
 function engineRows(c: Ctx, h: ReturnType<typeof makeHelpers>): readonly SettingRowModel[] {
   const active = activeEngine()?.id ?? null;
@@ -244,16 +252,43 @@ function engineRows(c: Ctx, h: ReturnType<typeof makeHelpers>): readonly Setting
       pick: { on: active === engineId, act: () => { chooseEngine(engineId); c.refresh(); } },
       ...(active === engineId ? { tag: t("settings.engine.opensFiles") } : {}),
       status: { text: t("settings.installed"), tone: "good" },
-      buttons: [...update, btn(t("settings.remove"), () => c.ask(remove.id))],
-      confirm: remove,
+      buttons: KEPT.has(id) ? [...update, btn(t("settings.engine.locate"), () => void locate())] : [...update, btn(t("settings.remove"), () => c.ask(remove.id))],
+      ...(KEPT.has(id) ? {} : { confirm: remove }),
     });
   };
   return [
     row("rizin", "Rizin", e.rizin.version ? t("settings.engine.rizinVersion", { version: e.rizin.version }) : t("settings.engine.rizin"), e.rizin.path, "rizinPath", false),
+    row("radare2", "radare2", e.radare2.version ? t("settings.engine.radare2Version", { version: e.radare2.version }) : t("settings.engine.radare2"), e.radare2.path, "radare2Path", false),
     row("ghidra", "Ghidra", e.ghidra.version ? t("settings.engine.ghidraVersion", { version: e.ghidra.version }) : t("settings.engine.ghidra"), e.ghidra.path, "ghidraDir", true),
     row("hopper", "Hopper", t("settings.engine.hopper"), e.hopper, "hopperPath", false),
     row("ida", "IDA Pro", t("settings.engine.ida"), e.ida, "idaPath", false),
+    row("binaryninja", "Binary Ninja", t("settings.engine.binaryninja"), e.binaryninja, "binjaPath", false),
   ];
+}
+
+function cutterRow(c: Ctx): SettingRowModel {
+  const found = c.info.engines.cutter;
+  const lead = { kind: "img", src: ENGINE_LOGO.cutter } as const;
+  const locate = async (): Promise<void> => {
+    const picked = await pickPath("file", t("settings.engine.locateTitle", { name: "Cutter" }));
+    if (picked === null) return;
+    c.update({ cutterPath: picked });
+    c.refresh();
+    c.toast(t("settings.engine.using", { name: "Cutter", path: tildePath(picked) }));
+  };
+  if (found === null) return info("Cutter", t("settings.cutter.desc"), { lead, status: { text: t("settings.notFound"), tone: "quiet" }, buttons: [btn(t("settings.engine.locate"), () => void locate())] });
+  const link = (): void => {
+    try {
+      linkCutter();
+      c.refresh();
+      c.toast(t("settings.cutter.linkedToast"));
+    } catch (err) {
+      c.toast(t("settings.cutter.linkFailed", { message: errorMessage(err) }));
+    }
+  };
+  if (!cutterLinked()) return info("Cutter", t("settings.cutter.desc"), { lead, status: { text: t("settings.installed"), tone: "good" }, buttons: [btn(t("settings.cutter.link"), link, "primary")] });
+  const live = openCutterSessions() > 0;
+  return info("Cutter", t("settings.cutter.desc"), { lead, status: live ? { text: t("settings.cutter.live"), tone: "good" } : { text: t("settings.cutter.linked"), tone: "quiet" } });
 }
 
 function newSkill(c: Ctx, folder: string): void {
@@ -416,6 +451,7 @@ export function buildPages(c: Ctx): Readonly<Record<Page, readonly GroupModel[]>
     ],
     engines: [
       { label: t("settings.group.openWith"), foot: t("settings.openWith.foot"), rows: engineRows(c, h) },
+      { label: t("settings.group.otherTools"), rows: [cutterRow(c)] },
       { label: t("settings.group.together"), rows: [tg("ghidraPseudocode", t("settings.ghidraPseudocode"), t("settings.ghidraPseudocode.desc"), { dim: activeEngine()?.id === "ghidra" })] },
       { label: "Ghidra", rows: [
         sel("ghidraMemory", t("settings.ghidraMemory"), t("settings.ghidraMemory.desc", { device: thisDevice() }), ["Automatic", "2 GB", "4 GB", "8 GB", "16 GB", "32 GB", "64 GB"], { Automatic: t("settings.ghidraMemory.automatic") }),

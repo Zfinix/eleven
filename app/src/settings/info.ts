@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { useEffect, useState } from "react";
@@ -6,6 +6,9 @@ import { useEffect, useState } from "react";
 import { findOnPath } from "../agents/detect";
 import { rememberedAnswerProjects } from "../agents/remembered";
 import { findLldbDap } from "../debug/adapter";
+import { binjaApp, binjaInstalled } from "../engine/binja";
+import { cutterApp } from "../engine/cutter";
+import { idaRegistration } from "../engine/ida";
 import { reaLaunch } from "../engine/rea";
 import { RECORDINGS_DIR } from "../gpu/trace";
 import { cacheDir, folderBytes, ghidraVersion, javaVersion, latestRelease, PROJECTS_DIR, projectCount, reaVersion, rizinVersion, sizeText, THREADS_DIR } from "./actions";
@@ -29,8 +32,12 @@ export type Info = {
   readonly engines: {
     readonly rizin: { readonly path: string | null; readonly version: string | null };
     readonly ghidra: { readonly path: string | null; readonly version: string | null };
+    readonly radare2: { readonly path: string | null; readonly version: string | null };
     readonly hopper: string | null;
+    /** The IDA MCP registration REA reads, which needs IDA and ida-pro-mcp. */
     readonly ida: string | null;
+    readonly binaryninja: string | null;
+    readonly cutter: string | null;
   };
   readonly java: { readonly path: string | null; readonly version: string | null };
   readonly rea: { readonly version: string | null; readonly state: ReaState };
@@ -50,19 +57,6 @@ function hopperPath(): string | null {
   return existing(currentSettings().hopperPath) ?? APPS.map((dir) => join(dir, "Hopper Disassembler.app")).find(existsSync) ?? null;
 }
 
-function idaPath(): string | null {
-  const chosen = existing(currentSettings().idaPath);
-  if (chosen) return chosen;
-  for (const dir of APPS) {
-    try {
-      const app = readdirSync(dir).find((name) => /^IDA.*\.app$/i.test(name));
-      if (app) return join(dir, app);
-    } catch {
-      continue;
-    }
-  }
-  return null;
-}
 
 function reaProgram(): string | null {
   const { command, args } = reaLaunch();
@@ -158,11 +152,13 @@ export async function checkAppUpdate(): Promise<AppUpdate> {
 
 async function gather(): Promise<Info> {
   const rizinProgram = existing(currentSettings().rizinPath) ?? existing(process.env.ELEVEN_RIZIN ?? "") ?? findOnPath("rizin");
+  const radare2Program = existing(currentSettings().radare2Path) ?? existing(process.env.ELEVEN_RADARE2 ?? "") ?? findOnPath("r2", ["/opt/homebrew/bin", "/usr/local/bin"]);
   const ghidraDir = existing(process.env.GHIDRA_INSTALL_DIR ?? "");
   const javaHome = existing(process.env.JAVA_HOME ?? "");
   const rea = reaProgram();
-  const [rizin, java, reaV, reaLatest] = await Promise.all([
+  const [rizin, radare2, java, reaV, reaLatest] = await Promise.all([
     rizinProgram ? rizinVersion(rizinProgram) : Promise.resolve(null),
+    radare2Program ? rizinVersion(radare2Program) : Promise.resolve(null),
     javaHome ? javaVersion(javaHome) : Promise.resolve(null),
     rea ? reaVersion(rea) : Promise.resolve(null),
     latestRelease("Zfinix/rea"),
@@ -173,7 +169,7 @@ async function gather(): Promise<Info> {
     return { kind: reaLatest ? "current" : "installed" };
   };
   return {
-    engines: { rizin: { path: rizinProgram, version: rizin }, ghidra: { path: ghidraDir, version: ghidraDir ? ghidraVersion(ghidraDir) : null }, hopper: hopperPath(), ida: idaPath() },
+    engines: { rizin: { path: rizinProgram, version: rizin }, ghidra: { path: ghidraDir, version: ghidraDir ? ghidraVersion(ghidraDir) : null }, radare2: { path: radare2Program, version: radare2 }, hopper: hopperPath(), ida: idaRegistration(), binaryninja: binjaInstalled() ? binjaApp() : null, cutter: cutterApp() },
     java: { path: javaHome, version: java },
     rea: { version: reaV, state: reaState() },
     lldb: findLldbDap(),
@@ -190,7 +186,7 @@ async function gather(): Promise<Info> {
 }
 
 const EMPTY: Info = {
-  engines: { rizin: { path: null, version: null }, ghidra: { path: null, version: null }, hopper: null, ida: null },
+  engines: { rizin: { path: null, version: null }, ghidra: { path: null, version: null }, radare2: { path: null, version: null }, hopper: null, ida: null, binaryninja: null, cutter: null },
   java: { path: null, version: null },
   rea: { version: null, state: { kind: "checking" } },
   lldb: null,

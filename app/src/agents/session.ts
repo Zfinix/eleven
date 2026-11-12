@@ -9,8 +9,9 @@ import { type Attachment, promptBlocks } from "./attachments";
 import { AGENT_ENV, BRIDGE_ENV, CHAT_ENV, ELEVEN_SERVER } from "../bridge/protocol";
 import { errorMessage } from "../lib/guards";
 import { toWebReadable, toWebWritable } from "../lib/streams";
-import { currentSettings, loadSettings, pathSetting } from "../settings/store";
+import { currentSettings, loadSettings } from "../settings/store";
 import { isAndroidCode } from "../engine/jadx";
+import { idaRegistration } from "../engine/ida";
 import { reaEnv } from "../engine/rea";
 import type { NativeCommand } from "./detect";
 import type { AgentEvent, PermissionChoice, SessionOption } from "./events";
@@ -73,10 +74,10 @@ function envList(value: unknown): acp.EnvVariable[] {
   return Object.entries(value).flatMap(([name, v]) => (typeof v === "string" ? [{ name, value: v }] : []));
 }
 
-/** An IDA MCP server described by a JSON file with `command`, `args` and `env`, as REA's IDA provider reads it. */
+/** An IDA MCP server described by a JSON file with `command`, `args` and `env`, as REA's IDA provider reads it. A URL registration has no command, so agents reach it through REA only. */
 function idaServer(): readonly acp.McpServer[] {
-  const config = pathSetting("idaPath", "REA_IDA_MCP_CONFIG");
-  if (!config?.endsWith(".json")) return [];
+  const config = idaRegistration();
+  if (!config) return [];
   try {
     const parsed: unknown = JSON.parse(readFileSync(config, "utf8"));
     if (typeof parsed !== "object" || parsed === null || !("command" in parsed) || typeof parsed.command !== "string") return [];

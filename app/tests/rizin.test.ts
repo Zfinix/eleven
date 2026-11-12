@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 
-import { rizinBytes, rizinDisassembly, rizinEntry, rizinFunctions, rizinSegments, rizinStrings } from "../src/engine/rizin";
+import { rizinBytes, rizinDisassembly, rizinEntry, rizinFunctions, rizinHasDecompiler, rizinSegments, rizinStrings } from "../src/engine/rizin";
 import { activeBackend, ENGINES, setEnabled } from "../src/analysis/engines";
 import { prepareTarget } from "../src/engine/target";
 import { loadProgram } from "../src/workbench/program";
@@ -60,7 +60,7 @@ run("rizin engine: turning it on routes loadProgram through the native backend, 
   process.env.ELEVEN_SUPPORT = mkdtempSync(join(tmpdir(), "eleven-rizin-prog-"));
   for (const e of ENGINES) setEnabled(e.id, false);
   setEnabled("rizin", true);
-  expect(activeBackend()).toBe("rizin");
+  expect(activeBackend()).toBe("pipe");
 
   const target = prepareTarget(ghidraBinary("linux_x86_64", (name) => !name.includes(".")));
   const program = await loadProgram(target);
@@ -69,7 +69,9 @@ run("rizin engine: turning it on routes loadProgram through the native backend, 
 
   const first = program.functions[0]?.addr ?? "0x0";
   expect((await program.code(first, "asm")).length).toBeGreaterThan(10);
-  expect(await program.code(first, "pseudo")).toContain("disassembly");
+  const pseudo = await program.code(first, "pseudo");
+  if (await rizinHasDecompiler(target.path)) expect(pseudo).toContain("{");
+  else expect(pseudo).toContain("disassembly");
   expect((await program.hex(first)).length).toBeGreaterThan(0);
 
   const refs = await program.refs(first);

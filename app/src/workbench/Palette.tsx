@@ -5,6 +5,10 @@ import { ask, goTo } from "./actions";
 import { codeForString } from "./layout";
 import { exportAllPseudocode, exportFunction, exportObjcInventory } from "./export";
 import { patchBytes } from "./patch";
+import { exportCutterProject, importCutterProject, openCutter } from "./cutter";
+import { cutterApp } from "../engine/cutter";
+import { errorMessage } from "../lib/guards";
+import { pickPath } from "../settings/system";
 import { YOU } from "../engine/edits";
 import { loadProject, updateProject } from "../engine/project";
 import { copyText } from "../chat/useThread";
@@ -51,6 +55,17 @@ function useActions(): readonly Action[] {
   const { s } = wb;
   const savedPatches = loadProject(program.id).patches.length;
   const close = (): void => wb.patch({ paletteOpen: false });
+  const inCutter = (work: () => Promise<string | null>): void => {
+    close();
+    void (async (): Promise<void> => {
+      try {
+        const done = await work();
+        if (done !== null) chat.thread.note(done);
+      } catch (err) {
+        chat.thread.note(t("workbench.cutter.failed", { message: errorMessage(err) }));
+      }
+    })();
+  };
   const exported = (work: Promise<string>): void => {
     close();
     void (async (): Promise<void> => {
@@ -89,6 +104,18 @@ function useActions(): readonly Action[] {
     { section: "file", icon: "debug", label: t("workbench.palette.debug"), command: "debug", run: () => { close(); wb.reveal("debug"); } },
     { section: "file", icon: "download", label: t("workbench.palette.exportAll"), command: null, run: () => exported(exportAllPseudocode(program)) },
     { section: "file", icon: "download", label: t("workbench.palette.exportObjc"), command: null, run: () => exported(exportObjcInventory(program)) },
+    ...(cutterApp() !== null
+      ? [
+          { section: "file", icon: "external", label: t("workbench.palette.openCutter"), command: null, run: () => inCutter(async () => t("workbench.cutter.opened", { path: await openCutter(program) })) },
+          { section: "file", icon: "download", label: t("workbench.palette.exportCutter"), command: null, run: () => exported(exportCutterProject(program)) },
+          { section: "file", icon: "upload", label: t("workbench.palette.importCutter"), command: null, run: () => inCutter(async () => {
+            const file = await pickPath("file", t("workbench.cutter.pick"));
+            if (file === null) return null;
+            const counts = await importCutterProject(program, file);
+            return t("workbench.cutter.imported", counts);
+          }) },
+        ] as const
+      : []),
     ...(savedPatches > 0
       ? [
           { section: "file", icon: "hex", label: savedPatches === 1 ? t("workbench.palette.writePatchedOne") : t("workbench.palette.writePatched", { count: savedPatches }), command: null, run: () => exported(patchBytes(program, [])) },

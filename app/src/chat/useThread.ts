@@ -17,6 +17,7 @@ import { entryProcedure, loadProcedures } from "../engine/procedures";
 import { projectId } from "../engine/project";
 import { type Opened, rea } from "../engine/rea";
 import { DALVIK, openJadx } from "../engine/jadx";
+import { binjaCode, binjaFunctions } from "../engine/binja";
 import { rizinDisassembly, rizinEntry, rizinFunctions, rizinPseudocode } from "../engine/rizin";
 import { androidHint, engineHint } from "../analysis/hint";
 import { activeBackend } from "../analysis/engines";
@@ -115,7 +116,8 @@ function openedFor(target: Target): Opened {
 
 async function entryName(target: Target, opened: { current: Opened | null }): Promise<string | null> {
   if (target.arch === DALVIK) return null;
-  if (activeBackend() === "rizin") return rizinEntry(await rizinFunctions(target.path))?.name ?? null;
+  if (activeBackend() === "pipe") return rizinEntry(await rizinFunctions(target.path))?.name ?? null;
+  if (activeBackend() === "binja") return rizinEntry(await binjaFunctions(target.path))?.name ?? null;
   opened.current ??= openedFor(target);
   return entryProcedure(await loadProcedures(target.path, opened.current.sha256))?.name ?? null;
 }
@@ -130,6 +132,12 @@ async function rizinCode(path: string, procedure: string): Promise<string> {
   }
 }
 
+async function binjaNamed(path: string, procedure: string): Promise<string> {
+  const fn = (await binjaFunctions(path)).find((candidate) => candidate.name === procedure);
+  if (!fn) throw new Error(t("chat.noFunction", { name: procedure }));
+  return binjaCode(path, fn.addr, "pseudo");
+}
+
 async function jadxCode(target: Target, procedure: string): Promise<string> {
   const app = await openJadx(target.path, projectId(target));
   const fn = app.functions.find((candidate) => candidate.name === procedure);
@@ -139,7 +147,8 @@ async function jadxCode(target: Target, procedure: string): Promise<string> {
 
 async function loadCode(target: Target, opened: { current: Opened | null }, procedure: string): Promise<string> {
   if (target.arch === DALVIK) return jadxCode(target, procedure);
-  if (activeBackend() === "rizin") return rizinCode(target.path, procedure);
+  if (activeBackend() === "pipe") return rizinCode(target.path, procedure);
+  if (activeBackend() === "binja") return binjaNamed(target.path, procedure);
   opened.current ??= openedFor(target);
   return rea.code(opened.current, procedure, "pseudocode");
 }
