@@ -27,6 +27,20 @@ export type News = {
 /** Newest first; the card opens on the first one. */
 export const NEWS: readonly [News, ...News[]] = [
   {
+    id: "engines",
+    title: "news.engines.title",
+    body: "news.engines.body",
+    art: { kind: "logos", files: ["engines/radare2.png", "engines/binaryninja.png", "engines/ida.png", "engines/cutter.png"] },
+    action: { kind: "settings", label: "news.engines.action", page: "engines" },
+  },
+  {
+    id: "big-apps",
+    title: "news.bigApps.title",
+    body: "news.bigApps.body",
+    art: { kind: "logos", files: ["engines/ghidra.png"] },
+    action: { kind: "none" },
+  },
+  {
     id: "notifications",
     title: "news.notifications.title",
     body: "news.notifications.body",
