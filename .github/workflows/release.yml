@@ -187,6 +187,16 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+      # A git checkout has no Windows addon; REA's docs restore it from the published package of the same version.
+      - name: Restore REA's Windows native files
+        working-directory: rea
+        run: |
+          version=$(node -p "require('./package.json').version")
+          npm pack "rea-agents@$version" --silent
+          tar -xzf "rea-agents-$version.tgz"
+          mkdir -p native/windows/build
+          cp package/native/windows/build/manifest.json package/native/windows/build/rea-windows-x64.node native/windows/build/
+          rm -rf package "rea-agents-$version.tgz"
       - name: Build REA
         working-directory: rea
         run: npm ci --no-audit --no-fund && npm run build:cached
