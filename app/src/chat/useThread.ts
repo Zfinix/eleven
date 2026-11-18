@@ -233,10 +233,6 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
   }, [live]);
 
   useEffect(() => {
-    dispatch({ type: "switchAgent" });
-  }, [agent.id, native?.path]);
-
-  useEffect(() => {
     opened.current = null;
     requested.current.clear();
     dispatch({ type: "retarget" });
@@ -250,6 +246,8 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
     // A late command replaces this file's session; a file the agent opened keeps its turn running.
     const restart = commandArrived && session.current !== null && !retargeted;
     if (agentOpenedIt && !switched) return;
+    // Cleared only when the session is replaced, so a kept turn stays busy.
+    if (switched || commandArrived) dispatch({ type: "switchAgent" });
     stopSession();
     if (live && (switched || restart || target === null || currentSettings().startAgentWithProject)) ensureSession();
   }, [agent.id, native?.path, target?.path]);
