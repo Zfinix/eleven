@@ -247,9 +247,9 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
     targetKey.current = target?.path;
     const agentOpenedIt = target !== null && target.path === adopted.current?.path;
     adopted.current = null;
-    // A late command replaces this conversation's session, never one left from another file.
-    const restart = commandArrived && session.current !== null && (!retargeted || agentOpenedIt);
-    if (agentOpenedIt && !switched && !restart) return;
+    // A late command replaces this file's session; a file the agent opened keeps its turn running.
+    const restart = commandArrived && session.current !== null && !retargeted;
+    if (agentOpenedIt && !switched) return;
     stopSession();
     if (live && (switched || restart || target === null || currentSettings().startAgentWithProject)) ensureSession();
   }, [agent.id, native?.path, target?.path]);
