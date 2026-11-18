@@ -116,7 +116,8 @@ export function standaloneAcp(id: string, home: string = homedir()): NativeComma
   return own && path && isExecutable(path) ? { path, args: own.args } : null;
 }
 
-function findAgentTool(name: string): string | null {
+/** Finds an agent CLI on PATH or in the folders agent installers use, as discovery does. */
+export function findAgentTool(name: string): string | null {
   return findOnPath(name, AGENT_BIN_DIRS);
 }
 

@@ -2,9 +2,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { findOnPath, type NativeCommand } from "../agents/detect";
+import { findAgentTool, findOnPath, type NativeCommand } from "../agents/detect";
 import { binaryInstalled, readyToRun, resolveLaunch } from "../agents/launch";
 import type { AgentEntry } from "../agents/registry";
+import { stringField } from "../lib/guards";
 import { t, thisDevice } from "../i18n";
 import { runInTerminal as openTerminal } from "../lib/platform";
 
@@ -30,11 +31,22 @@ function fileHas(text: string, ...parts: readonly string[]): boolean {
   }
 }
 
+function jsonHasText(key: string, ...parts: readonly string[]): boolean {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(join(HOME, ...parts), "utf8"));
+    const value = stringField(parsed, key);
+    return value !== undefined && value.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
 const LOGINS: Readonly<Record<string, Login>> = {
   "claude-acp": { signedIn: () => Boolean(process.env.ANTHROPIC_API_KEY) || fileHas("oauthAccount", ".claude.json"), cli: "claude", args: ["/login"], logout: ["/logout"], npx: "@anthropic-ai/claude-code" },
   "codex-acp": { signedIn: () => Boolean(process.env.OPENAI_API_KEY) || hasFile(".codex", "auth.json"), cli: "codex", args: ["login"], logout: ["logout"], npx: "@openai/codex" },
   gemini: { signedIn: () => Boolean(process.env.GEMINI_API_KEY) || hasFile(".gemini", "oauth_creds.json"), cli: "gemini", args: [], npx: "@google/gemini-cli" },
   opencode: { signedIn: () => hasFile(".local", "share", "opencode", "auth.json"), cli: "opencode", args: ["auth", "login"], logout: ["auth", "logout"], npx: "opencode-ai" },
+  commandcode: { signedIn: () => Boolean(process.env.COMMAND_CODE_API_KEY) || jsonHasText("apiKey", ".commandcode", "auth.json"), cli: "commandcode", args: ["login"], logout: ["logout"], npx: null },
   goose: { signedIn: () => hasFile(".config", "goose", "config.yaml"), cli: "goose", args: ["configure"], npx: null },
 };
 
@@ -46,8 +58,16 @@ export type AgentStatus =
   | { readonly kind: "signin" }
   | { readonly kind: "unavailable"; readonly detail: string };
 
+/** The CLI as the Terminal can run it: its bare name on PATH, else where discovery found it. */
+function loginCli(name: string): string | null {
+  if (findOnPath(name)) return name;
+  const found = findAgentTool(name);
+  return found && !/^[\w@%+=:,./-]+$/.test(found) ? `'${found.replaceAll("'", "'\\''")}'` : found;
+}
+
 function loginCommand(login: Login): string | null {
-  if (findOnPath(login.cli)) return [login.cli, ...login.args].join(" ");
+  const cli = loginCli(login.cli);
+  if (cli) return [cli, ...login.args].join(" ");
   if (login.npx && findOnPath("npx")) return ["npx", "-y", login.npx, ...login.args].join(" ");
   return null;
 }
