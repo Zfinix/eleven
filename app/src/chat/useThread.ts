@@ -177,6 +177,7 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
   const adopted = useRef<{ readonly from: string; readonly path: string } | null>(null);
   const agentKey = useRef<string | null>(null);
   const commandKey = useRef(native?.path);
+  const targetKey = useRef(target?.path);
   const tools = useRef(new Map<string, string>());
   const latest = useRef({ target, onTarget });
   latest.current = { target, onTarget };
@@ -242,12 +243,15 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
     const switched = agentChanged();
     const commandArrived = commandKey.current !== native?.path;
     commandKey.current = native?.path;
-    const running = session.current !== null;
+    const retargeted = targetKey.current !== target?.path;
+    targetKey.current = target?.path;
     const agentOpenedIt = target !== null && target.path === adopted.current?.path;
     adopted.current = null;
-    if (agentOpenedIt && !switched) return;
+    // A late command replaces this conversation's session, never one left from another file.
+    const restart = commandArrived && session.current !== null && (!retargeted || agentOpenedIt);
+    if (agentOpenedIt && !switched && !restart) return;
     stopSession();
-    if (live && (switched || (commandArrived && running) || target === null || currentSettings().startAgentWithProject)) ensureSession();
+    if (live && (switched || restart || target === null || currentSettings().startAgentWithProject)) ensureSession();
   }, [agent.id, native?.path, target?.path]);
 
   useEffect(() => {

@@ -157,3 +157,20 @@ test("the command arriving with no session running starts none with the gate off
   expect(runs).toEqual([]);
   ui.unmount();
 });
+
+test("opening another file as the command arrives starts no session with the gate off", async () => {
+  const ui = createTestRoot({ width: 600, height: 200 });
+  ui.render(<Chat />);
+  await until(ui, () => shown !== null);
+  chooseAgent?.(CODEX.id);
+  await until(ui, () => runs.length === 1);
+
+  openTarget?.(SECOND);
+  detectCommand?.({ path: "/usr/local/bin/codex-acp", args: [] });
+  await until(ui, () => ui.renderer.getAllText().join(" ").includes(SECOND.name));
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  ui.renderer.flush();
+  expect(runs).toHaveLength(1);
+  expect(runs[0]?.stopped).toBe(true);
+  ui.unmount();
+});
