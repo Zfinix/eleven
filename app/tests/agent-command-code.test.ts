@@ -65,7 +65,7 @@ if (process.env.ELEVEN_AUTH !== undefined) {
 console.log(JSON.stringify({ signedIn: setup.signedIn(entry), status: setup.agentStatus(entry, facts).kind }));
 `;
 
-type CheckOptions = { readonly home: string; readonly auth?: string; readonly apiKey?: string };
+type CheckOptions = { readonly home: string; readonly auth?: string; readonly apiKey?: string; readonly onPath?: boolean };
 type CheckResult = { readonly signedIn: unknown; readonly status: string };
 
 function runCheck(options: CheckOptions): CheckResult {
@@ -73,7 +73,7 @@ function runCheck(options: CheckOptions): CheckResult {
     ...process.env,
     HOME: options.home,
     USERPROFILE: options.home,
-    PATH: [bin, process.env.PATH ?? ""].join(delimiter),
+    PATH: options.onPath === false ? "/usr/bin:/bin" : [bin, process.env.PATH ?? ""].join(delimiter),
     ELEVEN_SETUP: join(import.meta.dir, "..", "src", "welcome", "agentSetup.ts"),
     ELEVEN_REGISTRY: join(import.meta.dir, "..", "src", "agents", "registry.ts"),
   };
@@ -114,4 +114,14 @@ test("Command Code with only COMMAND_CODE_API_KEY is signed in", () => {
   const result = runCheck({ home: join(home, "env-key"), apiKey: "test-key" });
   expect(result.signedIn).toBe(true);
   expect(result.status).toBe("ready");
+});
+
+test("Command Code installed in ~/.local/bin but not on PATH still offers sign-in", () => {
+  const userHome = join(home, "local-bin");
+  mkdirSync(join(userHome, ".local", "bin"), { recursive: true });
+  writeFileSync(join(userHome, ".local", "bin", "commandcode"), "#!/bin/sh\n");
+  chmodSync(join(userHome, ".local", "bin", "commandcode"), 0o755);
+  const result = runCheck({ home: userHome, onPath: false });
+  expect(result.signedIn).toBe(false);
+  expect(result.status).toBe("signin");
 });

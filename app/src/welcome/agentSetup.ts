@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { findOnPath, type NativeCommand } from "../agents/detect";
+import { findAgentTool, findOnPath, type NativeCommand } from "../agents/detect";
 import { binaryInstalled, readyToRun, resolveLaunch } from "../agents/launch";
 import type { AgentEntry } from "../agents/registry";
 import { stringField } from "../lib/guards";
@@ -58,8 +58,16 @@ export type AgentStatus =
   | { readonly kind: "signin" }
   | { readonly kind: "unavailable"; readonly detail: string };
 
+/** The CLI as the Terminal can run it: its bare name on PATH, else where discovery found it. */
+function loginCli(name: string): string | null {
+  if (findOnPath(name)) return name;
+  const found = findAgentTool(name);
+  return found && /\s/.test(found) ? `'${found}'` : found;
+}
+
 function loginCommand(login: Login): string | null {
-  if (findOnPath(login.cli)) return [login.cli, ...login.args].join(" ");
+  const cli = loginCli(login.cli);
+  if (cli) return [cli, ...login.args].join(" ");
   if (login.npx && findOnPath("npx")) return ["npx", "-y", login.npx, ...login.args].join(" ");
   return null;
 }
