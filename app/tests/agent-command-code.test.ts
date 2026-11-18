@@ -17,6 +17,7 @@ const bin = join(home, "bin");
 mkdirSync(bin, { recursive: true });
 writeFileSync(join(bin, "commandcode"), "#!/bin/sh\n");
 chmodSync(join(bin, "commandcode"), 0o755);
+if (process.platform === "win32") writeFileSync(join(bin, "commandcode.cmd"), "@echo off\r\n");
 
 const OPENCODE = { agents: [{ id: "opencode", name: "OpenCode", distribution: { npx: { package: "opencode-ai" } } }] };
 
@@ -116,7 +117,8 @@ test("Command Code with only COMMAND_CODE_API_KEY is signed in", () => {
   expect(result.status).toBe("ready");
 });
 
-test("Command Code installed in ~/.local/bin but not on PATH still offers sign-in", () => {
+// Windows searches only PATH, not ~/.local/bin.
+test.skipIf(process.platform === "win32")("Command Code installed in ~/.local/bin but not on PATH still offers sign-in", () => {
   const userHome = join(home, "local-bin");
   mkdirSync(join(userHome, ".local", "bin"), { recursive: true });
   writeFileSync(join(userHome, ".local", "bin", "commandcode"), "#!/bin/sh\n");

@@ -62,7 +62,7 @@ export type AgentStatus =
 function loginCli(name: string): string | null {
   if (findOnPath(name)) return name;
   const found = findAgentTool(name);
-  return found && /\s/.test(found) ? `'${found}'` : found;
+  return found && !/^[\w@%+=:,./-]+$/.test(found) ? `'${found.replaceAll("'", "'\\''")}'` : found;
 }
 
 function loginCommand(login: Login): string | null {
