@@ -1,8 +1,8 @@
 import "./fixtures/isolate";
 import { afterAll, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 
 import { loadIcon } from "../src/agents/icons";
 import { fallbackAgents, parseRegistry, sortAgents, type AgentEntry } from "../src/agents/registry";
@@ -11,6 +11,12 @@ import { isRecord } from "../src/lib/guards";
 const home = mkdtempSync(join(tmpdir(), "eleven-commandcode-"));
 
 afterAll(() => rmSync(home, { recursive: true, force: true }));
+
+/** An installed `commandcode`, so Setup can offer its login command. */
+const bin = join(home, "bin");
+mkdirSync(bin, { recursive: true });
+writeFileSync(join(bin, "commandcode"), "#!/bin/sh\n");
+chmodSync(join(bin, "commandcode"), 0o755);
 
 const OPENCODE = { agents: [{ id: "opencode", name: "OpenCode", distribution: { npx: { package: "opencode-ai" } } }] };
 
@@ -67,6 +73,7 @@ function runCheck(options: CheckOptions): CheckResult {
     ...process.env,
     HOME: options.home,
     USERPROFILE: options.home,
+    PATH: [bin, process.env.PATH ?? ""].join(delimiter),
     ELEVEN_SETUP: join(import.meta.dir, "..", "src", "welcome", "agentSetup.ts"),
     ELEVEN_REGISTRY: join(import.meta.dir, "..", "src", "agents", "registry.ts"),
   };
@@ -85,16 +92,16 @@ function runCheck(options: CheckOptions): CheckResult {
 test("Command Code without an auth file is not signed in", () => {
   const result = runCheck({ home: join(home, "missing") });
   expect(result.signedIn).toBe(false);
-  expect(["ready", "signin"]).toContain(result.status);
+  expect(result.status).toBe("signin");
 });
 
 test("Command Code with a null or empty apiKey is not signed in", () => {
   const nullKey = runCheck({ home: join(home, "null-key"), auth: JSON.stringify({ apiKey: null }) });
   expect(nullKey.signedIn).toBe(false);
-  expect(["ready", "signin"]).toContain(nullKey.status);
+  expect(nullKey.status).toBe("signin");
   const emptyKey = runCheck({ home: join(home, "empty-key"), auth: JSON.stringify({ apiKey: "" }) });
   expect(emptyKey.signedIn).toBe(false);
-  expect(["ready", "signin"]).toContain(emptyKey.status);
+  expect(emptyKey.status).toBe("signin");
 });
 
 test("Command Code with an apiKey in its auth file is ready", () => {
