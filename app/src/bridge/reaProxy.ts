@@ -17,6 +17,7 @@ export const ELEVEN_OWNED: ReadonlyMap<string, string> = new Map([
   ["set_bookmark", "bookmark"],
   ["unset_bookmark", "bookmark"],
   ["set_code_type", "set_code_type"],
+  ["define_c_type", "define_c_type"],
 ]);
 
 function refusal(tool: string, instead: string): CallToolResult {

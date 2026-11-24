@@ -25,6 +25,8 @@ const TAB: z.ZodType<Tab> = z.discriminatedUnion("kind", [
   z.object({ ...ID, kind: z.literal("shader"), library: z.string(), name: z.string() }),
   z.object({ ...ID, kind: z.literal("model"), name: z.string(), page: z.enum(MODEL_PAGES).catch("overview"), tensor: z.string().nullable().catch(null) }),
   z.object({ ...ID, kind: z.literal("profile"), title: z.string() }),
+  z.object({ ...ID, kind: z.literal("path"), from: z.string(), to: z.string() }),
+  z.object({ ...ID, kind: z.literal("notebook") }),
 ]);
 
 function clamp(index: number, count: number): number {

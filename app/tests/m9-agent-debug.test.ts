@@ -5,7 +5,7 @@ import { describeSession } from "../src/debug/useDebug";
 test("M9: a paused session reads as where it stopped, the stack, locals, registers and output", () => {
   const text = describeSession(
     {
-      kind: "stopped", reason: "breakpoint", thread: 1, threads: [],
+      kind: "stopped", reason: "breakpoint", thread: 1, threads: [], stop: 1,
       frames: [{ id: 1, name: "check_license", line: 0, source: null, pc: "0x100003e68" }, { id: 2, name: "main", line: 0, source: null, pc: "0x100004010" }],
       scopes: [{ name: "Locals", reference: 3, vars: [{ name: "key", value: "\"ELEVEN-2026\"", reference: 0 }] }],
     },

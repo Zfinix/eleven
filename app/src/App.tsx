@@ -5,13 +5,14 @@ import { useLiveChat } from "./bridge/live";
 import { claimWorkbenchOpen } from "./debug/live";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Home } from "./home/Home";
-import { adoptLanguage, useLanguage } from "./i18n";
+import { adoptLanguage, t, useLanguage } from "./i18n";
 import { type Chat, useChat } from "./chat/useChat";
 import { type AppItem, type MenuChoice } from "./keys/menus";
 import { runMenuAction } from "./keys/menuActions";
 import { useMenuBar } from "./keys/useMenuBar";
 import { adoptDesktop } from "./lib/native";
-import { listenForReplies, onOpenChat } from "./notify/notify";
+import { claimLinkOpener, type DeepLink, parseLink } from "./lib/deepLink";
+import { askForNotifications, listenForReplies, onOpenChat } from "./notify/notify";
 import { runCommand, useCommand } from "./lib/shortcuts";
 import type { Page } from "./settings/pages";
 import { onOpenSettings } from "./settings/open";
@@ -151,12 +152,57 @@ export function App({ initial }: { readonly initial: Target | null }): ReactElem
   useEffect(() => onOpenSettings(openSettingsAt), []);
   const desktop = useMemo(() => adoptDesktop(renderer), [renderer]);
   useEffect(() => (desktop ? listenForReplies(desktop) : undefined), [desktop]);
+  const { notifyWhenDone, notifyWhenAsked, notifyWhenReady } = useSettings().settings;
+  useEffect(() => {
+    if (desktop) askForNotifications(desktop);
+  }, [desktop, notifyWhenDone, notifyWhenAsked, notifyWhenReady]);
   const latestChat = useRef(chat);
   latestChat.current = chat;
   useEffect(() => onOpenChat((id) => {
     latestChat.current.openThread(id);
     if (here.current.kind === "settings" || here.current.kind === "setup") setScreen(HOME);
   }), []);
+  const pendingAt = useRef<DeepLink | null>(null);
+  const openDeepLink = (link: DeepLink): void => {
+    const current = latestChat.current;
+    const entry = listProjects().find((project) => project.id === link.project);
+    if (!entry) {
+      current.thread.note(t("chat.note.linkUnknown", { name: link.name ?? link.project.slice(0, 8) }));
+      return;
+    }
+    const opened = current.openProject(entry);
+    if (!opened) return;
+    setScreen({ kind: "workbench", target: opened });
+    if (!link.address) return;
+    if (current.project === link.project) current.thread.openFunction(link.address);
+    else pendingAt.current = link;
+  };
+  useEffect(() => {
+    claimLinkOpener(openDeepLink);
+    return () => claimLinkOpener(null);
+  }, []);
+  useEffect(() => {
+    const link = pendingAt.current;
+    if (!link?.address || chat.project !== link.project) return;
+    pendingAt.current = null;
+    chat.thread.openFunction(link.address);
+  }, [chat.project, chat.thread.id]);
+  useEffect(() => {
+    const setOpenPaths = renderer?.setOpenPaths?.bind(renderer);
+    if (!setOpenPaths) return;
+    setOpenPaths((paths: readonly string[]) => {
+      for (const path of paths) {
+        const link = parseLink(path);
+        if (link) {
+          openDeepLink(link);
+          continue;
+        }
+        const opened = latestChat.current.choose(path);
+        if (opened) setScreen({ kind: "workbench", target: opened });
+      }
+    });
+    return () => setOpenPaths(null);
+  }, [renderer]);
   const openAppItem = (item: AppItem): void => {
     switch (item) {
       case "about":

@@ -177,7 +177,7 @@ export async function smaliClass(apk: string, dir: string, file: string): Promis
   }
 }
 
-export type ResourceKind = "text" | "image" | "native" | "hermes" | "binary";
+export type ResourceKind = "text" | "image" | "native" | "hermes" | "il2cpp" | "binary";
 
 const IMAGE = /\.(?:png|jpe?g|gif|webp|bmp)$/i;
 const HERMES_MAGIC = Buffer.from([0xc6, 0x1f, 0xbc, 0x03, 0xc1, 0x03, 0x19, 0x1f]);
@@ -194,7 +194,44 @@ export function resourceKind(file: string, head: Buffer): ResourceKind {
   if (IMAGE.test(file)) return "image";
   if (head.subarray(0, 4).equals(ELF_MAGIC) || isMachO(file, head)) return "native";
   if (head.subarray(0, 8).equals(HERMES_MAGIC)) return "hermes";
+  if (/(?:^|\/)global-metadata\.dat$/.test(file)) return "il2cpp";
   return head.includes(0) ? "binary" : "text";
+}
+
+const IL2CPP_SANITY = 0xfab11baf;
+
+/** Unity IL2CPP metadata: its version when the header is Unity's own, or encrypted when a game hid it, which most do. */
+export type Il2cppMetadata = { readonly kind: "plain"; readonly version: number } | { readonly kind: "encrypted" };
+
+export function il2cppMetadata(head: Buffer): Il2cppMetadata {
+  if (head.length >= 8 && head.readUInt32LE(0) === IL2CPP_SANITY) return { kind: "plain", version: head.readInt32LE(4) };
+  return { kind: "encrypted" };
+}
+
+/** The Hermes bytecode version, right after the magic; decompilers each support only some versions. */
+export function hermesVersion(head: Buffer): number | null {
+  return head.length >= 12 && head.subarray(0, 8).equals(HERMES_MAGIC) ? head.readUInt32LE(8) : null;
+}
+
+const DART_SNAPSHOT_MAGIC = Buffer.from([0xf5, 0xf5, 0xdc, 0xdc]);
+
+/** What built a Dart AOT snapshot: the SDK's snapshot hash (which names the Dart version) and the features it was built with. */
+export type DartSnapshot = { readonly hash: string; readonly features: string };
+
+/** Finds the first Dart snapshot header in a library: magic, 8-byte length, 8-byte kind, a 32-character hash, then the features as text. */
+export function dartSnapshot(bytes: Buffer): DartSnapshot | null {
+  for (let at = bytes.indexOf(DART_SNAPSHOT_MAGIC); at >= 0; at = bytes.indexOf(DART_SNAPSHOT_MAGIC, at + 1)) {
+    const hash = bytes.subarray(at + 20, at + 52).toString("latin1");
+    if (!/^[0-9a-f]{32}$/.test(hash)) continue;
+    const end = bytes.indexOf(0, at + 52);
+    return { hash, features: bytes.subarray(at + 52, end < 0 ? at + 52 : Math.min(end, at + 52 + 400)).toString("latin1").trim() };
+  }
+  return null;
+}
+
+/** A Flutter app's own Dart code, compiled ahead of time into this library beside the Flutter engine. */
+export function isFlutterCode(file: string): boolean {
+  return /(?:^|\/)(?:libapp\.so|App\.framework\/App)$/.test(file);
 }
 
 /** Offset, sixteen bytes and their printable text per line, like `xxd`. */

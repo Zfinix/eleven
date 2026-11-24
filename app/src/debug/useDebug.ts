@@ -6,6 +6,7 @@ import { findLldbDap } from "./adapter";
 import { splitArgs } from "./args";
 import { claimDebug, type DebugAction } from "./live";
 import { DapClient, type StackFrame, type Thread, type Variable } from "./dap";
+import { hexRowsOf } from "../engine/hexRows";
 
 export type OutputLine = { readonly kind: "program" | "error" | "asked" | "answer"; readonly text: string };
 
@@ -17,7 +18,7 @@ export type DebugStatus =
   | { readonly kind: "idle" }
   | { readonly kind: "starting" }
   | { readonly kind: "running" }
-  | { readonly kind: "stopped"; readonly reason: string; readonly thread: number; readonly frames: readonly StackFrame[]; readonly scopes: readonly LoadedScope[]; readonly threads: readonly Thread[] }
+  | { readonly kind: "stopped"; readonly reason: string; readonly thread: number; readonly frames: readonly StackFrame[]; readonly scopes: readonly LoadedScope[]; readonly threads: readonly Thread[]; readonly stop: number }
   | { readonly kind: "exited"; readonly code: number | null }
   | { readonly kind: "error"; readonly message: string; readonly problem: DebugProblem | null };
 
@@ -42,9 +43,13 @@ export type Debug = {
   readonly evaluate: (expression: string) => void;
   /** Starts the last session again the same way, launched or attached. */
   readonly retry: () => void;
-  /** Replaces the breakpoints of the running session, if there is one. */
-  readonly syncBreakpoints: (breakAt: readonly string[]) => void;
+  /** Runs until `address`, stopping earlier at a breakpoint on the way, then puts `breakAt` back. */
+  readonly runTo: (address: string, breakAt: readonly string[]) => void;
+  /** Replaces the breakpoints of the running session, if there is one; `conditions` are lldb expressions keyed by address. */
+  readonly syncBreakpoints: (breakAt: readonly string[], conditions?: ReadonlyMap<string, string>) => void;
   readonly loadVars: (reference: number) => Promise<readonly Variable[]>;
+  /** Memory at an address, or at what an lldb expression like $sp or &buffer points to, while paused. */
+  readonly readMemory: (where: string) => Promise<{ readonly address: string; readonly bytes: Uint8Array }>;
   /** Resolves when the session next stops, exits or fails, or after a while if it keeps running. */
   readonly settle: () => Promise<void>;
   /** The session as an agent reads it. */
@@ -59,10 +64,15 @@ function threadOf(body: unknown): number {
   return isRecord(body) && typeof body.threadId === "number" ? body.threadId : 1;
 }
 
-async function sendBreakpoints(dap: DapClient, breakAt: readonly string[]): Promise<void> {
+/** A saved breakpoint's value: "on" stops every time, anything else is the lldb condition it stops on. */
+export function breakpointConditions(saved: ReadonlyMap<string, string>): ReadonlyMap<string, string> {
+  return new Map([...saved].filter(([, value]) => value !== "on" && value.trim() !== ""));
+}
+
+async function sendBreakpoints(dap: DapClient, breakAt: readonly string[], conditions: ReadonlyMap<string, string>): Promise<void> {
   const addresses = breakAt.filter((at) => /^0x[0-9a-f]+$/i.test(at));
   await dap.setFunctionBreakpoints(breakAt.filter((at) => !addresses.includes(at)));
-  await dap.setInstructionBreakpoints(addresses);
+  await dap.setInstructionBreakpoints(addresses, conditions);
 }
 
 function outputOf(body: unknown): OutputLine | null {
@@ -86,6 +96,7 @@ function startProblem(err: unknown): DebugStatus {
 }
 
 const SETTLE_MS = 15_000;
+const MEMORY_BYTES = 256;
 
 function shown(vars: readonly Variable[], limit: number): string {
   return vars.slice(0, limit).map((v) => `  ${v.name} = ${v.value}`).join("\n") || "  (none)";
@@ -125,6 +136,10 @@ export function useDebug(): Debug {
   const now = useRef<DebugStatus>(status);
   const lastThread = useRef(1);
   const settled = useRef(new Set<() => void>());
+  /** The breakpoints to put back once a run-to-here stops. */
+  const restore = useRef<readonly string[] | null>(null);
+  const conditions = useRef<ReadonlyMap<string, string>>(new Map());
+  const stops = useRef(0);
   const printed = useRef<readonly OutputLine[]>([]);
 
   useEffect(() => {
@@ -152,14 +167,17 @@ export function useDebug(): Debug {
 
   const onStopped = (dap: DapClient, body: unknown): void => {
     const thread = threadOf(body);
+    const back = restore.current;
+    restore.current = null;
+    if (back) void sendBreakpoints(dap, back, conditions.current).catch(() => undefined);
     void (async (): Promise<void> => {
       try {
         const [frames, threads] = await Promise.all([dap.stackTrace(thread), dap.threads().catch(() => [])]);
         const scopeList = frames[0] ? await dap.scopes(frames[0].id) : [];
         const scopes = await Promise.all(scopeList.map(async (scope) => ({ name: scope.name, reference: scope.reference, vars: await dap.variables(scope.reference) })));
-        if (client.current === dap) set({ kind: "stopped", reason: stoppedReason(body), thread, frames, scopes, threads });
+        if (client.current === dap) set({ kind: "stopped", reason: stoppedReason(body), thread, frames, scopes, threads, stop: ++stops.current });
       } catch {
-        if (client.current === dap) set({ kind: "stopped", reason: stoppedReason(body), thread, frames: [], scopes: [], threads: [] });
+        if (client.current === dap) set({ kind: "stopped", reason: stoppedReason(body), thread, frames: [], scopes: [], threads: [], stop: ++stops.current });
       }
     })();
   };
@@ -193,7 +211,7 @@ export function useDebug(): Debug {
         await dap.initialize();
         const started = startRequest(dap);
         await Promise.race([initialized, started.then(() => initialized)]);
-        await sendBreakpoints(dap, breakAt);
+        await sendBreakpoints(dap, breakAt, conditions.current);
         await dap.configurationDone();
         await started;
         if (client.current === dap) set({ kind: "running" });
@@ -213,10 +231,11 @@ export function useDebug(): Debug {
     begin((dap) => dap.attach(pid), breakAt);
   };
   const retry = (): void => last.current?.();
-  const syncBreakpoints = (breakAt: readonly string[]): void => {
+  const syncBreakpoints = (breakAt: readonly string[], next: ReadonlyMap<string, string> = conditions.current): void => {
+    conditions.current = next;
     const dap = client.current;
     if (!dap || status.kind === "idle" || status.kind === "starting" || status.kind === "exited" || status.kind === "error") return;
-    void sendBreakpoints(dap, breakAt).catch(() => undefined);
+    void sendBreakpoints(dap, breakAt, conditions.current).catch(() => undefined);
   };
 
   const step = (verb: "cont" | "over" | "in" | "out" | "instr"): void => {
@@ -232,6 +251,21 @@ export function useDebug(): Debug {
       : verb === "out" ? dap.stepOut(thread)
       : dap.next(thread, "instruction");
     void call.catch((err: unknown) => set({ kind: "error", message: err instanceof Error ? err.message : String(err), problem: null }));
+  };
+
+  const runTo = (address: string, breakAt: readonly string[]): void => {
+    const dap = client.current;
+    if (!dap || now.current.kind !== "stopped") return;
+    restore.current = breakAt;
+    void (async (): Promise<void> => {
+      try {
+        await sendBreakpoints(dap, [...breakAt, address], conditions.current);
+        step("cont");
+      } catch (err) {
+        restore.current = null;
+        set({ kind: "error", message: err instanceof Error ? err.message : String(err), problem: null });
+      }
+    })();
   };
 
   const stop = (): void => {
@@ -269,6 +303,16 @@ export function useDebug(): Debug {
   };
   const evaluate = (expression: string): void => {
     void answer(expression).catch(() => undefined);
+  };
+
+  const readMemory = async (where: string): Promise<{ readonly address: string; readonly bytes: Uint8Array }> => {
+    const dap = client.current;
+    const at = now.current;
+    if (!dap || at.kind !== "stopped") throw new Error("Pause the program to read its memory.");
+    const text = where.trim();
+    const address = /^0x[0-9a-f]+$/i.test(text) ? text : /0x[0-9a-f]+/i.exec(await dap.evaluate(text, at.frames[0]?.id ?? null))?.[0];
+    if (!address) throw new Error(`${text} isn't an address. Try one like 0x16fdff000, $sp or &buffer.`);
+    return { address, bytes: await dap.readMemory(address, MEMORY_BYTES) };
   };
 
   const loadVars = (reference: number): Promise<readonly Variable[]> => client.current?.variables(reference) ?? Promise.resolve([]);
@@ -314,9 +358,17 @@ export function useDebug(): Debug {
   };
 
   useEffect(() => {
-    claimDebug({ describe, act, evaluate: async (expression) => (await answer(expression)) || "Nothing came back." });
+    claimDebug({
+      describe,
+      act,
+      evaluate: async (expression) => (await answer(expression)) || "Nothing came back.",
+      memory: async (where) => {
+        const { address, bytes } = await readMemory(where);
+        return hexRowsOf([...bytes].map((b) => b.toString(16).padStart(2, "0")).join(""), address).map((row) => `${row.addr}  ${row.bytes}  ${row.ascii}`).join("\n") || `Nothing could be read at ${address}.`;
+      },
+    });
     return () => claimDebug(null);
   }, []);
 
-  return { status, output, launch, attach, cont: () => step("cont"), stepOver: () => step("over"), stepIn: () => step("in"), stepOut: () => step("out"), stepInstruction: () => step("instr"), stop, pause, restart, evaluate, retry, syncBreakpoints, loadVars, settle, describe };
+  return { status, output, launch, attach, cont: () => step("cont"), stepOver: () => step("over"), stepIn: () => step("in"), stepOut: () => step("out"), stepInstruction: () => step("instr"), stop, pause, restart, evaluate, retry, runTo, syncBreakpoints, loadVars, readMemory, settle, describe };
 }

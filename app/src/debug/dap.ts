@@ -109,9 +109,21 @@ export class DapClient {
     await this.request("setFunctionBreakpoints", { breakpoints: names.map((name) => ({ name })) });
   }
 
-  /** Breaks at exact instruction addresses; lldb launches without address randomization, so file addresses match. */
-  async setInstructionBreakpoints(addresses: readonly string[]): Promise<void> {
-    await this.request("setInstructionBreakpoints", { breakpoints: addresses.map((instructionReference) => ({ instructionReference })) });
+  /** Breaks at exact instruction addresses, each only when its lldb condition holds if it has one; lldb launches without address randomization, so file addresses match. */
+  async setInstructionBreakpoints(addresses: readonly string[], conditions: ReadonlyMap<string, string> = new Map()): Promise<void> {
+    await this.request("setInstructionBreakpoints", {
+      breakpoints: addresses.map((instructionReference) => {
+        const condition = conditions.get(instructionReference);
+        return condition ? { instructionReference, condition } : { instructionReference };
+      }),
+    });
+  }
+
+  /** Up to `count` bytes of the paused program's memory from `address`; shorter when part of it can't be read. */
+  async readMemory(address: string, count: number): Promise<Uint8Array> {
+    const body = await this.request("readMemory", { memoryReference: address, count });
+    const data = isRecord(body) && typeof body.data === "string" ? body.data : "";
+    return Uint8Array.from(Buffer.from(data, "base64"));
   }
 
   async configurationDone(): Promise<void> {

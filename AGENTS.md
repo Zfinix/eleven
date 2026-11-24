@@ -25,6 +25,7 @@ Any ACP agent works through REA (Ghidra headless) and Eleven's own tools.
 - `bun run dev [file]`: the app with hot reload. One window only.
 - `bunx tsc --noEmit --noUnusedLocals`: typecheck (covers src, tests, scripts).
 - `./script/test`: runs the deterministic test files one at a time (parallel Ghidra JVMs thrash the machine). `bun test <file>` for one file while iterating. `*.live.test.tsx` call a real agent and are excluded.
+- `CRACKMES=plain,xor bun test tests/crackmes.live.test.tsx`: scores the agent on the crackmes in tests/fixtures/crackmes, each answer checked by running the binary. `CRACKME_SKILL=solve-input` runs the question through one of Eleven's playbooks, to measure what it adds.
 - `bun scripts/gate-m1.ts <file...>`: engine-level open and read timing.
 - `./script/bundle-macos`: builds `build/Eleven.app` (bundle id app.chizi.eleven).
 - `./script/package`: builds, ad-hoc signs (or ELEVEN_SIGN_IDENTITY) and zips the app to build/Eleven-<version>-<arch>.zip.
@@ -33,6 +34,7 @@ Any ACP agent works through REA (Ghidra headless) and Eleven's own tools.
 ## Environment
 
 - REA must be 6.x. Eleven finds a checkout next to this repo (`../rea`), the copy bundled in Eleven.app, or `ELEVEN_REA`. Older `rea` builds on PATH refuse Ghidra on Apple Silicon.
+- REA 6.9 needs Node 22.23.4+, 24.22.1+ or 26.12.1+. In dev, when the `node` on your login PATH is older or in between, point `ELEVEN_NODE` at a supported one. The bundled app ships its own.
 - Ghidra 12.x, found in `~/.local/share`, `~/Applications` or `GHIDRA_INSTALL_DIR`. The JDK is found automatically.
 - Android apps read through jadx (never Ghidra); apktool, when installed, gives smali. `.xapk`/`.apks`/`.zip` split bundles open their base APK with the splits beside it.
 - Pinned npx agent versions can fail behind an npm `before` quarantine, so Eleven unpins them.

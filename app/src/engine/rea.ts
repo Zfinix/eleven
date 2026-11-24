@@ -53,6 +53,9 @@ export function openProblem(err: unknown): OpenProblem {
 
 export type CodeView = "pseudocode" | "assembly";
 
+/** A project's C types as Ghidra needs them on reopening: every declaration, then each placement with the declaration it places. */
+export type SavedCTypes = { readonly declarations: readonly string[]; readonly placements: readonly (readonly [string, string])[] };
+
 export type Opened = { readonly path: string; readonly sha256: string; readonly format: string; readonly architecture: string };
 
 /** How to start REA: the bundled Node when Eleven ships one, otherwise the user's. */
@@ -170,6 +173,7 @@ class Rea {
   private session: Session | null = null;
   private readonly queue = new SerialQueue();
   private readonly replays = new Map<string, () => readonly (readonly [string, CodeType])[]>();
+  private readonly cReplays = new Map<string, () => SavedCTypes>();
 
   private async connect(): Promise<Client> {
     if (this.client && this.clientObjc === this.objc) return this.client;
@@ -238,12 +242,26 @@ class Rea {
     for (const [address, type] of this.replays.get(path)?.() ?? []) {
       await this.call("set_code_type", { address, type }).catch(() => undefined);
     }
+    const saved = this.cReplays.get(path)?.();
+    for (const declaration of saved?.declarations ?? []) await this.call("define_c_type", { declaration }).catch(() => undefined);
+    for (const [address, declaration] of saved?.placements ?? []) await this.call("define_c_type", { declaration, address }).catch(() => undefined);
     return opened;
   }
 
   /** What to mark again each time Ghidra opens the file, since a fresh session starts from its own analysis. */
   replayOn(path: string, saved: () => readonly (readonly [string, CodeType])[]): void {
     this.replays.set(path, saved);
+  }
+
+  /** The C types to add again each time Ghidra opens the file, and where to place them. */
+  replayCTypesOn(path: string, saved: () => SavedCTypes): void {
+    this.cReplays.set(path, saved);
+  }
+
+  /** Adds a C declaration to the program's types, and reads the bytes at `address` as it when one is given. */
+  async defineCType(path: string, declaration: string, address: string | null): Promise<void> {
+    await this.ensureOpen(path);
+    await this.call("define_c_type", address ? { declaration, address } : { declaration });
   }
 
   /** Marks the bytes at an address as a type, or reads them as code again when `type` is null. */

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
 import { adoptLoginShell } from "../src/agents/detect";
-import { apktoolCommand, hexDump, resourceKind, resourceStrings, smaliFile, smaliMethod } from "../src/engine/apk";
+import { apktoolCommand, dartSnapshot, hermesVersion, hexDump, il2cppMetadata, isFlutterCode, resourceKind, resourceStrings, smaliFile, smaliMethod } from "../src/engine/apk";
 import { prepareTarget } from "../src/engine/target";
 import { adoptToolchain } from "../src/engine/toolchain";
 import { runSync } from "../src/lib/process";
@@ -82,3 +82,27 @@ test("a bundle of split APKs opens its base APK and lists the native libraries f
   const unpacked = await files.local("lib/arm64-v8a/libgreeter.so");
   expect(readFileSync(unpacked).subarray(0, 4).equals(ELF.subarray(0, 4))).toBe(true);
 }, 180_000);
+
+test("Unity metadata shows its version, or that it is encrypted; Flutter's Dart code is recognised", () => {
+  const plain = Buffer.alloc(8);
+  plain.writeUInt32LE(0xfab11baf, 0);
+  plain.writeInt32LE(31, 4);
+  expect(resourceKind("assets/bin/Data/Managed/Metadata/global-metadata.dat", plain)).toBe("il2cpp");
+  expect(il2cppMetadata(plain)).toEqual({ kind: "plain", version: 31 });
+  expect(il2cppMetadata(Buffer.from([1, 2, 3, 4, 5, 6, 7, 8]))).toEqual({ kind: "encrypted" });
+  expect(isFlutterCode("lib/arm64-v8a/libapp.so")).toBe(true);
+  expect(isFlutterCode("Frameworks/App.framework/App")).toBe(true);
+  expect(isFlutterCode("lib/arm64-v8a/libflutter.so")).toBe(false);
+});
+
+test("Hermes bytecode says its version, and a Dart snapshot its hash and features", () => {
+  const hermes = Buffer.alloc(12);
+  Buffer.from([0xc6, 0x1f, 0xbc, 0x03, 0xc1, 0x03, 0x19, 0x1f]).copy(hermes);
+  hermes.writeUInt32LE(96, 8);
+  expect(hermesVersion(hermes)).toBe(96);
+  expect(hermesVersion(Buffer.from("not hermes bytes"))).toBeNull();
+  const hash = "0123456789abcdef0123456789abcdef";
+  const snapshot = Buffer.concat([Buffer.from("ELF junk"), Buffer.from([0xf5, 0xf5, 0xdc, 0xdc]), Buffer.alloc(16), Buffer.from(hash), Buffer.from("product no-code_comments arm64 android"), Buffer.from([0])]);
+  expect(dartSnapshot(snapshot)).toEqual({ hash, features: "product no-code_comments arm64 android" });
+  expect(dartSnapshot(Buffer.from("nothing here"))).toBeNull();
+});

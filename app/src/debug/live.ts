@@ -11,6 +11,7 @@ export type DebugControl = {
   readonly describe: () => Promise<string>;
   readonly act: (action: DebugAction) => Promise<string>;
   readonly evaluate: (expression: string) => Promise<string>;
+  readonly memory: (where: string) => Promise<string>;
 };
 
 let control: DebugControl | null = null;

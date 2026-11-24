@@ -116,11 +116,16 @@ function sameAddress(a: string, b: string): boolean {
 function Breakpoint({ addr, paused }: { readonly addr: string | null; readonly paused: boolean }): ReactElement {
   const { p } = useTheme();
   const { wb } = useBench();
-  const on = addr !== null && wb.s.breakpoints.has(addr);
+  const value = addr === null ? undefined : wb.s.breakpoints.get(addr);
+  const on = value !== undefined;
+  const conditional = on && value !== "on";
   if (addr === null) return <div style={{ width: 22, flexShrink: 0 }} />;
+  const label = conditional ? t("workbench.view.code.breakpointWhen", { addr, condition: value }) : t("workbench.view.code.breakpointAt", { addr });
   return (
-    <div onClick={() => wb.toggleBreakpoint(addr)} role="button" aria-label={t("workbench.view.code.breakpointAt", { addr })} aria-selected={on} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 22, flexShrink: 0, cursor: "pointer", hover: { opacity: 0.72 } }}>
-      {paused ? <Icon name="play" size={11} color={on ? p.error : p.data} /> : <div style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: on ? p.error : "transparent", pointerEvents: "none" }} />}
+    <div onClick={() => wb.toggleBreakpoint(addr)} role="button" aria-label={label} aria-selected={on} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 22, flexShrink: 0, cursor: "pointer", hover: { opacity: 0.72 } }}>
+      {paused
+        ? <Icon name="play" size={11} color={on ? p.error : p.data} />
+        : <div style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: on && !conditional ? p.error : "transparent", ...(conditional ? { borderWidth: 2, borderColor: p.error } : {}), pointerEvents: "none" }} />}
     </div>
   );
 }

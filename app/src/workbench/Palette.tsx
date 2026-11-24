@@ -1,17 +1,22 @@
 import { type EventPayload, type PublicInstance, useGpuix } from "@gpuix/react";
-import { type ReactElement, useEffect, useRef, useState } from "react";
+import { type ReactElement, useEffect, useMemo, useRef, useState } from "react";
 
 import { ask, goTo } from "./actions";
 import { codeForString } from "./layout";
-import { exportAllPseudocode, exportFunction, exportObjcInventory } from "./export";
+import { exportAllPseudocode, exportFunction, exportObjcInventory, exportReport } from "./export";
 import { patchBytes } from "./patch";
+import { writeHook } from "./frida";
+import { nameUnnamed } from "./bulkName";
 import { exportCutterProject, importCutterProject, openCutter } from "./cutter";
 import { cutterApp } from "../engine/cutter";
+import { rizinInstalled } from "../analysis/engines";
 import { errorMessage } from "../lib/guards";
 import { pickPath } from "../settings/system";
 import { YOU } from "../engine/edits";
-import { loadProject, updateProject } from "../engine/project";
+import { listProjects, loadProject, updateProject } from "../engine/project";
+import { searchProjects } from "../engine/searchProjects";
 import { copyText } from "../chat/useThread";
+import { linkTo, openLink } from "../lib/deepLink";
 import { SANS, scrollbar, useTheme } from "../theme";
 import type { CommandId } from "../keys/commands";
 import { HOVER, MONO_STYLE, overlay, useBench } from "./parts";
@@ -26,6 +31,7 @@ import { type PlainId, t } from "../i18n";
 const MAX_RECENT = 3;
 const MAX_FUNCTIONS = 6;
 const MAX_DATA = 6;
+const MAX_PATH_ENDS = 12;
 
 type Kind = "fn" | "str" | "imp" | "seg" | "ai" | "act";
 
@@ -51,9 +57,11 @@ type Option = {
 type Group = { readonly title: string; readonly options: readonly Option[] };
 
 function useActions(): readonly Action[] {
-  const { wb, program, nameOf, focusAddr, chat, openCompare } = useBench();
+  const bench = useBench();
+  const { wb, program, nameOf, focusAddr, chat, openCompare } = bench;
   const { s } = wb;
   const savedPatches = loadProject(program.id).patches.length;
+  const secondOpinion = rizinInstalled() && !/rizin|radare2/i.test(program.engine) && program.dossier !== null;
   const close = (): void => wb.patch({ paletteOpen: false });
   const inCutter = (work: () => Promise<string | null>): void => {
     close();
@@ -79,8 +87,23 @@ function useActions(): readonly Action[] {
   return [
     { section: "function", icon: "rename", label: t("workbench.action.rename"), command: "rename", run: () => wb.patch({ paletteOpen: false, renaming: focusAddr, renameDraft: nameOf(focusAddr) }) },
     { section: "function", icon: "references", label: t("workbench.palette.findCallers"), command: "xrefs", run: () => { close(); runCommand("xrefs"); } },
+    ...(secondOpinion ? [{ section: "function", icon: "split", label: t("workbench.palette.secondOpinion"), command: null, run: () => { close(); wb.open({ kind: "second", addr: focusAddr }, false); } } as const] : []),
+    { section: "function", icon: "debug", label: t("workbench.palette.fridaHook"), command: null, run: () => {
+      close();
+      void (async (): Promise<void> => {
+        try {
+          const hook = await writeHook(program, focusAddr, nameOf(focusAddr));
+          wb.open({ kind: "text", title: t("workbench.frida.tab", { name: nameOf(focusAddr) }), text: hook.script }, false);
+          chat.thread.note(t("workbench.frida.saved", { path: hook.file, command: hook.command }));
+        } catch (err) {
+          chat.thread.note(t("workbench.export.failed", { message: errorMessage(err) }));
+        }
+      })();
+    } },
+    { section: "function", icon: "references", label: t("workbench.palette.findPath"), command: null, run: () => wb.patch({ pathFrom: focusAddr, paletteQuery: "" }) },
     { section: "function", icon: "bookmark", label: t("workbench.action.bookmark"), command: "bookmark", run: () => { close(); runCommand("bookmark"); } },
     { section: "function", icon: "copy", label: t("workbench.action.copyAddress"), command: null, run: () => { close(); copyText(focusAddr); } },
+    { section: "function", icon: "copy", label: t("workbench.palette.copyLink"), command: null, run: () => { close(); copyText(linkTo(program.id, focusAddr, program.name)); } },
     { section: "function", icon: "copy", label: t("workbench.palette.copyPseudocode"), command: null, run: () => { close(); void (async () => copyText(await program.code(focusAddr, "pseudo")))(); } },
     { section: "function", icon: "download", label: t("workbench.palette.exportPseudocode"), command: null, run: () => exported(exportFunction(program, focusAddr, "pseudo", nameOf(focusAddr))) },
     { section: "function", icon: "download", label: t("workbench.palette.exportAssembly"), command: null, run: () => exported(exportFunction(program, focusAddr, "asm", nameOf(focusAddr))) },
@@ -101,8 +124,29 @@ function useActions(): readonly Action[] {
     { section: "view", icon: "sidebar", label: t("workbench.palette.toggleSidebar"), command: null, run: () => wb.patch({ paletteOpen: false, sidebarOpen: !s.sidebarOpen }) },
     { section: "view", icon: "thread", label: t("workbench.palette.toggleAgent"), command: "agent", run: () => { close(); wb.toggleTool("agent"); } },
     { section: "file", icon: "references", label: t("workbench.palette.compare"), command: null, run: openCompare },
+    { section: "file", icon: "shield-alert", label: t("workbench.palette.guesses"), command: null, run: () => { close(); wb.open({ kind: "guesses" }, false); } },
+    { section: "file", icon: "note", label: t("workbench.palette.notebook"), command: null, run: () => { close(); wb.open({ kind: "notebook" }, false); } },
+    { section: "file", icon: "debug", label: t("workbench.palette.openCrash"), command: null, run: () => {
+      close();
+      void (async (): Promise<void> => {
+        const file = await pickPath("file", t("workbench.crash.pick"));
+        if (file) wb.open({ kind: "crash", file }, false);
+      })();
+    } },
+    { section: "file", icon: "tag", label: t("workbench.palette.cTypes"), command: null, run: () => { close(); wb.open({ kind: "ctypes", at: null }, false); } },
+    { section: "file", icon: "rename", label: t("workbench.palette.nameUnnamed"), command: null, run: () => {
+      close();
+      void (async (): Promise<void> => {
+        try {
+          await nameUnnamed(bench);
+        } catch (err) {
+          chat.thread.note(t("workbench.bulkName.failed", { message: errorMessage(err) }));
+        }
+      })();
+    } },
     { section: "file", icon: "debug", label: t("workbench.palette.debug"), command: "debug", run: () => { close(); wb.reveal("debug"); } },
     { section: "file", icon: "download", label: t("workbench.palette.exportAll"), command: null, run: () => exported(exportAllPseudocode(program)) },
+    { section: "file", icon: "download", label: t("workbench.palette.exportReport"), command: null, run: () => exported(exportReport(program)) },
     { section: "file", icon: "download", label: t("workbench.palette.exportObjc"), command: null, run: () => exported(exportObjcInventory(program)) },
     ...(cutterApp() !== null
       ? [
@@ -155,6 +199,16 @@ function useGroups(query: string): readonly Group[] {
     })();
   };
   const matches = (...texts: readonly string[]): boolean => !query || texts.some((text) => text.toLowerCase().includes(query));
+  const hits = useMemo(() => searchProjects(query, listProjects(), loadProject, program.id), [query, program.id]);
+  const pathFrom = wb.s.pathFrom;
+  if (pathFrom !== null) {
+    const ends = program.functions.filter((f) => f.addr !== pathFrom && matches(nameOf(f.addr), f.addr)).slice(0, MAX_PATH_ENDS);
+    const pick = (to: string): void => {
+      wb.patch({ pathFrom: null });
+      wb.open({ kind: "path", from: pathFrom, to }, false);
+    };
+    return [{ title: t("workbench.palette.pathTo", { from: nameOf(pathFrom) }), options: ends.map((f) => option(`path:${f.addr}`, "fn", "function", nameOf(f.addr), () => pick(f.addr), { addr: f.addr, mono: true })) }];
+  }
   const known = new Set(program.functions.map((f) => f.addr));
   const recent = query ? [] : [...new Set([...wb.s.trail].reverse())].filter((addr) => addr !== focusAddr && known.has(addr)).slice(0, MAX_RECENT).map((addr) => fnOption("recent", addr));
   const goto = /^0x[0-9a-f]+$/.test(query) && !known.has(query) ? [option(`go:${query}`, "act", "search", t("workbench.action.goTo", { address: query }), () => { close(); goTo(bench, query); }, { mono: true })] : [];
@@ -167,14 +221,19 @@ function useGroups(query: string): readonly Group[] {
     ...program.imports.filter((row) => matches(row.a, row.b)).slice(0, MAX_DATA).map((row) => option(`imp:${row.a}:${row.b}`, "imp", "library", row.b, () => { close(); wb.open({ kind: "list", list: "imports" }, false); }, { note: row.a, mono: true })),
     ...program.segments.filter((row) => matches(row.a)).slice(0, MAX_DATA).map((row) => option(`seg:${row.a}`, "seg", "segments", row.a, () => { close(); wb.open({ kind: "list", list: "segments" }, false); }, { note: segmentNote(row.b), addr: row.b.split(" to ")[0] ?? "", mono: true })),
   ];
+  const elsewhere = hits.map((hit) =>
+    option(`elsewhere:${hit.project.id}:${hit.kind}:${hit.addr}`, "fn", hit.kind === "name" ? "function" : hit.kind === "bookmark" ? "bookmark" : "note", hit.text, () => {
+      close();
+      openLink({ project: hit.project.id, address: hit.addr, name: hit.project.name });
+    }, { note: t("workbench.palette.inProject", { name: hit.project.name }), addr: hit.addr, mono: hit.kind === "name" }));
   const sections: readonly Section[] = ["function", "view", "file"];
   const commands = sections.map((section): Group => ({
     title: t(SECTION_TITLE[section]),
     options: actions.filter((a) => a.section === section && matches(a.label)).map((a) => option(`act:${actions.indexOf(a)}`, "act", a.icon, a.label, a.run, { combo: combo(a.command) })),
   }));
   const askGroup = { title: t("workbench.palette.askGroup"), options: asking };
-  const found = [{ title: t("workbench.palette.functions"), options: fns }, { title: t("workbench.palette.data"), options: data }];
-  const anyFound = [goto, recent, fns, data, ...commands.map((g) => g.options)].some((list) => list.length > 0);
+  const found = [{ title: t("workbench.palette.functions"), options: fns }, { title: t("workbench.palette.data"), options: data }, { title: t("workbench.palette.otherProjects"), options: elsewhere }];
+  const anyFound = [goto, recent, fns, data, elsewhere, ...commands.map((g) => g.options)].some((list) => list.length > 0);
   if (query && !anyFound) return [];
   return [
     { title: "", options: goto },
@@ -232,6 +291,7 @@ export function Palette(): ReactElement {
   const query = wb.s.paletteQuery.trim().toLowerCase();
   const close = (): void => wb.patch({ paletteOpen: false });
   const groups = useGroups(query);
+  useEffect(() => () => wb.patch({ pathFrom: null }), []);
   const all = groups.flatMap((group) => group.options);
   const current = Math.min(active, Math.max(0, all.length - 1));
   useEffect(() => setActive(0), [query]);
@@ -281,7 +341,7 @@ export function Palette(): ReactElement {
       <div onMouseDownOutside={close} role="dialog" aria-label={t("workbench.palette.title")} style={{ display: "flex", flexDirection: "column", flexGrow: 1, maxWidth: 620, marginLeft: 16, marginRight: 16, borderWidth: 1, borderColor: p.line3, borderRadius: 14, backgroundColor: p.raised2, overflow: "hidden", boxShadow: { offsetX: 0, offsetY: 24, blurRadius: 60, spreadRadius: 0, color: shadow } }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, height: 52, flexShrink: 0, paddingLeft: 16, paddingRight: 16, borderBottomWidth: 1, borderColor: p.line2 }}>
           <Icon name="search" size={17} color={p.muted} />
-          <input autoFocus value={wb.s.paletteQuery} placeholder={t("workbench.palette.placeholder")} aria-label={t("workbench.palette.search")} onChange={(e) => wb.patch({ paletteQuery: e.value ?? "" })} onKeyDown={onKey} onSubmit={() => {
+          <input autoFocus value={wb.s.paletteQuery} placeholder={wb.s.pathFrom === null ? t("workbench.palette.placeholder") : t("workbench.palette.pathPlaceholder")} aria-label={t("workbench.palette.search")} onChange={(e) => wb.patch({ paletteQuery: e.value ?? "" })} onKeyDown={onKey} onSubmit={() => {
             if (inTab.current) inTab.current = false;
             else submit(false);
           }} style={{ flexGrow: 1, fontSize: 15, color: p.text }} />

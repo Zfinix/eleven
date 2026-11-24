@@ -52,6 +52,8 @@ export type UiState = {
   readonly pickerOpen: boolean;
   readonly paletteOpen: boolean;
   readonly paletteQuery: string;
+  /** Set while the palette picks where a call path from this function should end. */
+  readonly pathFrom: string | null;
   readonly comments: ReadonlyMap<string, string>;
   readonly colors: ReadonlyMap<string, string>;
   /** What bytes were marked as, and how numbers show, from the project. */
@@ -139,7 +141,7 @@ export function initialState(panes: readonly Pane[], tree: PaneTree = rowOf(pane
   return {
     panes, tree, focus: 0, seq: 10, filter: "", names: new Map(), bookmarks: [], notes: new Map(), trail, trailTimes, at: trail.length - 1,
     sidebarOpen: true, docks, rightOpen: docks.right.length > 0, bottomOpen: false, right: docks.right[0] ?? "agent", bottom: docks.bottom[0] ?? "refs", showBytes: false, linked: false, breakpoints: new Map(), debugPc: null, navClosed: ["functions"], sizes: loadSizes(), resizing: null, paneDrag: null,
-    renaming: null, renameDraft: "", patching: null, patchDraft: "", pickerOpen: false,
+    renaming: null, pathFrom: null, renameDraft: "", patching: null, patchDraft: "", pickerOpen: false,
     paletteOpen: false, paletteQuery: "",
     comments: new Map(), colors: new Map(), types: new Map(), formats: new Map(), revision: 0, selected: null, commenting: null, commentDraft: "", refsOf: null, toast: null,
     lineRange: null, asking: null, finding: false, findQuery: "", findMode: "text", findAt: 0, groups: [], blockPicks: [], labelling: null, labelDraft: "",
@@ -164,6 +166,18 @@ function sameTarget(tab: Tab, target: TabTarget): boolean {
       return tab.kind === "diff";
     case "debug":
       return tab.kind === "debug";
+    case "path":
+      return tab.kind === "path" && tab.from === target.from && tab.to === target.to;
+    case "second":
+      return tab.kind === "second" && tab.addr === target.addr;
+    case "ctypes":
+      return tab.kind === "ctypes";
+    case "crash":
+      return tab.kind === "crash" && tab.file === target.file;
+    case "notebook":
+      return tab.kind === "notebook";
+    case "guesses":
+      return tab.kind === "guesses";
     case "listing":
       return tab.kind === "listing";
     case "source":
@@ -199,6 +213,18 @@ function freshTab(target: TabTarget, id: string, preview: boolean, view: CodeMod
       return { kind: "diff", id, preview };
     case "debug":
       return { kind: "debug", id, preview };
+    case "path":
+      return { kind: "path", id, from: target.from, to: target.to, preview };
+    case "second":
+      return { kind: "second", id, addr: target.addr, preview };
+    case "ctypes":
+      return { kind: "ctypes", id, at: target.at, preview };
+    case "crash":
+      return { kind: "crash", id, file: target.file, preview };
+    case "notebook":
+      return { kind: "notebook", id, preview };
+    case "guesses":
+      return { kind: "guesses", id, preview };
     case "listing":
       return { kind: "listing", id, preview };
     case "source":
@@ -430,6 +456,8 @@ export type Workbench = {
   readonly equalizePanes: () => void;
   readonly besidePseudo: (addr: string) => void;
   readonly toggleBreakpoint: (addr: string) => void;
+  /** Stops at a breakpoint only when this lldb expression holds; empty stops every time. */
+  readonly setBreakpointCondition: (addr: string, condition: string) => void;
   readonly setView: (pi: number, view: CodeMode) => void;
   readonly rename: (addr: string, name: string) => void;
   readonly toggleBookmark: (mark: Bookmark) => void;
@@ -479,6 +507,7 @@ export function useWorkbenchState(panes: readonly Pane[], docks: Docks): Workben
     moveTab: (pi: number, ti: number, by: 1 | -1) => setS((prev) => moveTab(prev, pi, ti, by)),
     resizePanes: (path: TreePath, index: number, weights: readonly [number, number]) => setS((prev) => resizePanes(prev, path, index, weights)),
     toggleBreakpoint: (addr: string) => setS((prev) => ({ ...prev, breakpoints: editMap(prev.breakpoints, addr, prev.breakpoints.has(addr) ? "" : "on") })),
+    setBreakpointCondition: (addr: string, condition: string) => setS((prev) => (prev.breakpoints.has(addr) ? { ...prev, breakpoints: editMap(prev.breakpoints, addr, condition.trim() || "on") } : prev)),
     besidePseudo: (addr: string) => setS((prev) => besidePseudo(prev, addr)),
     equalizePanes: () => setS((prev) => ({ ...prev, tree: equalize(prev.tree) })),
     setView: (pi: number, view: CodeMode) => setS((prev) => setView(prev, pi, view)),

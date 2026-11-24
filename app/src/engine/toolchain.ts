@@ -117,8 +117,9 @@ function findOnPathOf(name: string): string | null {
 }
 
 /** The Node that runs REA: the one inside Eleven.app when it ships one, otherwise the user's. */
+/** The bundled Node, else `ELEVEN_NODE` (for a dev machine whose default Node is one REA refuses), else the one on PATH. */
 export function nodeCommand(): string {
-  return BUNDLED_NODE || "node";
+  return BUNDLED_NODE || process.env.ELEVEN_NODE || "node";
 }
 
 const MIN_REA_MAJOR = 6;

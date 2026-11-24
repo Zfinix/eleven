@@ -6,7 +6,7 @@ import { describeType } from "./codeTypes";
 import { describeFormat } from "./operands";
 import type { BlockGroup, Project } from "./project";
 
-export const EDIT_FIELDS = ["names", "notes", "comments", "colors", "bookmarks", "patches", "groups", "types", "formats", "breakpoints"] as const;
+export const EDIT_FIELDS = ["names", "notes", "comments", "colors", "bookmarks", "patches", "groups", "types", "formats", "breakpoints", "ctypes", "ctypeAt", "pages"] as const;
 
 export type EditField = (typeof EDIT_FIELDS)[number];
 
@@ -29,7 +29,34 @@ export type Edit = {
   readonly status: EditStatus;
   /** Why an agent suggested it, in its own words. */
   readonly reason?: string;
+  /** What an agent read that backs it: addresses in the binary, each with what it saw there. */
+  readonly evidence?: readonly string[];
 };
+
+/** Kinds of edit that state a claim about the code, so an agent making one should say what it is based on. */
+const CLAIMS: ReadonlySet<EditField> = new Set(["names", "notes", "comments", "bookmarks", "pages"]);
+
+export function isClaim(field: EditField): boolean {
+  return CLAIMS.has(field);
+}
+
+/** An agent's claim with nothing behind it: shown as a guess until checked. */
+export function unbacked(edit: Edit): boolean {
+  return edit.by.kind === "agent" && isClaim(edit.field) && edit.after !== null && (edit.evidence?.length ?? 0) === 0;
+}
+
+const MAX_EVIDENCE = 8;
+const MAX_EVIDENCE_CHARS = 120;
+
+/** An agent's evidence, one item per comma or line, kept only where it names an address in the binary. */
+export function parseEvidence(text: string): readonly string[] {
+  return [...new Set(text.split(/[,\n;]+/).map((item) => item.trim().slice(0, MAX_EVIDENCE_CHARS)).filter((item) => /\b0x[0-9a-f]+\b/i.test(item)))].slice(0, MAX_EVIDENCE);
+}
+
+/** The address an evidence item points at, for a link to it. */
+export function evidenceAddress(item: string): string | null {
+  return /\b0x[0-9a-f]+\b/i.exec(item)?.[0].toLowerCase() ?? null;
+}
 
 export type Change = { readonly field: EditField; readonly key: string; readonly before: string | null; readonly after: string | null };
 
@@ -58,6 +85,9 @@ export function fieldMap(project: Project, field: EditField): ReadonlyMap<string
     case "types":
     case "formats":
     case "breakpoints":
+    case "ctypes":
+    case "ctypeAt":
+    case "pages":
       return project[field];
     case "bookmarks":
       return new Map(project.bookmarks.map((mark) => [mark.addr, mark.label]));
@@ -82,6 +112,9 @@ function withField(project: Project, field: EditField, map: ReadonlyMap<string, 
     case "types":
     case "formats":
     case "breakpoints":
+    case "ctypes":
+    case "ctypeAt":
+    case "pages":
       return { ...project, [field]: map };
     case "bookmarks":
       return { ...project, bookmarks: entries.map(([addr, label]) => ({ addr, label })) };
@@ -143,9 +176,9 @@ function trim(log: readonly Edit[]): readonly Edit[] {
   });
 }
 
-export function newEdit(change: Change, by: Author, status: EditStatus, now: number, reason?: string): Edit {
-  const edit: Edit = { id: randomUUID(), at: now, changedAt: now, by, status, ...change };
-  return reason ? { ...edit, reason } : edit;
+export function newEdit(change: Change, by: Author, status: EditStatus, now: number, reason?: string, evidence?: readonly string[]): Edit {
+  const edit: Edit = { id: randomUUID(), at: now, changedAt: now, by, status, ...change, ...(reason ? { reason } : {}) };
+  return evidence && evidence.length > 0 ? { ...edit, evidence } : edit;
 }
 
 function folds(last: Edit, change: Change, by: Author, now: number): boolean {
@@ -153,17 +186,17 @@ function folds(last: Edit, change: Change, by: Author, now: number): boolean {
 }
 
 /** Appends applied changes; one that repeats the newest entry within a minute folds into it, so typing a note is one entry. */
-export function record(log: readonly Edit[], changes: readonly Change[], by: Author, now: number = stamp()): readonly Edit[] {
+export function record(log: readonly Edit[], changes: readonly Change[], by: Author, now: number = stamp(), evidence?: readonly string[]): readonly Edit[] {
   if (changes.length === 0) return log;
   let next = [...log];
   for (const change of changes) {
     const last = next.at(-1);
     if (!last || !folds(last, change, by, now)) {
-      next.push(newEdit(change, by, "applied", now));
+      next.push(newEdit(change, by, "applied", now, undefined, evidence));
       continue;
     }
     next = next.slice(0, -1);
-    if (last.before !== change.after) next.push({ ...last, after: change.after, changedAt: now });
+    if (last.before !== change.after) next.push({ ...last, after: change.after, changedAt: now, ...(evidence && evidence.length > 0 ? { evidence } : {}) });
   }
   return trim(next);
 }
@@ -211,6 +244,12 @@ export function describeEdit(edit: Edit, nameOf: (addr: string) => string, origi
       return after === null ? `Showed the number at ${key} as it was` : `Showed the number at ${key} as ${describeFormat(after)}`;
     case "breakpoints":
       return after === null ? `Removed the breakpoint at ${key}` : `Added a breakpoint at ${key}`;
+    case "ctypes":
+      return after === null ? `Removed the C type ${key}` : before === null ? `Wrote the C type ${key}` : `Changed the C type ${key}`;
+    case "ctypeAt":
+      return after === null ? `Took the C type off ${key}` : `Read ${key} as ${after}`;
+    case "pages":
+      return after === null ? `Cleared the ${key}` : `Wrote in the ${key}`;
     default: {
       const unhandled: never = field;
       return unhandled;
@@ -239,4 +278,5 @@ export const EDIT: z.ZodType<Edit> = z.object({
   after: z.string().nullable(),
   status: z.enum(["applied", "proposed", "rejected", "undone"]),
   reason: z.string().exactOptional(),
+  evidence: z.array(z.string()).exactOptional(),
 });

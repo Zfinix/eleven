@@ -6,6 +6,7 @@ import { type ReactElement, useEffect, useMemo, useState } from "react";
 import type { Syntax } from "../components/code";
 import { Button, ErrorCard } from "../components/kit";
 import { Icon } from "../components/ui";
+import { checkCommand, compileCheck, type CheckResult } from "../engine/compileCheck";
 import { forgetRecreation, languageOf, recreate, type RecreateFn, type RecreateKey, type RecreateRequest, savedPath, savedRecreation } from "../engine/recreate";
 import { listOf, type PlainId, t, thisDevice } from "../i18n";
 import { swiftTypes, type SwiftType } from "../engine/swiftTypes";
@@ -53,6 +54,61 @@ type Recreation =
   | { readonly kind: "failed"; readonly message: string };
 
 /** What the file was built from, as a list the reader's language joins: "3 functions and 1 type". */
+const ASK_ERRORS = 30;
+const ASK_CODE = 12_000;
+
+type Checked = { readonly kind: "idle" } | { readonly kind: "checking" } | { readonly kind: "done"; readonly result: CheckResult } | { readonly kind: "failed"; readonly message: string };
+
+/** Runs Xcode's compiler over the recreated file. Compiling is a first check, so the result says it doesn't prove the same behavior. */
+function CompileCheck({ file, code }: { readonly file: string; readonly code: string }): ReactElement | null {
+  const { p } = useTheme();
+  const bench = useBench();
+  const [checked, setChecked] = useState<Checked>({ kind: "idle" });
+  if (checkCommand(file, file) === null) return null;
+  const run = (): void => {
+    setChecked({ kind: "checking" });
+    void (async (): Promise<void> => {
+      try {
+        const result = await compileCheck(file, code);
+        setChecked(result ? { kind: "done", result } : { kind: "idle" });
+      } catch (err) {
+        setChecked({ kind: "failed", message: errorMessage(err) });
+      }
+    })();
+  };
+  const name = file.split("/").pop() ?? file;
+  const errors = checked.kind === "done" ? checked.result.errors : [];
+  const fix = (): void => ask(bench, t("workbench.view.recovered.fixPrompt", { name, errors: errors.slice(0, ASK_ERRORS).join("\n"), code: code.slice(0, ASK_CODE) }));
+  const said = ((): { readonly text: string; readonly color: string } | null => {
+    switch (checked.kind) {
+      case "idle":
+        return null;
+      case "checking":
+        return { text: t("workbench.view.recovered.checking"), color: p.muted };
+      case "failed":
+        return { text: t("workbench.view.recovered.checkFailed", { error: checked.message }), color: p.error };
+      case "done":
+        if (errors.length > 0) return { text: t("workbench.view.recovered.checkErrors", { count: errors.length }), color: p.error };
+        return { text: checked.result.depth === "types" ? t("workbench.view.recovered.compiles") : t("workbench.view.recovered.parses"), color: p.string };
+    }
+  })();
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingLeft: 16, paddingRight: 12, paddingTop: 4 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+        <TextButton label={t("workbench.view.recovered.check")} tone="ghost" onClick={run} />
+        {said && <div style={{ flexGrow: 1, flexBasis: 200, fontSize: 12, color: said.color }}>{said.text}</div>}
+        {errors.length > 0 && <TextButton label={t("workbench.view.recovered.fix")} tone="outline" onClick={fix} />}
+      </div>
+      {errors.slice(0, 6).map((line) => <div key={line} style={{ fontSize: 11.5, color: p.text3, userSelect: "text", ...ELLIPSIS, ...MONO_STYLE }}>{line}</div>)}
+    </div>
+  );
+}
+
+/** Lines the agent marked `// guessed`: things it filled in rather than read from the binary. */
+function guessedLines(text: string): number {
+  return text.split("\n").filter((line) => /\/\/\s*guessed\b/i.test(line)).length;
+}
+
 function builtFrom(fns: number, types: number): string {
   const parts = [fns === 1 ? t("workbench.view.recovered.oneFunction") : t("workbench.view.recovered.functions", { count: fns })];
   if (types) parts.push(types === 1 ? t("workbench.view.recovered.oneType") : t("workbench.view.recovered.types", { count: types }));
@@ -233,10 +289,12 @@ function TracedFile({ trace }: { readonly trace: FileTrace }): ReactElement {
       <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0 }}>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, paddingTop: 8, paddingLeft: 16, paddingRight: 12 }}>
           <div style={{ flexGrow: 1, flexBasis: 260, fontSize: 12, color: p.muted }}>{t("workbench.view.recovered.done", { language: languageName(trace.file), agent: agent.name, from: builtFrom(trace.fns.length, trace.types.length) })}</div>
+          {guessedLines(state.source.text) > 0 && <div style={{ flexShrink: 0, fontSize: 12, color: p.data }}>{t("workbench.view.recovered.guessedLines", { count: guessedLines(state.source.text) })}</div>}
           <TextButton label={t("workbench.view.recovered.builtFrom")} tone="ghost" onClick={() => setEvidence(true)} />
           <TextButton label={t("workbench.view.copy")} tone="ghost" onClick={() => copy(bench, state.source.text, name)} />
           <TextButton label={t("workbench.view.recovered.again")} tone="ghost" onClick={again} />
         </div>
+        <CompileCheck file={trace.file} code={state.source.text} />
         <SourceLines source={state.source} syntax={syntaxOf(trace.file)} labels ask={sourcePlace(trace.file, syntaxOf(trace.file))} />
       </div>
     );

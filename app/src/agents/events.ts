@@ -45,5 +45,5 @@ export type AgentEvent =
   | { readonly kind: "options"; readonly options: readonly SessionOption[] }
   | { readonly kind: "usage"; readonly usage: Usage }
   | { readonly kind: "notice"; readonly text: string }
-  | { readonly kind: "turnEnded"; readonly cancelled: boolean }
+  | { readonly kind: "turnEnded"; readonly cancelled: boolean; readonly refused?: boolean }
   | { readonly kind: "failed"; readonly reason: string };

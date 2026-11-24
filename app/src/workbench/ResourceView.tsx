@@ -2,7 +2,7 @@ import { open, readFile, stat } from "node:fs/promises";
 
 import type { ReactElement } from "react";
 
-import { type ApkFiles, hexDump, type ResourceKind, resourceKind, sizeText } from "../engine/apk";
+import { type ApkFiles, dartSnapshot, type DartSnapshot, hermesVersion, hexDump, il2cppMetadata, isFlutterCode, type ResourceKind, resourceKind, sizeText } from "../engine/apk";
 import { plistXml } from "../engine/apple";
 import { Button, ErrorCard } from "../components/kit";
 import { useLoaded } from "../lib/useLoaded";
@@ -16,7 +16,7 @@ const HEAD = 4096;
 /** Past this a text file shows its first bytes as hex instead of every line. */
 const TEXT_LIMIT = 32 << 20;
 
-type Read = { readonly path: string; readonly size: number; readonly kind: ResourceKind; readonly text: string };
+type Read = { readonly path: string; readonly size: number; readonly kind: ResourceKind; readonly text: string; readonly head: Buffer; readonly dart?: DartSnapshot | null };
 
 async function readResource(files: ApkFiles, file: string): Promise<Read> {
   const path = await files.local(file);
@@ -30,11 +30,12 @@ async function readResource(files: ApkFiles, file: string): Promise<Read> {
   }
   if (head.subarray(0, 8).toString("latin1") === "bplist00") {
     const xml = await plistXml(path);
-    if (xml !== null) return { path, size, kind: "text", text: xml };
+    if (xml !== null) return { path, size, kind: "text", text: xml, head };
   }
   const kind = resourceKind(file, head);
-  if (kind === "text" && size <= TEXT_LIMIT) return { path, size, kind, text: await readFile(path, "utf8") };
-  return { path, size, kind: kind === "text" ? "binary" : kind, text: hexDump(head) };
+  if (kind === "text" && size <= TEXT_LIMIT) return { path, size, kind, text: await readFile(path, "utf8"), head };
+  const dart = kind === "native" && isFlutterCode(file) ? dartSnapshot(await readFile(path)) : undefined;
+  return { path, size, kind: kind === "text" ? "binary" : kind, text: hexDump(head), head, ...(dart === undefined ? {} : { dart }) };
 }
 
 function Card({ title, detail, children }: { readonly title: string; readonly detail: string; readonly children?: ReactElement }): ReactElement {
@@ -71,7 +72,7 @@ function Loaded({ file, read }: { readonly file: string; readonly read: Read }):
     case "native":
       return (
         <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0 }}>
-          <Card title={name} detail={abiOf(file) ? t("workbench.view.resource.nativeFor", { abi: abiOf(file), size: sizeText(read.size) }) : t("workbench.view.resource.native", { size: sizeText(read.size) })}>
+          <Card title={name} detail={isFlutterCode(file) ? `${t("workbench.view.resource.flutter", { size: sizeText(read.size) })}${read.dart ? ` ${t("workbench.view.resource.dartSnapshot", { hash: read.dart.hash, features: read.dart.features })}` : ""}` : abiOf(file) ? t("workbench.view.resource.nativeFor", { abi: abiOf(file), size: sizeText(read.size) }) : t("workbench.view.resource.native", { size: sizeText(read.size) })}>
             <>
               <Button label={t("workbench.view.resource.openLibrary")} tone="primary" icon="library" onClick={() => void bench.chat.choose(read.path)} />
               <Button label={t("workbench.view.resource.ask", { agent })} tone="ask" onClick={() => ask(bench, `What does ${name}, a native library in ${bench.program.name}, do? It's unpacked at ${read.path}.`)} />
@@ -83,12 +84,25 @@ function Loaded({ file, read }: { readonly file: string; readonly read: Read }):
     case "hermes":
       return (
         <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0 }}>
-          <Card title={name} detail={t("workbench.view.resource.hermes", { size: sizeText(read.size) })}>
+          <Card title={name} detail={hermesVersion(read.head) === null ? t("workbench.view.resource.hermes", { size: sizeText(read.size) }) : `${t("workbench.view.resource.hermes", { size: sizeText(read.size) })} ${t("workbench.view.resource.hermesVersion", { version: hermesVersion(read.head) ?? 0 })}`}>
             <Button label={t("workbench.view.resource.askRead", { agent })} tone="ask" onClick={() => ask(bench, `${bench.program.name} is a React Native app. Its JavaScript is compiled to Hermes bytecode at ${read.path}. Read it and tell me what the app does.`)} />
           </Card>
           <SourceLines source={{ text: read.text, starts: [] }} syntax="code" />
         </div>
       );
+    case "il2cpp": {
+      const meta = il2cppMetadata(read.head);
+      return (
+        <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0 }}>
+          <Card title={name} detail={meta.kind === "plain" ? t("workbench.view.resource.il2cpp", { version: meta.version, size: sizeText(read.size) }) : t("workbench.view.resource.il2cppEncrypted", { size: sizeText(read.size) })}>
+            <Button label={t("workbench.view.resource.askRead", { agent })} tone="ask" onClick={() => ask(bench, meta.kind === "plain"
+              ? `${bench.program.name} is a Unity game built with IL2CPP. Its metadata (version ${meta.version}) is at ${read.path} and the game code is in its libil2cpp library. Map the metadata's method names onto the native functions and tell me what the game does.`
+              : `${bench.program.name} is a Unity game built with IL2CPP, and its metadata at ${read.path} is encrypted (no Unity header). Find where libil2cpp loads and decrypts global-metadata.dat, and explain how to get the decrypted metadata.`)} />
+          </Card>
+          <SourceLines source={{ text: read.text, starts: [] }} syntax="code" />
+        </div>
+      );
+    }
     case "binary":
       return (
         <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0 }}>

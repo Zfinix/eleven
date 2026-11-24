@@ -90,3 +90,17 @@ test("slash commands: only text that starts with / is a command", () => {
   expect(isCommand("/ what")).toBe(false);
   expect(isCommand("/goal")).toBe(true);
 });
+
+function answered(reply: string, refused = false): string | null {
+  const asked = threadReducer(threadReducer(EMPTY_THREAD, { type: "event", event: { kind: "connected", agent: "Claude" }, at: 0 }), { type: "sent", draft: { text: "what does FUN_1000 do?", attachments: [] }, at: 1 });
+  const wrote = threadReducer(asked, { type: "event", event: { kind: "text", text: reply }, at: 2 });
+  const last = threadReducer(wrote, { type: "event", event: { kind: "turnEnded", cancelled: false, refused }, at: 3 }).messages.at(-1);
+  return last?.kind === "agent" ? last.outcome : null;
+}
+
+test("thread: a provider refusal, by stop reason or by its words, ends the turn as refused", () => {
+  expect(answered("FUN_1000 parses the license key.")).toBe("done");
+  expect(answered("", true)).toBe("refused");
+  expect(answered("API Error: Claude Code is unable to respond to this request, which appears to violate our Usage Policy.")).toBe("refused");
+  expect(answered("The app refuses to run without a license, which is the check we want.")).toBe("done");
+});

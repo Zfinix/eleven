@@ -121,11 +121,17 @@ export type Project = {
   readonly formats: ReadonlyMap<string, string>;
   /** Where the debugger stops, keyed by instruction address. */
   readonly breakpoints: ReadonlyMap<string, string>;
+  /** C types written for this binary, keyed by type name, each its whole declaration. */
+  readonly ctypes: ReadonlyMap<string, string>;
+  /** Which C type the bytes at an address are, keyed by address. */
+  readonly ctypeAt: ReadonlyMap<string, string>;
+  /** Free-form pages of findings, keyed by page name; the workbench shows the one called "notebook". */
+  readonly pages: ReadonlyMap<string, string>;
   /** Every change made to the values above, oldest first, including agent suggestions waiting for review. */
   readonly edits: readonly Edit[];
 };
 
-export const EMPTY_PROJECT: Project = { names: new Map(), bookmarks: [], notes: new Map(), patches: [], comments: new Map(), colors: new Map(), groups: [], types: new Map(), formats: new Map(), breakpoints: new Map(), edits: [] };
+export const EMPTY_PROJECT: Project = { names: new Map(), bookmarks: [], notes: new Map(), patches: [], comments: new Map(), colors: new Map(), groups: [], types: new Map(), formats: new Map(), breakpoints: new Map(), ctypes: new Map(), ctypeAt: new Map(), pages: new Map(), edits: [] };
 
 function file(id: string): string {
   return join(PROJECTS, `${id}.json`);
@@ -142,6 +148,9 @@ const PROJECT: z.ZodType<Project> = z.object({
   types: textMap,
   formats: textMap,
   breakpoints: textMap,
+  ctypes: textMap,
+  ctypeAt: textMap,
+  pages: textMap,
   edits: listOf(EDIT),
 });
 
@@ -161,7 +170,7 @@ export function loadProject(id: string): Project {
 export function saveProject(id: string, project: Project): void {
   unsaved.delete(id);
   mkdirSync(PROJECTS, { recursive: true });
-  const json = { names: Object.fromEntries(project.names), bookmarks: project.bookmarks, notes: Object.fromEntries(project.notes), patches: project.patches, comments: Object.fromEntries(project.comments), colors: Object.fromEntries(project.colors), groups: project.groups, types: Object.fromEntries(project.types), formats: Object.fromEntries(project.formats), breakpoints: Object.fromEntries(project.breakpoints), edits: project.edits };
+  const json = { names: Object.fromEntries(project.names), bookmarks: project.bookmarks, notes: Object.fromEntries(project.notes), patches: project.patches, comments: Object.fromEntries(project.comments), colors: Object.fromEntries(project.colors), groups: project.groups, types: Object.fromEntries(project.types), formats: Object.fromEntries(project.formats), breakpoints: Object.fromEntries(project.breakpoints), ctypes: Object.fromEntries(project.ctypes), ctypeAt: Object.fromEntries(project.ctypeAt), pages: Object.fromEntries(project.pages), edits: project.edits };
   writeFileSync(file(id), `${JSON.stringify(json, null, 2)}\n`);
 }
 
@@ -188,10 +197,10 @@ type Listener = (id: string) => void;
 const listeners = new Set<Listener>();
 
 /** Applies a change, logs it as made `by` (null when the change edits the log itself), and announces it. */
-export function updateProject(id: string, change: (project: Project) => Project, by: Author | null): Project {
+export function updateProject(id: string, change: (project: Project) => Project, by: Author | null, evidence?: readonly string[]): Project {
   const before = loadProject(id);
   const changed = change(before);
-  const next = by ? { ...changed, edits: record(changed.edits, diffProjects(before, changed), by) } : changed;
+  const next = by ? { ...changed, edits: record(changed.edits, diffProjects(before, changed), by, undefined, evidence) } : changed;
   if (next.edits === before.edits && diffProjects(before, next).length === 0) return before;
   if (currentSettings().autosave) saveProject(id, next);
   else holdUnsaved(id, next);

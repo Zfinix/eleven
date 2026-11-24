@@ -36,6 +36,18 @@ function useLook(tab: Tab): Look {
       return { title: t("workbench.chrome.compare"), icon: "split", iconColor: null };
     case "debug":
       return { title: t("workbench.chrome.debugger"), icon: "debug", iconColor: null };
+    case "path":
+      return { title: t("workbench.path.tab", { to: nameOf(tab.to) }), icon: "references", iconColor: null };
+    case "second":
+      return { title: t("workbench.second.tab", { name: nameOf(tab.addr) }), icon: "split", iconColor: null };
+    case "ctypes":
+      return { title: t("workbench.ctype.tab"), icon: "tag", iconColor: null };
+    case "crash":
+      return { title: tab.file.split("/").pop() ?? tab.file, icon: "debug", iconColor: null };
+    case "notebook":
+      return { title: t("workbench.notebook.tab"), icon: "note", iconColor: null };
+    case "guesses":
+      return { title: t("workbench.guesses.tab"), icon: "shield-alert", iconColor: null };
     case "listing":
       return { title: t("workbench.chrome.listing"), icon: "assembly", iconColor: null };
     case "source":

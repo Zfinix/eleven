@@ -1,6 +1,7 @@
 import type { Attachment } from "../agents/attachments";
 import type { AgentEvent, PermissionChoice, PlanItem, SessionOption, SlashCommand, StepStatus, ToolKind, Usage } from "../agents/events";
 import { stringField } from "../lib/guards";
+import { refusedReply } from "./refusal";
 
 export type Step = {
   readonly id: string;
@@ -21,7 +22,8 @@ export type Block =
   | { readonly kind: "thought"; readonly text: string; readonly startedAt: number; readonly endedAt: number | null }
   | { readonly kind: "tool"; readonly step: Step };
 
-export type TurnOutcome = "running" | "done" | "cancelled" | "failed";
+/** `refused` is a turn the agent's provider declined, so another agent may still answer it. */
+export type TurnOutcome = "running" | "done" | "cancelled" | "failed" | "refused";
 
 export type PermissionState = { readonly kind: "pending" } | { readonly kind: "answered"; readonly label: string };
 
@@ -202,6 +204,12 @@ function withTurn(state: ThreadState): readonly Message[] {
   return [...state.messages, { kind: "agent", blocks: [], startedAt: state.agent.since, endedAt: null, outcome: "running" }];
 }
 
+function runningText(state: ThreadState): string {
+  const turn = state.messages.at(-1);
+  if (turn?.kind !== "agent" || turn.outcome !== "running") return "";
+  return turn.blocks.flatMap((block) => (block.kind === "text" ? [block.text] : [])).join("\n");
+}
+
 function finishTurn(state: ThreadState, outcome: TurnOutcome, at: number): ThreadState {
   const messages = withTurn(state).map((message) =>
     message.kind === "agent" && message.outcome === "running" ? { ...message, outcome, endedAt: at, blocks: closeThoughts(message.blocks, at) } : message,
@@ -239,7 +247,7 @@ function onEvent(state: ThreadState, event: AgentEvent, at: number): ThreadState
     case "notice":
       return { ...state, messages: [...state.messages, { kind: "note", text: event.text, tone: "info" }] };
     case "turnEnded":
-      return finishTurn(state, event.cancelled ? "cancelled" : "done", at);
+      return finishTurn(state, event.cancelled ? "cancelled" : event.refused || refusedReply(runningText(state)) ? "refused" : "done", at);
     case "failed": {
       const ended = finishTurn(state, "failed", at);
       return { ...ended, agent: { kind: "idle" }, messages: [...ended.messages, { kind: "note", text: event.reason, tone: "error" }] };

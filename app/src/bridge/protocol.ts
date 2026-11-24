@@ -9,7 +9,7 @@ export const CHAT_ENV = "ELEVEN_CHAT";
 
 export const ELEVEN_SERVER = "eleven";
 
-export type BridgeTool = "open_function" | "current_view" | "set_view" | "rename_function" | "add_note" | "add_comment" | "bookmark" | "propose_patch" | "set_code_type" | "set_number_format" | "list_marks" | "gpu_profile" | "debug_start" | "debug_state" | "debug_control" | "debug_evaluate" | "set_breakpoint";
+export type BridgeTool = "open_function" | "current_view" | "set_view" | "rename_function" | "add_note" | "add_comment" | "bookmark" | "propose_patch" | "set_code_type" | "set_number_format" | "define_c_type" | "list_marks" | "search_projects" | "add_to_notebook" | "export_report" | "second_opinion" | "read_crash_report" | "gpu_profile" | "debug_start" | "debug_state" | "debug_control" | "debug_evaluate" | "debug_memory" | "set_breakpoint";
 
 /** Which agent, in which chat, sent a request. */
 export type BridgeCaller = { readonly agent: string; readonly chat: string | null };
@@ -22,7 +22,7 @@ export function bridgePath(): string {
   return OS === "windows" ? `\\\\.\\pipe\\eleven-bridge-${process.pid}` : join(cacheRoot(), `bridge-${process.pid}.sock`);
 }
 
-const TOOLS: readonly BridgeTool[] = ["open_function", "current_view", "set_view", "rename_function", "add_note", "add_comment", "bookmark", "propose_patch", "set_code_type", "set_number_format", "list_marks", "gpu_profile", "debug_start", "debug_state", "debug_control", "debug_evaluate", "set_breakpoint"];
+const TOOLS: readonly BridgeTool[] = ["open_function", "current_view", "set_view", "rename_function", "add_note", "add_comment", "bookmark", "propose_patch", "set_code_type", "set_number_format", "define_c_type", "list_marks", "search_projects", "add_to_notebook", "export_report", "second_opinion", "read_crash_report", "gpu_profile", "debug_start", "debug_state", "debug_control", "debug_evaluate", "debug_memory", "set_breakpoint"];
 
 export function isBridgeTool(value: unknown): value is BridgeTool {
   return TOOLS.some((tool) => tool === value);

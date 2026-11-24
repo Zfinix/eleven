@@ -1,4 +1,8 @@
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+
+import { t } from "../i18n";
 import { currentDesktop, type Desktop } from "../lib/native";
+import { supportDir, supportPath } from "../lib/support";
 import { inFront, notify as notifyByScript } from "../lib/platform";
 import { currentSettings, type Settings } from "../settings/store";
 import { type Moment, noteFor } from "./moments";
@@ -88,4 +92,21 @@ export function onOpenChat(open: (chat: string) => void): () => void {
   return () => {
     openers.delete(open);
   };
+}
+
+const ASKED = "notifications-asked";
+
+/**
+ * macOS asks for permission before an app's first notification. Eleven sends
+ * that first one as soon as notifications are on, so the question comes now,
+ * not in the middle of an agent's work. Only once: macOS remembers the answer.
+ */
+export function askForNotifications(desktop: Desktop, settings: Settings = currentSettings()): boolean {
+  if (!desktop.notificationsAvailable() || !(settings.notifyWhenDone || settings.notifyWhenAsked || settings.notifyWhenReady)) return false;
+  const marker = supportPath(ASKED);
+  if (existsSync(marker)) return false;
+  mkdirSync(supportDir(), { recursive: true });
+  writeFileSync(marker, "");
+  desktop.showNotification({ tag: ASKED, title: t("notify.on.title"), body: t("notify.on.body"), actions: [] });
+  return true;
 }

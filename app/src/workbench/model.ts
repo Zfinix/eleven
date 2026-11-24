@@ -24,6 +24,12 @@ export type Tab =
   | { readonly kind: "profile"; readonly id: string; readonly title: string; readonly preview: boolean }
   | { readonly kind: "diff"; readonly id: string; readonly preview: boolean }
   | { readonly kind: "debug"; readonly id: string; readonly preview: boolean }
+  | { readonly kind: "path"; readonly id: string; readonly from: string; readonly to: string; readonly preview: boolean }
+  | { readonly kind: "second"; readonly id: string; readonly addr: string; readonly preview: boolean }
+  | { readonly kind: "ctypes"; readonly id: string; readonly at: string | null; readonly preview: boolean }
+  | { readonly kind: "crash"; readonly id: string; readonly file: string; readonly preview: boolean }
+  | { readonly kind: "notebook"; readonly id: string; readonly preview: boolean }
+  | { readonly kind: "guesses"; readonly id: string; readonly preview: boolean }
   | { readonly kind: "listing"; readonly id: string; readonly preview: boolean }
   | { readonly kind: "source"; readonly id: string; readonly file: string; readonly preview: boolean }
   | { readonly kind: "resource"; readonly id: string; readonly file: string; readonly preview: boolean }
@@ -39,6 +45,12 @@ export type TabTarget =
   | { readonly kind: "profile"; readonly title: string }
   | { readonly kind: "diff" }
   | { readonly kind: "debug" }
+  | { readonly kind: "path"; readonly from: string; readonly to: string }
+  | { readonly kind: "second"; readonly addr: string }
+  | { readonly kind: "ctypes"; readonly at: string | null }
+  | { readonly kind: "crash"; readonly file: string }
+  | { readonly kind: "notebook" }
+  | { readonly kind: "guesses" }
   | { readonly kind: "listing" }
   | { readonly kind: "source"; readonly file: string }
   | { readonly kind: "resource"; readonly file: string }
@@ -59,6 +71,7 @@ export type Refs = { readonly callers: readonly Caller[]; readonly callees: read
 export type HexRow = { readonly addr: string; readonly bytes: string; readonly ascii: string };
 
 export type { Loaded } from "../lib/useLoaded";
+import type { CallPath } from "../engine/callPath";
 
 /** Everything the workbench shows about one binary, from REA. */
 export type Program = {
@@ -97,5 +110,9 @@ export type Program = {
   readonly resources?: ApkFiles;
   /** The functions that use the string at an address, for engines that can follow references to data. */
   readonly codeUsing?: (addr: string) => Promise<readonly string[]>;
+  /** Adds a C declaration to the engine's types and reads `at` as it when given; only engines that take C types have it. */
+  readonly defineCType?: (declaration: string, at: string | null) => Promise<void>;
+  /** The chain of direct calls from one function to another, for engines with their own search; others walk `refs`. */
+  readonly callPath?: (from: string, to: string) => Promise<CallPath>;
 };
 

@@ -73,6 +73,8 @@ run("M9: lldb-dap launches a program, stops at a breakpoint, reads a local, and 
     expect(scopes.some((s) => /register/i.test(s.name))).toBe(true);
     expect((await client.threads()).some((t) => t.id === tid)).toBe(true);
     expect(await client.evaluate("answer + 1", frames[0]?.id ?? null)).toContain("43");
+    const where = /0x[0-9a-f]+/.exec(await client.evaluate("&answer", frames[0]?.id ?? null))?.[0] ?? "";
+    expect([...(await client.readMemory(where, 4))]).toEqual([42, 0, 0, 0]);
 
     await client.next(tid, "instruction");
     await events.wait("stopped");
@@ -81,6 +83,37 @@ run("M9: lldb-dap launches a program, stops at a breakpoint, reads a local, and 
     await events.wait("exited");
     const printed = await events.wait("output");
     expect(JSON.stringify(printed.body)).toContain("hello");
+  } finally {
+    await client.disconnect();
+  }
+}, 60_000);
+
+const LOOP = ["#include <stdio.h>", "__attribute__((noinline)) int step(int i) { return i * 2; }", "int main(void) {", "  int total = 0;", "  for (int i = 0; i < 10; i++) total += step(i);", "  printf(\"%d\\n\", total);", "  return 0;", "}", ""].join("\n");
+
+run("M9: an instruction breakpoint with a condition stops only when it holds", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "eleven-dap-cond-"));
+  const src = join(dir, "loop.c");
+  const bin = join(dir, "loop");
+  writeFileSync(src, LOOP);
+  execFileSync("cc", ["-O0", src, "-o", bin]);
+  const address = `0x${/([0-9a-f]+) T _step$/m.exec(execFileSync("nm", [bin], { encoding: "utf8" }))?.[1]?.replace(/^0+/, "") ?? ""}`;
+
+  const client = new DapClient(adapter as string);
+  const events = new Events(client);
+  try {
+    await client.initialize();
+    const launched = client.launch({ program: bin, stopOnEntry: false });
+    await events.wait("initialized");
+    await client.setInstructionBreakpoints([address], new Map([[address, "$x0 == 7"]]));
+    await client.configurationDone();
+    await launched;
+
+    const stopped = await events.wait("stopped");
+    const frames = await client.stackTrace(threadId(stopped));
+    expect(frames[0]?.name).toContain("step");
+    expect(await client.evaluate("$x0", frames[0]?.id ?? null)).toMatch(/0x0*7\b/);
+    await client.continue(threadId(stopped));
+    await events.wait("exited");
   } finally {
     await client.disconnect();
   }

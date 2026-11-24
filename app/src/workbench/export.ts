@@ -7,6 +7,8 @@ import { currentSettings, pathSetting } from "../settings/store";
 import { isRecord, recordField, stringField } from "../lib/guards";
 import { rea } from "../engine/rea";
 import type { Program } from "./model";
+import { projectReport } from "./report";
+import { loadProject } from "../engine/project";
 import { openExternal, reveal } from "../lib/platform";
 
 export type ObjcEntry = { readonly address: string; readonly name: string };
@@ -33,7 +35,7 @@ export async function exportPath(program: Program, file: string): Promise<string
   return join(dir, file);
 }
 
-async function write(program: Program, file: string, body: string): Promise<string> {
+async function write(program: Pick<Program, "name">, file: string, body: string): Promise<string> {
   const dir = join(exportDir(), safe(program.name));
   await mkdir(dir, { recursive: true });
   const path = join(dir, file);
@@ -87,6 +89,17 @@ export async function exportObjcInventory(program: Program): Promise<string> {
   const classes = entries(classReply, "classes");
   const protocols = entries(protoReply, "protocols");
   return write(program, `${safe(program.name)}-objc.txt`, objcInventory(program.name, classes, protocols));
+}
+
+/** Writes everything found in the project as a Markdown report beside the other exports. */
+export function exportReport(program: Program): Promise<string> {
+  const original = new Map(program.functions.map((fn) => [fn.addr, fn.name]));
+  return writeReport(program.name, program.id, (addr) => original.get(addr) ?? addr);
+}
+
+/** The report for a project by name and id, for callers with no Program, like an agent's tool call. */
+export function writeReport(name: string, id: string, originalName: (addr: string) => string): Promise<string> {
+  return write({ name }, `${safe(name)}-report.md`, projectReport(name, loadProject(id), originalName));
 }
 
 /** Functions per REA call, so each call ends well inside its deadline and a stopped export keeps what it wrote. */

@@ -21,3 +21,8 @@ export function startAppBridge(): void {
 export function useLiveChat(chat: Chat): void {
   latest = chat;
 }
+
+/** The chat on screen, for a message row that needs more than its own thread; null before the window starts. */
+export function liveChat(): Chat | null {
+  return latest;
+}

@@ -18,6 +18,7 @@ import { ChainOfThought, ChainOfThoughtResults, ChainOfThoughtStep } from "./Cha
 import { Sources, sourcesOf } from "./Sources";
 import { copyText } from "./useThread";
 import { shownText } from "../skills/load";
+import { liveChat } from "../bridge/live";
 
 const PREVIEW_CHARS = 1200;
 
@@ -240,6 +241,7 @@ function chainLabel(turn: AgentTurn, steps: number, now: number): string {
       return t("chat.chain.stopped", { steps: count });
     case "done":
     case "failed":
+    case "refused":
       return turn.endedAt === null ? t("chat.chain.worked", { steps: count }) : t("chat.chain.workedIn", { steps: count, time: seconds(turn.endedAt - turn.startedAt) });
     default: {
       const unhandled: never = turn.outcome;
@@ -259,6 +261,24 @@ function mentionedFunctions(turn: AgentTurn): readonly string[] {
 
 function replyText(turn: AgentTurn): string {
   return turn.blocks.flatMap((block) => (block.kind === "text" ? [block.text.trim()] : [])).join("\n\n");
+}
+
+/** After a refusal: the same question goes to another installed agent with one click. */
+function OtherAgents(): ReactElement | null {
+  const { p } = useTheme();
+  const chat = liveChat();
+  if (!chat) return null;
+  const others = chat.agents.list.filter((agent) => agent.id !== chat.agents.selected.id && chat.agents.installed.has(agent.id));
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ fontSize: 12.5, color: p.text3 }}>{others.length > 0 ? t("chat.refused.tryOther", { name: chat.agents.selected.name }) : t("chat.refused.noOther", { name: chat.agents.selected.name })}</div>
+      {others.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {others.map((agent) => <JumpButton key={agent.id} label={t("chat.refused.askWith", { name: agent.name })} onClick={() => chat.tryWith(agent.id)} />)}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function TurnFooter({ turn, last, onRetry }: { readonly turn: AgentTurn; readonly last: boolean; readonly onRetry: () => void }): ReactElement | null {
@@ -324,6 +344,7 @@ function AgentReply({ turn, last, onRetry, onOpen, onOpenText }: {
           {mentionedFunctions(turn).map((name) => <JumpButton key={name} label={t("chat.open", { name })} onClick={() => onOpen(name)} />)}
         </div>
       )}
+      {turn.outcome === "refused" && last && <OtherAgents />}
       <TurnFooter turn={turn} last={last} onRetry={onRetry} />
     </div>
   );

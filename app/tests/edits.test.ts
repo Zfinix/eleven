@@ -7,8 +7,8 @@ import type { Author } from "../src/engine/edits";
 
 process.env.ELEVEN_SUPPORT = mkdtempSync(join(tmpdir(), "eleven-edits-"));
 
-const { diffProjects, record, redoTarget, undoTarget, YOU } = await import("../src/engine/edits");
-const { accept, decline, pending, propose, redo, undo } = await import("../src/engine/history");
+const { diffProjects, evidenceAddress, parseEvidence, record, redoTarget, unbacked, undoTarget, YOU } = await import("../src/engine/edits");
+const { accept, decline, dependents, pending, propose, redo, standingGuesses, undo, withdraw } = await import("../src/engine/history");
 const { EMPTY_PROJECT, loadProject, updateProject } = await import("../src/engine/project");
 
 const CLAUDE: Author = { kind: "agent", agent: "Claude", chat: "chat-1" };
@@ -93,4 +93,53 @@ test("edits: breakpoints are saved with the project and can be undone", () => {
   expect([...loadProject(id).breakpoints]).toEqual([["0x100003e68", "on"]]);
   undo(id);
   expect(loadProject(id).breakpoints.size).toBe(0);
+});
+
+test("evidence: items that name an address are kept, the rest dropped", () => {
+  expect(parseEvidence('0x100004906 string "COLUMNS", 0x1000016d8 calls getenv\nit looked like a parser, 0x100004906 string "COLUMNS"')).toEqual(['0x100004906 string "COLUMNS"', "0x1000016d8 calls getenv"]);
+  expect(parseEvidence("I just know")).toEqual([]);
+  expect(evidenceAddress("0x1000016D8 calls getenv")).toBe("0x1000016d8");
+});
+
+test("evidence: an agent's rename keeps what it read, and one with nothing is a guess", () => {
+  const id = "evidence";
+  updateProject(id, (project) => ({ ...project, names: new Map(project.names).set("0x10", "read_columns") }), CLAUDE, ["0x100004906 string \"COLUMNS\""]);
+  updateProject(id, (project) => ({ ...project, names: new Map(project.names).set("0x20", "do_thing") }), CLAUDE);
+  rename(id, "0x30", "mine", YOU);
+  const [backed, guess, yours] = loadProject(id).edits;
+  expect(backed?.evidence).toEqual(['0x100004906 string "COLUMNS"']);
+  expect(backed && unbacked(backed)).toBe(false);
+  expect(guess && unbacked(guess)).toBe(true);
+  expect(yours && unbacked(yours)).toBe(false);
+  const suggested = propose(id, "notes", "0x10", "reads COLUMNS", CLAUDE, undefined, ["0x100004906 string"]);
+  accept(id, [suggested.id]);
+  expect(loadProject(id).edits.find((edit) => edit.id === suggested.id)?.evidence).toEqual(["0x100004906 string"]);
+});
+
+test("withdraw: taking back a rename takes back what was built on it, and nothing else", () => {
+  const id = "withdraw";
+  updateProject(id, (project) => ({ ...project, names: new Map(project.names).set("0x10", "parse_args") }), CLAUDE, ["0x10 reads argv"]);
+  const [renamed] = loadProject(id).edits;
+  updateProject(id, (project) => ({ ...project, notes: new Map(project.notes).set("0x20", "main hands argv to parse_args") }), CLAUDE, ["0x20 calls 0x10"]);
+  updateProject(id, (project) => ({ ...project, comments: new Map(project.comments).set("0x24", "flag check") }), CLAUDE, ["0x10 compares the flag"]);
+  updateProject(id, (project) => ({ ...project, notes: new Map(project.notes).set("0x30", "prints usage") }), CLAUDE, ["0x30 calls puts"]);
+  if (!renamed) throw new Error("no rename was logged");
+  expect(dependents(loadProject(id), renamed.id).map((edit) => edit.key)).toEqual(["0x20", "0x24"]);
+  expect(withdraw(id, renamed.id)).toBe(3);
+  const project = loadProject(id);
+  expect(project.names.has("0x10")).toBe(false);
+  expect(project.notes.has("0x20")).toBe(false);
+  expect(project.comments.has("0x24")).toBe(false);
+  expect(project.notes.get("0x30")).toBe("prints usage");
+});
+
+test("guesses: only an agent's unbacked marks that still stand are left to check", () => {
+  const id = "guesses";
+  updateProject(id, (project) => ({ ...project, names: new Map(project.names).set("0x10", "guess_one") }), CLAUDE);
+  updateProject(id, (project) => ({ ...project, names: new Map(project.names).set("0x20", "backed") }), CLAUDE, ["0x20 calls getenv"]);
+  updateProject(id, (project) => ({ ...project, notes: new Map(project.notes).set("0x30", "a hunch") }), CLAUDE);
+  rename(id, "0x30", "mine", YOU);
+  updateProject(id, (project) => ({ ...project, names: new Map(project.names).set("0x40", "overwritten") }), CLAUDE);
+  rename(id, "0x40", "fixed_by_you", YOU);
+  expect(standingGuesses(loadProject(id)).map((edit) => [edit.field, edit.key])).toEqual([["names", "0x10"], ["notes", "0x30"]]);
 });

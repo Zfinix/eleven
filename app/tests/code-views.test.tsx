@@ -13,6 +13,7 @@ import { foldGroups, layoutGraph } from "../src/workbench/cfg";
 import { findInBytes, lineMatcher } from "../src/workbench/Find";
 import { graphPdf } from "../src/workbench/graphPdf";
 import { WorkbenchView } from "../src/workbench/Workbench";
+import { updateProject } from "../src/engine/project";
 import { NO_GPU, SAMPLE_PROGRAM } from "./fixtures/sampleProgram";
 import { Screen } from "./harness";
 
@@ -177,4 +178,40 @@ test("palette: typing then Return opens the top match; shortcuts read as plain t
   screen.type("Search functions, strings and actions", "cmd-a backspace F U N _ 1 0 0 0 0 4 0 8 8 enter");
   await screen.until(() => screen.labelled("Search functions, strings and actions") === null, 5_000);
   expect(screen.labelled("FUN_100004088 (preview, click again to keep it open)")).not.toBeNull();
+}, 60_000);
+
+test("palette: a call path from one function to another opens as steps", async () => {
+  screen.clickLabel("entry");
+  await screen.until(() => screen.texts().includes("0x100000960"), 20_000);
+  press("k");
+  await screen.until(() => screen.labelled("Search functions, strings and actions") !== null, 5_000);
+  screen.type("Search functions, strings and actions", "c a l l space p a t h");
+  await screen.until(() => screen.text().includes("Find a call path from here…"), 5_000);
+  screen.click("Find a call path from here…");
+  await screen.until(() => screen.text().includes("Path from entry to…"), 5_000);
+  screen.type("Search functions, strings and actions", "1 9 f c enter");
+  await screen.until(() => screen.text().includes("How entry reaches FUN_1000019fc"), 10_000);
+  await screen.until(() => screen.texts().includes("FUN_1000016d8"), 10_000);
+  expect(screen.texts().filter((text) => text === "0x1000016d8" || text === "0x1000019fc")).toEqual(["0x1000016d8", "0x1000019fc"]);
+}, 60_000);
+
+test("palette: the notebook links the addresses written in it, and guesses list what agents left unproven", async () => {
+  press("k");
+  await screen.until(() => screen.labelled("Search functions, strings and actions") !== null, 5_000);
+  screen.type("Search functions, strings and actions", "n o t e b o o k");
+  await screen.until(() => screen.text().includes("Open the notebook"), 5_000);
+  screen.click("Open the notebook");
+  await screen.until(() => screen.labelled(`Notebook for ${SAMPLE_PROGRAM.name}`) !== null, 5_000);
+  screen.type(`Notebook for ${SAMPLE_PROGRAM.name}`, "e n t r y space i s space 0 x 1 0 0 0 0 0 9 6 0");
+  await screen.until(() => screen.text().includes("Addresses in this page"), 5_000);
+  expect(screen.texts().some((text) => text.includes("0x100000960"))).toBe(true);
+
+  updateProject(SAMPLE_PROGRAM.id, (project) => ({ ...project, names: new Map(project.names).set("0x100004088", "maybe_usage") }), { kind: "agent", agent: "Claude", chat: null });
+  press("k");
+  await screen.until(() => screen.labelled("Search functions, strings and actions") !== null, 5_000);
+  screen.type("Search functions, strings and actions", "g u e s s e s");
+  await screen.until(() => screen.text().includes("Show guesses to check"), 5_000);
+  screen.click("Show guesses to check");
+  await screen.until(() => screen.text().includes("1 guesses to check"), 5_000);
+  expect(screen.texts().some((text) => text.includes("maybe_usage"))).toBe(true);
 }, 60_000);

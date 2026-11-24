@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 
 import { useGpuix } from "@gpuix/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { AgentEntry } from "../agents/registry";
 import { documentPath } from "../engine/document";
@@ -76,6 +76,8 @@ export type Chat = {
   readonly openFile: () => void;
   readonly detach: () => void;
   readonly pickAgent: (id: string) => void;
+  /** Switches this chat to another agent and asks it the last question again. */
+  readonly tryWith: (id: string) => void;
 };
 
 function replaced<T>(list: readonly T[], index: number, value: T): readonly T[] {
@@ -277,6 +279,18 @@ export function useChat(target: Target | null, onTarget: (target: Target | null)
     setTabs((prev) => ({ ...prev, agentIds: replaced(prev.agentIds, prev.active, id) }));
     if (thread.state.messages.length > 0) thread.note(t("chat.note.switchedAgents"));
   };
+  const askAgain = useRef(false);
+  const activeAgent = agentAt(tabs.active).id;
+  useEffect(() => {
+    if (!askAgain.current) return;
+    askAgain.current = false;
+    thread.retry();
+  }, [activeAgent]);
+  const tryWith = (id: string): void => {
+    if (id === activeAgent) return;
+    askAgain.current = true;
+    pickAgent(id);
+  };
   const list = tabs.order.map((slot): ChatTab => {
     const open = at(slot);
     return { id: open.id, title: titleOf(open, saved) ?? t("chat.untitled"), busy: open.busy, active: slot === tabs.active, agent: agentAt(slot).id, found: lastFinding(open.state.messages) };
@@ -300,6 +314,7 @@ export function useChat(target: Target | null, onTarget: (target: Target | null)
     openFile: () => void openFile(),
     detach: () => retarget(null),
     pickAgent,
+    tryWith,
     slicePrompt,
   };
 }

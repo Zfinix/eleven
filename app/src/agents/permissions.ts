@@ -23,7 +23,7 @@ function elevenToolName(tool: string): string | null {
 
 const SUGGESTS_ELEVEN = ["propose_patch"] as const;
 
-const EDITS_ELEVEN = ["rename_function", "add_note", "add_comment", "bookmark", "set_code_type", "set_number_format", "set_breakpoint"] as const;
+const EDITS_ELEVEN = ["rename_function", "add_note", "add_comment", "bookmark", "set_code_type", "set_number_format", "define_c_type", "add_to_notebook", "set_breakpoint"] as const;
 
 /** Eleven tools that only file a suggestion for review, so asking first would make the user approve it twice. */
 export function onlySuggests(tool: string, reviewAgentEdits: boolean): boolean {
@@ -33,10 +33,10 @@ export function onlySuggests(tool: string, reviewAgentEdits: boolean): boolean {
 }
 
 const TOOL_KIND: Readonly<Record<string, PermissionTool>> = {
-  open_function: "view", current_view: "view", set_view: "view", list_marks: "view",
-  rename_function: "rename", add_note: "notes", add_comment: "notes", bookmark: "notes", set_code_type: "notes", set_number_format: "notes",
+  open_function: "view", current_view: "view", set_view: "view", list_marks: "view", search_projects: "view", export_report: "view", second_opinion: "view", read_crash_report: "view",
+  rename_function: "rename", add_note: "notes", add_comment: "notes", bookmark: "notes", set_code_type: "notes", set_number_format: "notes", define_c_type: "notes", add_to_notebook: "notes",
   propose_patch: "patch", gpu_profile: "gpu",
-  debug_start: "debug", debug_state: "view", debug_control: "debug", debug_evaluate: "debug", set_breakpoint: "debug",
+  debug_start: "debug", debug_state: "view", debug_control: "debug", debug_evaluate: "debug", debug_memory: "view", set_breakpoint: "debug",
 };
 
 /** Which row of the Permissions page governs a tool call. */

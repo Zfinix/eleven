@@ -146,6 +146,59 @@ function codeType(value: string | undefined): CodeType | null {
   return isCodeType(value) ? value : null;
 }
 
+function changedKeys(before: ReadonlyMap<string, string>, after: ReadonlyMap<string, string>): readonly string[] {
+  return [...new Set([...before.keys(), ...after.keys()])].filter((key) => before.get(key) !== after.get(key));
+}
+
+/**
+ * Hands every C type change in the project to the engine: a new or edited
+ * declaration is added, a placement reads its bytes as that type, a removed
+ * placement clears them. A change the engine refuses is taken back.
+ */
+function useCTypes(program: Program, wb: WorkbenchState): void {
+  useEffect(() => {
+    const define = program.defineCType;
+    const retype = program.retype;
+    if (!define || !program.id) return;
+    const queue = new SerialQueue();
+    let applied = loadProject(program.id);
+    return onProjectChange((id) => {
+      if (id !== program.id) return;
+      const before = applied;
+      const after = loadProject(id);
+      applied = after;
+      const types = changedKeys(before.ctypes, after.ctypes).filter((name) => after.ctypes.has(name));
+      const places = changedKeys(before.ctypeAt, after.ctypeAt);
+      if (types.length === 0 && places.length === 0) return;
+      void queue.run(async () => {
+        const undo = (field: "ctypes" | "ctypeAt", key: string, was: string | null, err: unknown): void => {
+          updateProject(program.id, (project) => setValue(project, field, key, was), null);
+          applied = loadProject(program.id);
+          wb.notify(t("workbench.ctype.failed", { what: key, error: errorMessage(err) }), null);
+        };
+        for (const name of types) {
+          try {
+            await define(after.ctypes.get(name) ?? "", null);
+          } catch (err) {
+            undo("ctypes", name, before.ctypes.get(name) ?? null, err);
+          }
+        }
+        for (const addr of places) {
+          const name = after.ctypeAt.get(addr);
+          const declaration = name ? after.ctypes.get(name) : undefined;
+          try {
+            if (declaration) await define(declaration, addr);
+            else if (retype) await retype(addr, "undefined", null);
+          } catch (err) {
+            undo("ctypeAt", addr, before.ctypeAt.get(addr) ?? null, err);
+          }
+        }
+        wb.reread();
+      });
+    });
+  }, [program]);
+}
+
 /** Hands every type change in the project (yours, undo, redo) to the engine, then has open views read the code again. */
 function useRetyping(program: Program, wb: WorkbenchState): void {
   useEffect(() => {
@@ -223,6 +276,7 @@ function useBenchValue(program: Program, onBack: () => void, openTarget: (target
   const fallback = program.functions[0]?.addr ?? "";
   const focusAddr = tab?.kind === "fn" ? tab.addr : (program.functions.find((f) => f.name === "entry")?.addr ?? fallback);
   useRetyping(program, wb);
+  useCTypes(program, wb);
   const functions = useMemo(() => withTypes(program.functions, s.types), [program, s.types]);
   const shown = useMemo(() => (functions === program.functions ? program : { ...program, functions }), [program, functions]);
   const byAddr = useMemo(() => new Map(functions.map((f) => [f.addr, f.name])), [functions]);

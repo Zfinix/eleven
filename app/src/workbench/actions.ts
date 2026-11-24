@@ -153,6 +153,18 @@ function targetOf(b: Bench, subject: Subject): TabTarget | null {
           return { kind: "diff" };
         case "debug":
           return { kind: "debug" };
+        case "path":
+          return { kind: "path", from: tab.from, to: tab.to };
+        case "second":
+          return { kind: "second", addr: tab.addr };
+        case "ctypes":
+          return { kind: "ctypes", at: tab.at };
+        case "crash":
+          return { kind: "crash", file: tab.file };
+        case "notebook":
+          return { kind: "notebook" };
+        case "guesses":
+          return { kind: "guesses" };
         case "listing":
           return { kind: "listing" };
         case "source":

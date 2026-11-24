@@ -1,5 +1,5 @@
 
-import { forgetCode, rea, type Opened } from "../engine/rea";
+import { forgetCode, rea, type Opened, type SavedCTypes } from "../engine/rea";
 import { type CodeType, isCodeType } from "../engine/codeTypes";
 import { bundleOf, type Target } from "../engine/target";
 import { type ApkFiles } from "../engine/apk";
@@ -7,6 +7,7 @@ import { bundleFiles } from "../engine/apple";
 import { loadDossier } from "../engine/dossier";
 import { loadProject, projectId } from "../engine/project";
 import { codeUsingString, hexRows, programSegments, programStrings } from "./layout";
+import { parseReaCallPath } from "../engine/callPath";
 import type { Fn, Program, TableRow } from "./model";
 import { forgetProcedures, loadProcedures, type Procedure } from "../engine/procedures";
 import { activeBackend, activeEngine, rizinInstalled } from "../analysis/engines";
@@ -18,6 +19,20 @@ const HEX_BYTES = 256;
 const CODE_USING_LIMIT = 12;
 
 const LOG_WIDTH = 37;
+
+/** A project's C types for Ghidra to add again on reopening: declarations first, then each placement with its declaration. */
+function savedCTypes(id: string): () => SavedCTypes {
+  return () => {
+    const { ctypes, ctypeAt } = loadProject(id);
+    return {
+      declarations: [...ctypes.values()],
+      placements: [...ctypeAt].flatMap(([addr, name]) => {
+        const declaration = ctypes.get(name);
+        return declaration ? [[addr, declaration] as const] : [];
+      }),
+    };
+  };
+}
 
 /** The types saved in a project, in the order they were set, to mark again when the engine reopens the file. */
 function savedTypes(id: string): () => readonly (readonly [string, CodeType])[] {
@@ -168,6 +183,7 @@ async function loadProgramRea(target: Target): Promise<Program> {
   const sha256 = projectId(target);
   const opened: Opened = { path: target.path, sha256, format: "", architecture: target.arch };
   rea.replayOn(target.path, savedTypes(sha256));
+  rea.replayCTypesOn(target.path, savedCTypes(sha256));
   const procedures = await timed(log, "list_procedures", () => loadProcedures(target.path, sha256));
   const functions: readonly Fn[] = procedures
     .filter((p) => p.kind !== "External")
@@ -204,6 +220,11 @@ async function loadProgramRea(target: Target): Promise<Program> {
     },
     dossier: (addr) => loadDossier(opened, addr),
     codeUsing: (addr) => timed(log, `xrefs ${addr}`, () => codeUsingString(target.path, addr, CODE_USING_LIMIT)),
+    defineCType: async (declaration, at) => {
+      await timed(log, `define_c_type${at ? ` ${at}` : ""}`, () => rea.defineCType(target.path, declaration, at));
+      await forgetCode(sha256);
+    },
+    callPath: async (from, to) => parseReaCallPath(await timed(log, `trace_call_path ${from} ${to}`, () => rea.tool(target.path, "trace_call_path", { start: from, goal: to, direction: "forward" }))),
     hex: (addr) => hexRows(target.path, addr),
     focusLine: () => -1,
     retype: async (addr, next) => {

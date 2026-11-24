@@ -64,6 +64,7 @@ export function recreatePrompt(req: RecreateRequest): string {
       : ["Nothing in the binary points to the file directly. Find its code yourself from the types and strings here.", ""]),
     ...(req.strings.length ? ["Strings that mention it:", ...req.strings.map((text) => `- ${JSON.stringify(text)}`), ""] : []),
     "Write the whole file the way its author likely wrote it: imports, type declarations, stored properties, then methods. Keep the behavior exactly. Name things from what the code makes clear, and keep unknown calls by their current names.",
+    "Where the binary doesn't show something and you filled it in (a field, a type, a parameter name, a default value, a missing branch), end that line with `// guessed`, so the reader knows what you inferred rather than read. Never fill a gap silently.",
     "Right above each declaration that comes from one of the functions above, put a line with only `// @` and its address, for example `// @0x1000a3184`. Eleven turns those into links and removes them.",
     `Reply with one \`\`\`${language.fence} code block holding the whole file, and nothing else.`,
     ...req.pseudocode.flatMap((fn) => ["", `Pseudocode of ${fn.name} (${fn.addr}):`, "```c", fn.code, "```"]),

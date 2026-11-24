@@ -12,6 +12,12 @@ import { CODE_LANGUAGES, type CodeLanguage, useSettings } from "../settings/stor
 import { RewriteView } from "./RewriteView";
 import { CodeLines } from "./CodeLines";
 import { DebugView } from "./DebugView";
+import { PathView } from "./PathView";
+import { SecondOpinion } from "./SecondOpinion";
+import { CTypesView } from "./CTypesView";
+import { CrashView } from "./CrashView";
+import { NotebookView } from "./NotebookView";
+import { GuessesView } from "./GuessesView";
 import { DiffView } from "./DiffView";
 import { ModelTab, ProfileTab, ShaderTab } from "./GpuTabs";
 import { Graph } from "./Graph";
@@ -196,6 +202,18 @@ function Body({ tab }: { readonly tab: Tab | undefined }): ReactElement {
       return <DiffView />;
     case "debug":
       return <DebugView />;
+    case "path":
+      return <PathView from={tab.from} to={tab.to} />;
+    case "second":
+      return <SecondOpinion addr={tab.addr} />;
+    case "ctypes":
+      return <CTypesView at={tab.at} />;
+    case "crash":
+      return <CrashView file={tab.file} />;
+    case "notebook":
+      return <NotebookView />;
+    case "guesses":
+      return <GuessesView />;
     case "listing":
       return <Listing />;
     case "source":
@@ -218,7 +236,7 @@ function Body({ tab }: { readonly tab: Tab | undefined }): ReactElement {
 }
 
 function ownsScroll(tab: Tab | undefined): boolean {
-  if (tab?.kind === "list" || tab?.kind === "listing" || tab?.kind === "thread" || tab?.kind === "text") return true;
+  if (tab?.kind === "list" || tab?.kind === "listing" || tab?.kind === "thread" || tab?.kind === "text" || tab?.kind === "second" || tab?.kind === "ctypes" || tab?.kind === "crash" || tab?.kind === "notebook" || tab?.kind === "guesses") return true;
   if (tab?.kind === "model") return pageOwnsScroll(tab.page);
   if (tab?.kind === "tool") return fillsSpace(tab.tool);
   return tab?.kind === "fn" && tab.view !== "hex";

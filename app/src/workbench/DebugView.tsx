@@ -2,7 +2,7 @@ import { useCommand } from "../lib/shortcuts";
 import { type ReactElement, useEffect, useRef, useState } from "react";
 
 import { scrollbar, useTheme } from "../theme";
-import { type Debug, type DebugProblem, useDebug, type DebugStatus, type LoadedScope, type OutputLine } from "../debug/useDebug";
+import { breakpointConditions, type Debug, type DebugProblem, useDebug, type DebugStatus, type LoadedScope, type OutputLine } from "../debug/useDebug";
 import type { StackFrame, Thread, Variable } from "../debug/dap";
 import { ask } from "./actions";
 import { claimDebugStart } from "../debug/live";
@@ -11,15 +11,19 @@ import { useSettings } from "../settings/store";
 import { type PlainId, t } from "../i18n";
 import { Dot } from "../components/ui";
 import { HOVER, IconButton, MONO_STYLE, SegItem, TextButton, useBench } from "./parts";
+import { hexRowsOf } from "../engine/hexRows";
+import { StepChanges } from "../debug/changes";
+import type { HexRow } from "./model";
 
 type Stopped = Extract<DebugStatus, { kind: "stopped" }>;
 
-type Page = "stack" | "threads" | "registers" | "breakpoints" | "output";
+type Page = "stack" | "threads" | "registers" | "memory" | "breakpoints" | "output";
 
 const PAGES: readonly { readonly page: Page; readonly label: PlainId }[] = [
   { page: "stack", label: "debug.page.stack" },
   { page: "threads", label: "debug.page.threads" },
   { page: "registers", label: "debug.page.registers" },
+  { page: "memory", label: "debug.page.memory" },
   { page: "breakpoints", label: "debug.page.breakpoints" },
   { page: "output", label: "debug.page.output" },
 ];
@@ -69,8 +73,11 @@ function Frames({ frames }: { readonly frames: readonly StackFrame[] }): ReactEl
   );
 }
 
-function VarRow({ v, load, depth }: { readonly v: Variable; readonly load: (reference: number) => Promise<readonly Variable[]>; readonly depth: number }): ReactElement {
+const seen = new StepChanges();
+
+function VarRow({ v, load, depth, stop, path }: { readonly v: Variable; readonly load: (reference: number) => Promise<readonly Variable[]>; readonly depth: number; readonly stop: number; readonly path: string }): ReactElement {
   const { p } = useTheme();
+  const changed = seen.changed(stop, path, v.value);
   const [open, setOpen] = useState(false);
   const [children, setChildren] = useState<readonly Variable[] | null>(null);
   const limit = useVarLimit();
@@ -85,14 +92,14 @@ function VarRow({ v, load, depth }: { readonly v: Variable; readonly load: (refe
       <div onClick={toggle} style={{ display: "flex", userSelect: "text", gap: 8, fontSize: 12, paddingLeft: depth * 14, ...(expandable ? { cursor: "pointer", hover: HOVER } : {}), ...MONO_STYLE }}>
         <div style={{ flexShrink: 0, width: 10, color: p.muted }}>{expandable ? (open ? "▾" : "▸") : ""}</div>
         <div style={{ flexShrink: 0, color: p.text }}>{v.name}</div>
-        <div style={{ flexGrow: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: p.string }}>{v.value}</div>
+        <div {...(changed ? { "aria-label": t("debug.changed", { name: v.name }) } : {})} style={{ flexGrow: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: changed ? p.data : p.string, ...(changed ? { fontWeight: 600 } : {}) }}>{v.value}</div>
       </div>
-      {open && children?.map((child, ix) => <VarRow key={`${child.name}:${ix}`} v={child} load={load} depth={depth + 1} />)}
+      {open && children?.map((child, ix) => <VarRow key={`${child.name}:${ix}`} v={child} load={load} depth={depth + 1} stop={stop} path={`${path}/${child.name}`} />)}
     </div>
   );
 }
 
-function Scopes({ scopes, load }: { readonly scopes: readonly LoadedScope[]; readonly load: (reference: number) => Promise<readonly Variable[]> }): ReactElement {
+function Scopes({ scopes, load, stop }: { readonly scopes: readonly LoadedScope[]; readonly load: (reference: number) => Promise<readonly Variable[]>; readonly stop: number }): ReactElement {
   const { p } = useTheme();
   const limit = useVarLimit();
   return (
@@ -102,7 +109,7 @@ function Scopes({ scopes, load }: { readonly scopes: readonly LoadedScope[]; rea
         <div key={scope.name} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <Heading text={scope.name} />
           {scope.vars.length === 0 && <div style={{ color: p.muted }}>{t("debug.nothingHere")}</div>}
-          {scope.vars.slice(0, limit).map((v, ix) => <VarRow key={`${v.name}:${ix}`} v={v} load={load} depth={0} />)}
+          {scope.vars.slice(0, limit).map((v, ix) => <VarRow key={`${v.name}:${ix}`} v={v} load={load} depth={0} stop={stop} path={`${scope.name}/${v.name}`} />)}
           {scope.vars.length > limit && <div style={{ fontSize: 11.5, color: p.faint }}>{t("debug.more", { count: (scope.vars.length - limit).toLocaleString() })}</div>}
         </div>
       ))}
@@ -147,6 +154,43 @@ function Output({ lines }: { readonly lines: readonly OutputLine[] }): ReactElem
   );
 }
 
+/** The paused program's memory around an address or expression, in rows of 16 bytes. */
+function Memory({ debug }: { readonly debug: Debug }): ReactElement {
+  const { p } = useTheme();
+  const [where, setWhere] = useState("$sp");
+  const [shown, setShown] = useState<{ readonly rows: readonly HexRow[] } | { readonly problem: string } | null>(null);
+  const read = (): void => {
+    void (async (): Promise<void> => {
+      try {
+        const { address, bytes } = await debug.readMemory(where);
+        setShown({ rows: hexRowsOf([...bytes].map((b) => b.toString(16).padStart(2, "0")).join(""), address) });
+      } catch (err) {
+        setShown({ problem: err instanceof Error ? err.message : String(err) });
+      }
+    })();
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <input {...TYPING} value={where} placeholder={t("debug.memory.placeholder")} aria-label={t("debug.memory.where")} onChange={(e) => setWhere(e.value ?? "")} onSubmit={read} style={{ flexGrow: 1, minWidth: 0, height: 28, paddingLeft: 8, paddingRight: 8, borderRadius: 6, backgroundColor: p.deep, fontSize: 12, color: p.text, ...MONO_STYLE }} />
+        <TextButton label={t("debug.memory.read")} tone="outline" onClick={read} />
+      </div>
+      {shown && "problem" in shown && <div role="alert" style={{ fontSize: 12, color: p.error }}>{shown.problem}</div>}
+      {shown && "rows" in shown && (
+        <div style={{ display: "flex", flexDirection: "column", userSelect: "text", fontSize: 11.5, ...MONO_STYLE }}>
+          {shown.rows.map((row) => (
+            <div key={row.addr} style={{ display: "flex", gap: 14, whiteSpace: "nowrap" }}>
+              <div style={{ color: p.faint }}>{row.addr}</div>
+              <div style={{ color: p.text }}>{row.bytes}</div>
+              <div style={{ color: p.muted }}>{row.ascii}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Breakpoints(): ReactElement {
   const { p } = useTheme();
   const { program, nameOf, openFn, wb } = useBench();
@@ -164,6 +208,7 @@ function Breakpoints(): ReactElement {
               <div style={{ flexShrink: 0, color: p.text }}>{addr}</div>
               <div style={{ flexGrow: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: p.faint }}>{fn ? nameOf(fn) : ""}</div>
             </div>
+            <input {...TYPING} value={(wb.s.breakpoints.get(addr) ?? "on") === "on" ? "" : (wb.s.breakpoints.get(addr) ?? "")} placeholder={t("debug.breakpoints.condition")} aria-label={t("debug.breakpoints.conditionFor", { addr })} onChange={(e) => wb.setBreakpointCondition(addr, e.value ?? "")} style={{ flexGrow: 1, flexBasis: 0, minWidth: 0, maxWidth: 220, height: 24, paddingLeft: 8, paddingRight: 8, borderRadius: 6, backgroundColor: p.deep, fontSize: 11.5, color: p.text, ...MONO_STYLE }} />
             <IconButton icon="close" label={t("debug.breakpoints.remove")} size={22} iconSize={10} onClick={() => wb.toggleBreakpoint(addr)} />
           </div>
         );
@@ -172,7 +217,7 @@ function Breakpoints(): ReactElement {
   );
 }
 
-function Toolbar({ debug, onAsk }: { readonly debug: Debug; readonly onAsk: (() => void) | null }): ReactElement {
+function Toolbar({ debug, onAsk, runTo }: { readonly debug: Debug; readonly onAsk: (() => void) | null; readonly runTo: (() => void) | null }): ReactElement {
   const { p } = useTheme();
   const { status } = debug;
   const stopped = status.kind === "stopped";
@@ -189,6 +234,7 @@ function Toolbar({ debug, onAsk }: { readonly debug: Debug; readonly onAsk: (() 
       <IconButton icon="debug-step-into" label={t("debug.stepInto")} color={step} onClick={stopped ? debug.stepIn : noop} />
       <IconButton icon="debug-step-out" label={t("debug.stepOut")} color={step} onClick={stopped ? debug.stepOut : noop} />
       <IconButton icon="debug-step-instruction" label={t("debug.stepInstruction")} color={step} onClick={stopped ? debug.stepInstruction : noop} />
+      <IconButton icon="arrow-right" label={t("debug.runToHere")} color={stopped && runTo ? p.link : p.faint} onClick={stopped && runTo ? runTo : noop} />
       <div style={{ width: 8 }} />
       <IconButton icon="debug-restart" label={t("debug.restart")} color={live ? p.string : p.faint} onClick={live ? debug.restart : noop} />
       <IconButton icon="debug-stop" label={t("debug.stop")} color={live ? p.error : p.faint} onClick={live ? debug.stop : noop} />
@@ -227,7 +273,7 @@ function Evaluate({ debug }: { readonly debug: Debug }): ReactElement {
   );
 }
 
-function Session({ debug, page, setPage, onAsk }: { readonly debug: Debug; readonly page: Page; readonly setPage: (page: Page) => void; readonly onAsk: (stopped: Stopped) => void }): ReactElement {
+function Session({ debug, page, setPage, onAsk, runTo }: { readonly debug: Debug; readonly page: Page; readonly setPage: (page: Page) => void; readonly onAsk: (stopped: Stopped) => void; readonly runTo: (() => void) | null }): ReactElement {
   const { p } = useTheme();
   const { program } = useBench();
   const { status } = debug;
@@ -237,16 +283,17 @@ function Session({ debug, page, setPage, onAsk }: { readonly debug: Debug; reado
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12, paddingBottom: 8 }}>
         <Header status={status} name={program.name} />
-        <Toolbar debug={debug} onAsk={stopped ? () => onAsk(stopped) : null} />
+        <Toolbar debug={debug} onAsk={stopped ? () => onAsk(stopped) : null} runTo={runTo} />
       </div>
       <div role="tablist" style={{ display: "flex", flexWrap: "wrap", gap: 2, paddingLeft: 10, paddingRight: 10, paddingBottom: 6 }}>
         {PAGES.map((item) => <SegItem key={item.page} label={t(item.label)} on={page === item.page} onBg={p.sel2} padding={9} onClick={() => setPage(item.page)} />)}
       </div>
       <div style={{ flexGrow: 1, minHeight: 0, overflow: "scroll", ...scrollbar(p), paddingLeft: 12, paddingRight: 12, paddingTop: 4, paddingBottom: 12 }}>
-        {page === "stack" && (stopped ? <div style={{ display: "flex", flexDirection: "column", gap: 12 }}><Frames frames={stopped.frames} /><Scopes scopes={stopped.scopes.filter((scope) => !isRegisters(scope))} load={debug.loadVars} /></div> : waiting)}
+        {page === "stack" && (stopped ? <div style={{ display: "flex", flexDirection: "column", gap: 12 }}><Frames frames={stopped.frames} /><Scopes scopes={stopped.scopes.filter((scope) => !isRegisters(scope))} load={debug.loadVars} stop={stopped.stop} /></div> : waiting)}
         {page === "threads" && (stopped ? <Threads threads={stopped.threads} current={stopped.thread} /> : waiting)}
-        {page === "registers" && (stopped ? <Scopes scopes={stopped.scopes.filter(isRegisters)} load={debug.loadVars} /> : waiting)}
+        {page === "registers" && (stopped ? <Scopes scopes={stopped.scopes.filter(isRegisters)} load={debug.loadVars} stop={stopped.stop} /> : waiting)}
         {page === "breakpoints" && <Breakpoints />}
+        {page === "memory" && <Memory debug={debug} />}
         {page === "output" && <Output lines={debug.output} />}
       </div>
       <div style={{ paddingLeft: 12, paddingRight: 12, paddingBottom: 12 }}>
@@ -272,11 +319,13 @@ export function DebugView(): ReactElement {
   const [pid, setPid] = useState("");
   const { stopAtFunction } = useSettings().settings;
   const breakAt = [...(breakFn && stopAtFunction ? [breakFn] : []), ...wb.s.breakpoints.keys()];
-  useEffect(() => debug.syncBreakpoints(breakAt), [wb.s.breakpoints]);
+  useEffect(() => debug.syncBreakpoints(breakAt, breakpointConditions(wb.s.breakpoints)), [wb.s.breakpoints]);
   const pc = debug.status.kind === "stopped" ? (debug.status.frames[0]?.pc ?? null) : null;
   useEffect(() => wb.patch({ debugPc: pc }), [pc]);
   useEffect(() => () => wb.patch({ debugPc: null }), []);
   const start = (): void => debug.launch(program.path, breakAt);
+  const chosen = wb.s.selected?.kind === "line" ? wb.s.selected.addr : null;
+  const runTo = chosen ? (): void => debug.runTo(chosen, breakAt) : null;
   const latest = useRef(breakAt);
   latest.current = breakAt;
   useEffect(() => {
@@ -302,7 +351,7 @@ export function DebugView(): ReactElement {
     ask(bench, `The debugger stopped (${at.reason}) in ${program.name}.\n\nCall stack:\n${stack}\n\nLocals:\n${locals || "  (none)"}\n\nExplain where it is and what is happening here.`);
   };
   const { status } = debug;
-  if (status.kind === "starting" || status.kind === "running" || status.kind === "stopped") return <Session debug={debug} page={page} setPage={setPage} onAsk={askStopped} />;
+  if (status.kind === "starting" || status.kind === "running" || status.kind === "stopped") return <Session debug={debug} page={page} setPage={setPage} onAsk={askStopped} runTo={runTo} />;
   const breaking = breakFn !== "" && stopAtFunction;
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "scroll", ...scrollbar(p), padding: 16, gap: 12 }}>

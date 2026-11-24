@@ -125,12 +125,11 @@ export function systemDark(): boolean {
   }
 }
 
-/** A desktop notification. */
+/** A desktop notification where the window has no native one. Never on the Mac: there only the app's own notifications are used, under its name and with the permission macOS asks for. */
 export async function notify(title: string, body: string): Promise<void> {
-  const quoted = (text: string): string => `"${text.replace(/["\\]/g, "\\$&")}"`;
   try {
-    if (OS === "mac") await run("osascript", ["-e", `display notification ${quoted(body)} with title ${quoted(title)}`]);
-    else if (OS === "linux") await run("notify-send", [title, body]);
+    if (OS === "mac") return;
+    if (OS === "linux") await run("notify-send", [title, body]);
     else await run("powershell.exe", ["-NoProfile", "-Command", `[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null; $x = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); $t = $x.GetElementsByTagName('text'); $t.Item(0).AppendChild($x.CreateTextNode('${title.replace(/'/g, "''")}')) > $null; $t.Item(1).AppendChild($x.CreateTextNode('${body.replace(/'/g, "''")}')) > $null; [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Eleven').Show([Windows.UI.Notifications.ToastNotification]::new($x))`]);
   } catch {
     return;
