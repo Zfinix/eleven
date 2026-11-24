@@ -2,6 +2,7 @@ import { open, readFile, stat } from "node:fs/promises";
 
 import type { ReactElement } from "react";
 
+import { decompileHermes, hbcDecompiler, hermesSupported } from "../engine/hermes";
 import { type ApkFiles, dartSnapshot, type DartSnapshot, hermesVersion, hexDump, il2cppMetadata, isFlutterCode, type ResourceKind, resourceKind, sizeText } from "../engine/apk";
 import { plistXml } from "../engine/apple";
 import { Button, ErrorCard } from "../components/kit";
@@ -9,7 +10,8 @@ import { useLoaded } from "../lib/useLoaded";
 import { useTheme } from "../theme";
 import { t } from "../i18n";
 import { ask } from "./actions";
-import { useBench } from "./parts";
+import { type Bench, useBench } from "./parts";
+import { errorMessage } from "../lib/guards";
 import { SourceLines } from "./SourceView";
 
 const HEAD = 4096;
@@ -38,6 +40,20 @@ async function readResource(files: ApkFiles, file: string): Promise<Read> {
   return { path, size, kind: kind === "text" ? "binary" : kind, text: hexDump(head), head, ...(dart === undefined ? {} : { dart }) };
 }
 
+/** Decompiles a Hermes bundle with hermes-dec, opens the start of it, and says where the whole file is. */
+function decompileBundle(bench: Bench, name: string, path: string): void {
+  bench.chat.thread.note(t("workbench.view.resource.hermesWorking", { name }));
+  void (async (): Promise<void> => {
+    try {
+      const out = await decompileHermes(path);
+      bench.wb.open({ kind: "text", title: `${name}.js`, text: out.preview }, false);
+      bench.chat.thread.note(t("workbench.view.resource.hermesDone", { lines: out.lines.toLocaleString("en-US"), path: out.file }));
+    } catch (err) {
+      bench.chat.thread.note(t("workbench.view.resource.hermesFailed", { error: errorMessage(err) }));
+    }
+  })();
+}
+
 function Card({ title, detail, children }: { readonly title: string; readonly detail: string; readonly children?: ReactElement }): ReactElement {
   const { p } = useTheme();
   return (
@@ -54,6 +70,7 @@ function abiOf(file: string): string {
 }
 
 function Loaded({ file, read }: { readonly file: string; readonly read: Read }): ReactElement {
+  const { p } = useTheme();
   const bench = useBench();
   const name = file.split("/").pop() ?? file;
   const agent = bench.chat.agents.selected.name;
@@ -85,8 +102,13 @@ function Loaded({ file, read }: { readonly file: string; readonly read: Read }):
       return (
         <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, minHeight: 0 }}>
           <Card title={name} detail={hermesVersion(read.head) === null ? t("workbench.view.resource.hermes", { size: sizeText(read.size) }) : `${t("workbench.view.resource.hermes", { size: sizeText(read.size) })} ${t("workbench.view.resource.hermesVersion", { version: hermesVersion(read.head) ?? 0 })}`}>
-            <Button label={t("workbench.view.resource.askRead", { agent })} tone="ask" onClick={() => ask(bench, `${bench.program.name} is a React Native app. Its JavaScript is compiled to Hermes bytecode at ${read.path}. Read it and tell me what the app does.`)} />
+            <>
+              {hbcDecompiler() !== null && hermesSupported(hermesVersion(read.head) ?? 0) && <Button label={t("workbench.view.resource.hermesDecompile")} tone="primary" icon="pseudocode" onClick={() => decompileBundle(bench, name, read.path)} />}
+              <Button label={t("workbench.view.resource.askRead", { agent })} tone="ask" onClick={() => ask(bench, `${bench.program.name} is a React Native app. Its JavaScript is compiled to Hermes bytecode at ${read.path}. Read it and tell me what the app does.`)} />
+            </>
           </Card>
+          {hbcDecompiler() === null && <div style={{ marginLeft: 16, marginRight: 16, fontSize: 12, color: p.muted }}>{t("workbench.view.resource.hermesInstall")}</div>}
+          {hbcDecompiler() !== null && !hermesSupported(hermesVersion(read.head) ?? 0) && <div style={{ marginLeft: 16, marginRight: 16, fontSize: 12, color: p.muted }}>{t("workbench.view.resource.hermesUnsupported", { version: hermesVersion(read.head) ?? 0 })}</div>}
           <SourceLines source={{ text: read.text, starts: [] }} syntax="code" />
         </div>
       );
