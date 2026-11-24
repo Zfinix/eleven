@@ -7,6 +7,7 @@ import { isRecord } from "./guards";
 import { cacheRoot, OS, unzip } from "./platform";
 import { isNewer } from "./version";
 import { run, startWith } from "./process";
+import { keepsToThisMac } from "./private";
 
 const RELEASES = "https://api.github.com/repos/Zfinix/eleven/releases";
 const MIRROR = "https://dl.chizi.app";
@@ -93,7 +94,7 @@ async function checkForUpdate(app: string): Promise<void> {
 
 export function startUpdates(): void {
   const app = runningApp();
-  if (app === null || !currentSettings().autoUpdate) return;
+  if (app === null || !currentSettings().autoUpdate || keepsToThisMac()) return;
   void (async (): Promise<void> => {
     try {
       await checkForUpdate(app);

@@ -431,6 +431,7 @@ export function buildPages(c: Ctx): Readonly<Record<Page, readonly GroupModel[]>
     privacy: [
       { label: t("settings.group.leaves"), foot: t("settings.leaves.foot", { device: thisDevice() }), rows: [
         info(t("settings.privacy.agent"), t("settings.privacy.agent.desc"), { status: { text: agentName, tone: "quiet" } }),
+        tg("keepOnThisMac", t("settings.keepOnThisMac"), t("settings.keepOnThisMac.desc")),
         tg("hidePaths", t("settings.hidePaths"), t("settings.hidePaths.desc")),
         tg("askBeforeWholeFile", t("settings.askBeforeWholeFile"), t("settings.askBeforeWholeFile.desc")),
       ] },

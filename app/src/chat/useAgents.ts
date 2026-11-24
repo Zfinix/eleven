@@ -4,6 +4,7 @@ import { detectInstalled, type Presence } from "../agents/detect";
 import { type AgentIcon, loadIcons } from "../agents/icons";
 import { type AgentEntry, customAgentEntry, DEFAULT_AGENT_ID, fallbackAgents, loadAgents } from "../agents/registry";
 import { loadSettings, useSettings } from "../settings/store";
+import { LOCAL_MODEL_AGENTS } from "../lib/private";
 
 export type Agents = {
   readonly list: readonly AgentEntry[];
@@ -42,7 +43,10 @@ export function useAgents(): Agents {
     void load();
   }, []);
 
-  const custom = customAgentEntry(useSettings().settings.customAgent);
-  const all = custom ? [custom, ...list] : list;
+  const { customAgent, keepOnThisMac } = useSettings().settings;
+  const custom = customAgentEntry(customAgent);
+  const every = custom ? [custom, ...list] : list;
+  const local = every.filter((agent) => LOCAL_MODEL_AGENTS.has(agent.id));
+  const all = keepOnThisMac && local.length > 0 ? local : every;
   return { list: all, icons, installed, selected: pick(all, selectedId), select: setSelectedId };
 }

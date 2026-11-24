@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { errorMessage, isRecord, recordField, stringField } from "../lib/guards";
 import { cacheRoot } from "../lib/platform";
+import { keepsToThisMac } from "../lib/private";
 
 const REGISTRY_URL = "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json";
 const CACHE_DIR = join(cacheRoot(), "agents");
@@ -177,7 +178,7 @@ async function cached(): Promise<unknown> {
 export async function loadAgents(): Promise<readonly AgentEntry[]> {
   let json: unknown = null;
   try {
-    json = (await isFresh(REGISTRY_FILE)) ? await cached() : await download();
+    json = keepsToThisMac() || (await isFresh(REGISTRY_FILE)) ? await cached() : await download();
   } catch (err) {
     console.warn(`eleven: using the cached agent list (${errorMessage(err)})`);
     json = await cached();

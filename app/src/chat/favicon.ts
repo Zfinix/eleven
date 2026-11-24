@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { cacheRoot } from "../lib/platform";
+import { keepsToThisMac } from "../lib/private";
 
 const DIR = join(cacheRoot(), "favicons");
 const pending = new Map<string, Promise<string | null>>();
@@ -12,6 +13,7 @@ function fileFor(domain: string): string {
 }
 
 async function download(domain: string, file: string): Promise<string | null> {
+  if (keepsToThisMac()) return null;
   try {
     const response = await fetch(`https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`);
     if (!response.ok) return null;

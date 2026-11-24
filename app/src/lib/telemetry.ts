@@ -7,6 +7,7 @@ import { appVersion } from "../settings/system";
 import { errorMessage, isRecord } from "./guards";
 import { FROM_SOURCE, OS } from "./platform";
 import { supportDir, supportPath } from "./support";
+import { keepsToThisMac } from "./private";
 
 export type CrashKind = "screen" | "exception" | "rejection";
 
@@ -76,6 +77,7 @@ export function crashReport(kind: CrashKind, error: unknown, extra = ""): CrashR
 }
 
 async function post(path: string, body: unknown): Promise<number | null> {
+  if (keepsToThisMac()) return null;
   try {
     const response = await fetch(`${ENDPOINT}/${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(10_000) });
     return response.status;

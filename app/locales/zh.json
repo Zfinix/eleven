@@ -269,6 +269,8 @@
   "settings.forgetAnswers.noneSaved": "没有保存过答复",
   "settings.privacy.agent": "你使用的智能体",
   "settings.privacy.agent.desc": "你发送的代码和问题会传给该智能体的服务商，遵循其隐私条款。本地智能体则把所有数据留在本机。",
+  "settings.keepOnThisMac": "所有内容都留在这台 Mac 上",
+  "settings.keepOnThisMac.desc": "Eleven 自身不发送任何内容:不检查更新、不统计安装、不发送崩溃报告、不下载图标。只提供能在这台 Mac 上运行模型的智能体(Aster、goose、opencode 或你自己的命令);请在它们各自的设置中指向本地模型。",
   "settings.hidePaths": "在路径中隐藏你的用户名",
   "settings.hidePaths.desc": "智能体看到的是 ~/Downloads 而不是 /Users/你的用户名/Downloads。",
   "settings.askBeforeWholeFile": "发送整个文件前先询问",

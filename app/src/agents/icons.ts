@@ -6,10 +6,12 @@ import { ASSETS } from "../lib/assets";
 import { readCachedText } from "./launch";
 import type { AgentEntry } from "./registry";
 import { cacheRoot } from "../lib/platform";
+import { keepsToThisMac } from "../lib/private";
 
 const ICON_DIR = join(cacheRoot(), "agents", "icons");
 
 async function download(url: string, file: string): Promise<string | null> {
+  if (keepsToThisMac()) return null;
   try {
     const response = await fetch(url);
     if (!response.ok) return null;

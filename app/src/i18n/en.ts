@@ -296,6 +296,8 @@ export const en = {
   "settings.privacy.agent": "The agent you use",
   "settings.privacy.agent.desc": "Code and questions you send go to that agent’s provider, under its own privacy terms. Local agents keep everything here.",
   "settings.privacy.noAgent": "None",
+  "settings.keepOnThisMac": "Keep everything on this Mac",
+  "settings.keepOnThisMac.desc": "Eleven sends nothing of its own: no update checks, install counts, crash reports or downloaded icons. Only agents that can run on a model on this Mac are offered (Aster, goose, opencode or your own command); point them at a local model in their own settings.",
   "settings.hidePaths": "Hide your name in paths",
   "settings.hidePaths.desc": "Agents see ~/Downloads instead of /Users/yourname/Downloads.",
   "settings.askBeforeWholeFile": "Ask before sending a whole file",

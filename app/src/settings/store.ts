@@ -102,6 +102,8 @@ export type Settings = {
   readonly countInstall: boolean;
   readonly crashReports: boolean;
   readonly usageStats: boolean;
+  /** Eleven itself sends nothing over the network, and only agents that can run on a local model are offered. */
+  readonly keepOnThisMac: boolean;
   readonly disabledSkills: readonly string[];
   readonly skillsInComposer: boolean;
   readonly ghidraPseudocode: boolean;
@@ -196,6 +198,7 @@ export const DEFAULT_SETTINGS: Settings = {
   countInstall: true,
   crashReports: false,
   usageStats: false,
+  keepOnThisMac: false,
   disabledSkills: [],
   skillsInComposer: true,
   ghidraPseudocode: true,
@@ -309,6 +312,7 @@ const SETTINGS: z.ZodType<Settings> = z.object({
   countInstall: z.boolean().catch(D.countInstall),
   crashReports: z.boolean().catch(D.crashReports),
   usageStats: z.boolean().catch(D.usageStats),
+  keepOnThisMac: z.boolean().catch(D.keepOnThisMac),
   disabledSkills: z.array(z.string()).catch([]),
   skillsInComposer: z.boolean().catch(D.skillsInComposer),
   ghidraPseudocode: z.boolean().catch(D.ghidraPseudocode),
