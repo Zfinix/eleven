@@ -54,6 +54,8 @@ export type UiState = {
   readonly paletteQuery: string;
   /** Set while the palette picks where a call path from this function should end. */
   readonly pathFrom: string | null;
+  /** Set while the palette picks a library from macOS's dyld shared cache to open. */
+  readonly systemPick: boolean;
   readonly comments: ReadonlyMap<string, string>;
   readonly colors: ReadonlyMap<string, string>;
   /** What bytes were marked as, and how numbers show, from the project. */
@@ -141,7 +143,7 @@ export function initialState(panes: readonly Pane[], tree: PaneTree = rowOf(pane
   return {
     panes, tree, focus: 0, seq: 10, filter: "", names: new Map(), bookmarks: [], notes: new Map(), trail, trailTimes, at: trail.length - 1,
     sidebarOpen: true, docks, rightOpen: docks.right.length > 0, bottomOpen: false, right: docks.right[0] ?? "agent", bottom: docks.bottom[0] ?? "refs", showBytes: false, linked: false, breakpoints: new Map(), debugPc: null, navClosed: ["functions"], sizes: loadSizes(), resizing: null, paneDrag: null,
-    renaming: null, pathFrom: null, renameDraft: "", patching: null, patchDraft: "", pickerOpen: false,
+    renaming: null, pathFrom: null, systemPick: false, renameDraft: "", patching: null, patchDraft: "", pickerOpen: false,
     paletteOpen: false, paletteQuery: "",
     comments: new Map(), colors: new Map(), types: new Map(), formats: new Map(), revision: 0, selected: null, commenting: null, commentDraft: "", refsOf: null, toast: null,
     lineRange: null, asking: null, finding: false, findQuery: "", findMode: "text", findAt: 0, groups: [], blockPicks: [], labelling: null, labelDraft: "",

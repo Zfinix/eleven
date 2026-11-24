@@ -19,19 +19,57 @@ import { copyText } from "../chat/useThread";
 import { linkTo, openLink } from "../lib/deepLink";
 import { SANS, scrollbar, useTheme } from "../theme";
 import type { CommandId } from "../keys/commands";
-import { HOVER, MONO_STYLE, overlay, useBench } from "./parts";
+import { type Bench, HOVER, MONO_STYLE, overlay, useBench } from "./parts";
 import { noteTyping, runCommand } from "../lib/shortcuts";
 import { type Combo, comboFor, comboKeys } from "../keys/keymaps";
 import { useSettings } from "../settings/store";
 import { Icon } from "../components/ui";
 import { showAddress } from "../settings/look";
-import { MOD, primaryHeld } from "../lib/platform";
+import { cacheRoot, MOD, OS, primaryHeld } from "../lib/platform";
+import { freeBytes, isUnpacked, removeUnpacked, systemCache, systemLibraries, unpack, unpackedDir, unpackedEstimate } from "../engine/dyldCache";
+import { join } from "node:path";
 import { type PlainId, t } from "../i18n";
 
 const MAX_RECENT = 3;
 const MAX_FUNCTIONS = 6;
 const MAX_DATA = 6;
 const MAX_PATH_ENDS = 12;
+const MAX_LIBRARIES = 14;
+
+const listed = new Map<string, readonly string[]>();
+
+/** The unpacked libraries, listed once per folder: there are thousands. */
+function librariesIn(dir: string): readonly string[] {
+  const known = listed.get(dir);
+  if (known) return known;
+  const found = systemLibraries(dir);
+  listed.set(dir, found);
+  return found;
+}
+
+function gigabytes(bytes: number): string {
+  return (bytes / 1e9).toFixed(1);
+}
+
+/** Unpacks the cache with progress in a toast, then says how to open a library. */
+function unpackSystem(bench: Bench, cache: string): void {
+  const { wb, chat } = bench;
+  chat.thread.note(t("workbench.system.unpacking"));
+  void (async (): Promise<void> => {
+    let shown = -1;
+    try {
+      const dir = await unpack(cache, (done, total) => {
+        const percent = Math.floor((done / total) * 100);
+        if (percent - shown < 5 && done !== total) return;
+        shown = percent;
+        wb.notify(t("workbench.system.progress", { percent }), null);
+      });
+      chat.thread.note(t("workbench.system.unpacked", { count: librariesIn(dir).length.toLocaleString("en-US") }));
+    } catch (err) {
+      chat.thread.note(t("workbench.system.failed", { error: errorMessage(err) }));
+    }
+  })();
+}
 
 type Kind = "fn" | "str" | "imp" | "seg" | "ai" | "act";
 
@@ -124,6 +162,8 @@ function useActions(): readonly Action[] {
     { section: "view", icon: "sidebar", label: t("workbench.palette.toggleSidebar"), command: null, run: () => wb.patch({ paletteOpen: false, sidebarOpen: !s.sidebarOpen }) },
     { section: "view", icon: "thread", label: t("workbench.palette.toggleAgent"), command: "agent", run: () => { close(); wb.toggleTool("agent"); } },
     { section: "file", icon: "references", label: t("workbench.palette.compare"), command: null, run: openCompare },
+    ...(OS === "mac" ? [{ section: "file", icon: "library", label: t("workbench.palette.systemLibrary"), command: null, run: () => wb.patch({ systemPick: true, paletteQuery: "" }) } as const] : []),
+    ...(OS === "mac" && systemCache() !== null && isUnpacked(systemCache() ?? "") ? [{ section: "file", icon: "close", label: t("workbench.palette.removeSystem"), command: null, run: () => { close(); void (async (): Promise<void> => { await removeUnpacked(systemCache() ?? ""); chat.thread.note(t("workbench.system.removed")); })(); } } as const] : []),
     { section: "file", icon: "shield-alert", label: t("workbench.palette.guesses"), command: null, run: () => { close(); wb.open({ kind: "guesses" }, false); } },
     { section: "file", icon: "note", label: t("workbench.palette.notebook"), command: null, run: () => { close(); wb.open({ kind: "notebook" }, false); } },
     { section: "file", icon: "debug", label: t("workbench.palette.openCrash"), command: null, run: () => {
@@ -200,6 +240,22 @@ function useGroups(query: string): readonly Group[] {
   };
   const matches = (...texts: readonly string[]): boolean => !query || texts.some((text) => text.toLowerCase().includes(query));
   const hits = useMemo(() => searchProjects(query, listProjects(), loadProject, program.id), [query, program.id]);
+  const systemCacheFile = OS === "mac" ? systemCache() : null;
+  const libraries = useMemo(() => (wb.s.systemPick && systemCacheFile && isUnpacked(systemCacheFile) ? librariesIn(unpackedDir(systemCacheFile)) : []), [wb.s.systemPick, systemCacheFile]);
+  if (wb.s.systemPick) {
+    if (!systemCacheFile) return [{ title: t("workbench.system.title"), options: [option("system:none", "act", "library", t("workbench.system.noCache"), close)] }];
+    if (!isUnpacked(systemCacheFile)) {
+      const size = gigabytes(unpackedEstimate(systemCacheFile));
+      const free = gigabytes(freeBytes(cacheRoot()));
+      return [{ title: t("workbench.system.title"), options: [option("system:unpack", "act", "download", t("workbench.system.unpack", { size, free }), () => { close(); unpackSystem(bench, systemCacheFile); }, { note: t("workbench.system.unpackNote") })] }];
+    }
+    const picked = libraries.filter((path) => matches(path)).slice(0, MAX_LIBRARIES).map((path) =>
+      option(`system:${path}`, "act", "library", path.split("/").pop() ?? path, () => {
+        close();
+        chat.choose(join(unpackedDir(systemCacheFile), path));
+      }, { note: path, mono: true }));
+    return [{ title: t("workbench.system.pick", { count: libraries.length.toLocaleString("en-US") }), options: picked }];
+  }
   const pathFrom = wb.s.pathFrom;
   if (pathFrom !== null) {
     const ends = program.functions.filter((f) => f.addr !== pathFrom && matches(nameOf(f.addr), f.addr)).slice(0, MAX_PATH_ENDS);
@@ -291,7 +347,7 @@ export function Palette(): ReactElement {
   const query = wb.s.paletteQuery.trim().toLowerCase();
   const close = (): void => wb.patch({ paletteOpen: false });
   const groups = useGroups(query);
-  useEffect(() => () => wb.patch({ pathFrom: null }), []);
+  useEffect(() => () => wb.patch({ pathFrom: null, systemPick: false }), []);
   const all = groups.flatMap((group) => group.options);
   const current = Math.min(active, Math.max(0, all.length - 1));
   useEffect(() => setActive(0), [query]);
@@ -341,7 +397,7 @@ export function Palette(): ReactElement {
       <div onMouseDownOutside={close} role="dialog" aria-label={t("workbench.palette.title")} style={{ display: "flex", flexDirection: "column", flexGrow: 1, maxWidth: 620, marginLeft: 16, marginRight: 16, borderWidth: 1, borderColor: p.line3, borderRadius: 14, backgroundColor: p.raised2, overflow: "hidden", boxShadow: { offsetX: 0, offsetY: 24, blurRadius: 60, spreadRadius: 0, color: shadow } }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, height: 52, flexShrink: 0, paddingLeft: 16, paddingRight: 16, borderBottomWidth: 1, borderColor: p.line2 }}>
           <Icon name="search" size={17} color={p.muted} />
-          <input autoFocus value={wb.s.paletteQuery} placeholder={wb.s.pathFrom === null ? t("workbench.palette.placeholder") : t("workbench.palette.pathPlaceholder")} aria-label={t("workbench.palette.search")} onChange={(e) => wb.patch({ paletteQuery: e.value ?? "" })} onKeyDown={onKey} onSubmit={() => {
+          <input autoFocus value={wb.s.paletteQuery} placeholder={wb.s.systemPick ? t("workbench.palette.systemPlaceholder") : wb.s.pathFrom === null ? t("workbench.palette.placeholder") : t("workbench.palette.pathPlaceholder")} aria-label={t("workbench.palette.search")} onChange={(e) => wb.patch({ paletteQuery: e.value ?? "" })} onKeyDown={onKey} onSubmit={() => {
             if (inTab.current) inTab.current = false;
             else submit(false);
           }} style={{ flexGrow: 1, fontSize: 15, color: p.text }} />
