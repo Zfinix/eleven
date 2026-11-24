@@ -19,3 +19,10 @@ run("a file that isn't Hermes bytecode fails with hermes-dec's own reason", asyn
   writeFileSync(fake, "not hermes at all");
   await expect(decompileHermes(fake)).rejects.toThrow("magic header");
 }, 60_000);
+
+run("real Hermes bytecode decompiles, closures included", async () => {
+  const out = await decompileHermes(join(import.meta.dir, "fixtures", "hermes", "app.hbc"));
+  expect(out.preview).toContain("Original name: checkPin");
+  expect(out.preview).toContain("'4821'");
+  expect(out.preview).toContain("Original name: next");
+}, 60_000);
