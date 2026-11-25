@@ -175,6 +175,9 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
   const requested = useRef(new Set<string>());
   const prompted = useRef(false);
   const adopted = useRef<{ readonly from: string; readonly path: string } | null>(null);
+  const agentKey = useRef<string | null>(null);
+  const commandKey = useRef(native?.path);
+  const targetKey = useRef(target?.path);
   const tools = useRef(new Map<string, string>());
   const latest = useRef({ target, onTarget });
   latest.current = { target, onTarget };
@@ -216,6 +219,13 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
     prompted.current = false;
   };
 
+  /** The first run only records the agent, so mounting keeps the startup rule it had. */
+  const agentChanged = (): boolean => {
+    const changed = agentKey.current !== null && agentKey.current !== agent.id;
+    agentKey.current = agent.id;
+    return changed;
+  };
+
   useEffect(() => stopSession, []);
 
   useEffect(() => {
@@ -223,18 +233,23 @@ export function useThread(agent: AgentEntry, native: NativeCommand | null, targe
   }, [live]);
 
   useEffect(() => {
-    dispatch({ type: "switchAgent" });
-  }, [agent.id, native?.path]);
-
-  useEffect(() => {
     opened.current = null;
     requested.current.clear();
     dispatch({ type: "retarget" });
+    const switched = agentChanged();
+    const commandArrived = commandKey.current !== native?.path;
+    commandKey.current = native?.path;
+    const retargeted = targetKey.current !== target?.path;
+    targetKey.current = target?.path;
     const agentOpenedIt = target !== null && target.path === adopted.current?.path;
     adopted.current = null;
-    if (agentOpenedIt) return;
+    // A late command replaces this file's session; a file the agent opened keeps its turn running.
+    const restart = commandArrived && session.current !== null && !retargeted;
+    if (agentOpenedIt && !switched) return;
+    // Cleared only when the session is replaced, so a kept turn stays busy.
+    if (switched || commandArrived) dispatch({ type: "switchAgent" });
     stopSession();
-    if (live && (target === null || currentSettings().startAgentWithProject)) ensureSession();
+    if (live && (switched || restart || target === null || currentSettings().startAgentWithProject)) ensureSession();
   }, [agent.id, native?.path, target?.path]);
 
   useEffect(() => {
